@@ -9,9 +9,13 @@ class ExcelReader:
     def get_data(self):
         return self.data
     
-order = ExcelReader("order_excel/A442出貨單資料20250426_250425200051.xls")
-data_frame = order.get_data()
-for index, row in data_frame.iterrows():
-    tcat_number = row['查貨號碼']
-    if not pd.isna(tcat_number):
-        Tcat.order_status(int(tcat_number))
+# order = ExcelReader("order_excel/A442出貨單資料20250426_250425200051.xls")
+# data_frame = order.get_data()
+# processed = []
+# for index, row in data_frame.iterrows():
+#     tcat_number = row['查貨號碼']
+#     if not pd.isna(tcat_number):
+#         if tcat_number not in processed:
+#             processed.append(tcat_number)
+#             Tcat.order_status(int(tcat_number))
+
