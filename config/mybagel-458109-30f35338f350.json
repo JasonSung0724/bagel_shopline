@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "mybagel-458109",
+  "private_key_id": "30f35338f3500b076e08491348a19ff7ff58513d",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCwjs73+we1b7kx\nRsD0HVES14h+1b7WMg96qP9YgSHlaTdIqmMs70dBy/nO0zYeg+kILIaPGxsfJBhL\nKhQGeDmMIt637NpnkYAZOHiu6VexmtsFT4pFuY5Rog2WrKFDSg4BbnPDVPvWGO2l\nWTR3MXOyPPvrxBcMXHz2NgSBtKNtpU6jZpiloL2NbEuuxSPNH0pz2obMwZCHIb3O\nJ6h/kyjpjqdOZsHnbQIN4ARVJjPQts5OTV8JsuM7rxwrWWQCb+U8R34ykeW8Qz6A\n9iC6VklBfD1lb8TXov2PWpGBVCUd6n0hjKABqzpeEP4SbZ8a5ylnJ6/6dGHRoRpD\nLP8KuWHbAgMBAAECggEAJtekLOYrMf1cTrz0IkB4355PRygbDeCBi0i2tG/kVyYo\npXHm07HoiU8orBnHZDs8/zFcgQtDkjxMo+yj7zBv6KabPPd8rSBTgDjuQ/zN8CLT\nYH25O9Gwv8DZIHbmG3mlTydPjH+bz+Q4FBJl+nsEqwfDnIDNWUjXrQsBPs/QzIQd\nfoWJ7qqlOBOO2UGRJlUPBUhScd3L+iLgHT7k6fwhxU//QCvgGJwtvGRDwwIsDNDD\nRRYfRYBjxJd++sWjkfoBsYF2QniooUme1QHLGgC8m35z3oRJXF15q9kPNx/6lnHs\nM1W77Apmn2XW7WRtsXRwr38bKL2Yd6ZBh+P8GY6MAQKBgQDuBODGWV4bAN9tb5qB\nRPwjwgGSsMH6OrOXZ5EgMLRxa+GEja5QxtGM1TPOVGWjbES91KWGpr8Vylh69u27\nacdui4UpT3IZBV6ex9f2GeBWxAO6u50zcTPOPHOyNofOPbTWtjENq/Q8qdYIMMgz\nDRGw8G6FRIUyBY7bLiH/jrwU2wKBgQC95VBMT4ReP4xaxRt24+4SzWpymMfELh/F\nvLhfK6jr82ZjM9z6Z6kEW1Ti4lsW/2bgd4AQ/33Y7lC0+s95cb7OVzcGg+cIhCSl\n/1kKxuL9vjlrGi1WMQK7rQ09rXZoTeT+JSc9yWeKcDfdf7fDGA8IG4jJ+yHW9iy3\nf3qA0vr3AQKBgFiC4d+Azjj2ex+kF+2obKcTdyhIqOnXuH8+GT7CPefLuWJkmYUa\nWkSn6Ar7YYyDL5D0KdXH3llJFNwtRTyjWnFmWs+A5qodUBF1uX6gIsfBPq3LJOtD\nVoOEAXYtRxVP5xbNS7KM1ldUxO3ozhoF6yVEU6UlVO7EGFqzbhstxg1vAoGBALYC\nN++ce5PWNxG9QLC4kLTG3FNQapB3YQ6m7tSRRUw6NBW7XP9JIe/CFl+Mc6BcVd+p\nyj8Akz+8U/DTQM73HdoqL9x3ypYYCgRs9YxlyqVIkUI9idzGBweZO0q1mvsoRebt\n92m6RBqlqnYL9zbwNWAg/AAUS3/83ilW7zTQg6kBAoGASTw5pgqlAv3WRHZdIZZS\nEjOfCFH5noMLuBPy5b9tAaj9JUA9kXOrQDKkZnRXq8Fk0Qm7ondZdX/aeGPcIK2g\n/e2S7SPMlulRJ9h3aeLwRU4CzYQzAI4+QRTHpNdbC1oRpnMhENc1rYVh9LZcFxCt\n9vFARFjf4MkAiH84ebEe9QI=\n-----END PRIVATE KEY-----\n",
+  "client_email": "bagelshopc2c@mybagel-458109.iam.gserviceaccount.com",
+  "client_id": "110575893516256195447",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/bagelshopc2c%40mybagel-458109.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

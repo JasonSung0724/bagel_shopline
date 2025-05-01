@@ -2,3 +2,4 @@ venv/*
 .DS_Store
 *.xls
 __pycache__/*
+result.json
