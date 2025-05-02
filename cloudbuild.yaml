@@ -1,2 +1,7 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'gcr.io/mybagel-458109/mybagel', '.']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/mybagel-458109/mybagel']
 options:
-  logging: CLOUD_LOGGING_ONLY
+  logging: 'CLOUD_LOGGING_ONLY'
