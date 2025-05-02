@@ -3,3 +3,5 @@ venv/*
 *.xls
 __pycache__/*
 result.json
+google-cloud-sdk/*
+*.pyc
