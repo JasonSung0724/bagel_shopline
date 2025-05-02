@@ -16,4 +16,4 @@ class Tcat:
             return status_text
         else:
             print(f"訂單 {order_id} 狀態 : 暫無資料")
-            return "Order not found"
+            return None
