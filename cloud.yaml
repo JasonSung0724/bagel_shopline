@@ -1,6 +1,0 @@
-runtime: python312
-entrypoint: python c2c_main.py
-
-handlers:
-- url: /.*
-  script: auto
