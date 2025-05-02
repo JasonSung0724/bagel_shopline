@@ -95,5 +95,4 @@ def google_sheet_handle(update_orders):
 if __name__ == "__main__":
     fetch_email_by_date()
     order_status = delivery_excel_handle()
-    order_status = {}
     google_sheet_handle(order_status)
