@@ -2,6 +2,7 @@ import pygsheets
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 import pandas as pd
+import datetime
 
 
 class C2CGoogleSheet:
@@ -39,6 +40,25 @@ class C2CGoogleSheet:
 
     def get_worksheet_all_values(self, worksheet):
         return worksheet.get_all_values()
+
+    def find_c2c_track_sheet(self, sheets):
+        current_date = datetime.datetime.now().strftime("%Y%m%d")
+        previous_date = (datetime.datetime.now() - datetime.timedelta(days=31)).strftime("%Y%m%d")
+        print(current_date, previous_date)
+        current_date_found = False
+        previous_date_found = False
+        target_sheets = []
+        for sheet_name in list(sheets.keys()):
+            if not current_date_found and not previous_date_found:
+                if sheet_name.startswith(previous_date + "快電商"):
+                    target_sheets.append(sheet_name)
+                    previous_date_found = True
+                elif sheet_name.startswith(current_date + "快電商"):
+                    target_sheets.append(sheet_name)
+                    current_date_found = True
+            else:
+                break
+        return target_sheets
 
     def update_worksheet(self, worksheet, df):
         try:
