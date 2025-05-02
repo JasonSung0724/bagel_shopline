@@ -9,8 +9,8 @@ def run_task():
     custom_header = request.headers.get('X-Auth')
     if custom_header != 'BagelShopC2C':
         return 'Unauthorized', 401
-    fetch_email_by_date()
-    order_status = delivery_excel_handle()
+    result = fetch_email_by_date()
+    order_status = delivery_excel_handle(result)
     google_sheet_handle(order_status)
     return 'Task completed', 200
 
