@@ -3,6 +3,7 @@ from googleapiclient.discovery import build
 from google.oauth2 import service_account
 import pandas as pd
 import datetime
+from loguru import logger
 
 
 class C2CGoogleSheet:
@@ -19,11 +20,11 @@ class C2CGoogleSheet:
         results = self.service.files().list(q="mimeType='application/vnd.google-apps.spreadsheet'", fields="files(id, name)").execute()
         files = results.get("files", [])
         if not files:
-            print("No files found.")
+            logger.warning("No files found.")
         else:
             file_dict = {}
             for file in files:
-                print(f"Name: {file['name']}, ID: {file['id']}")
+                logger.info(f"Name: {file['name']}, ID: {file['id']}")
                 file_dict[file["name"]] = file["id"]
             return file_dict
 
@@ -44,7 +45,6 @@ class C2CGoogleSheet:
     def find_c2c_track_sheet(self, sheets):
         current_date = datetime.datetime.now().strftime("%Y%m%d")
         previous_date = (datetime.datetime.now() - datetime.timedelta(days=31)).strftime("%Y%m%d")
-        print(current_date, previous_date)
         current_date_found = False
         previous_date_found = False
         target_sheets = []
@@ -74,7 +74,7 @@ class C2CGoogleSheet:
                     if current_value != new_value:
                         cell = worksheet.cell((row_idx + 2, col_idx + 1))
                         cell.value = new_value
-            print("成功更新 Google Sheet")
+            logger.success("成功更新 Google Sheet")
         except Exception as e:
-            print(f"更新 Google Sheet 時發生錯誤: {str(e)}")
+            logger.error(f"更新 Google Sheet 時發生錯誤: {str(e)}")
             raise

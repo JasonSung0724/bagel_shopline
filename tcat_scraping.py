@@ -1,5 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
+from loguru import logger
 
 
 class Tcat:
@@ -12,8 +13,8 @@ class Tcat:
         order_status = soup.find("strong")
         if order_status:
             status_text = order_status.text.strip()
-            print(f"訂單 {order_id} 狀態 : {status_text}")
+            logger.debug(f"訂單 {order_id} 狀態 : {status_text}")
             return status_text
         else:
-            print(f"訂單 {order_id} 狀態 : 暫無資料")
+            logger.warning(f"訂單 {order_id} 狀態 : 暫無資料")
             return None

@@ -5,6 +5,7 @@ from gmail_fetch import GmailConnect
 from excel_hadle import ExcelReader
 from google_drive import C2CGoogleSheet
 from tcat_scraping import Tcat
+from loguru import logger
 
 config = json.load(open("config/field_config.json", "r", encoding="utf-8"))
 
@@ -16,7 +17,7 @@ def fetch_today_email():
     for message in messages:
         data = script.parse_email(message)
         if data:
-            print(data)
+            logger.info(data)
 
 
 def delivery_excel_handle():
@@ -58,27 +59,27 @@ def google_sheet_handle(update_orders):
                         update_status = Tcat.order_status(tcat_number)
                         df.loc[index, config["c2c"]["current_status"]] = update_status
                         if row[config["c2c"]["current_status"]] != update_status:
-                            print(f"只更新該單號的狀態 {row[config['c2c']['customer_order_number']]}")
+                            logger.debug(f"只更新該單號的狀態 {row[config['c2c']['customer_order_number']]}")
                             update_count += 1
                     elif not tcat_number:
                         if row[config["c2c"]["customer_order_number"]] in update_orders:
-                            print(f"更新單號及狀態 {row[config['c2c']['customer_order_number']]}")
+                            logger.debug(f"更新單號及狀態 {row[config['c2c']['customer_order_number']]}")
                             df.loc[index, config["c2c"]["delivery_number"]] = update_orders[row[config["c2c"]["customer_order_number"]]]["tcat_number"]
                             status = update_orders[row[config["c2c"]["customer_order_number"]]]["status"]
                             df.loc[index, config["c2c"]["current_status"]] = status if status else config["c2c"]["status_name"]["no_data"]
                             update_count += 1
                         else:
-                            print(f"逢泰excel中未更新此單號 : {row[config['c2c']['customer_order_number']]}")
+                            logger.debug(f"逢泰excel中未更新此單號 : {row[config['c2c']['customer_order_number']]}")
         except Exception as e:
-            print(f"在Google Sheet處理 {customer_order_number} 訂單時發生錯誤: {e}")
+            logger.warning(f"在Google Sheet處理 {customer_order_number} 訂單時發生錯誤: {e}")
             raise
 
-        print(f"總共更新了 {update_count} 筆資料")
+        logger.success(f"總共更新了 {update_count} 筆資料")
         if update_count > 0:
-            print("正在更新 Google Sheet...")
+            logger.debug("正在更新 Google Sheet...")
             drive.update_worksheet(worksheet, df)
         else:
-            print("沒有需要更新的資料")
+            logger.debug("沒有需要更新的資料")
 
 
 if __name__ == "__main__":

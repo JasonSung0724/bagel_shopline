@@ -95,7 +95,6 @@ class ShopLine:
                 query_params.append(f"{key}={value}")
         query_string = "&".join(query_params)
         full_url = f"{url}?{query_string}"
-        print(full_url)
         response = requests.get(url=full_url, headers=self.header)
         return self.response_handler(response)
 
