@@ -4,7 +4,9 @@ from google.oauth2 import service_account
 import pandas as pd
 import datetime
 from loguru import logger
+import json
 
+config = json.load(open("config/field_config.json", "r", encoding="utf-8"))
 
 class C2CGoogleSheet:
 
@@ -43,21 +45,23 @@ class C2CGoogleSheet:
         return worksheet.get_all_values()
 
     def find_c2c_track_sheet(self, sheets):
-        current_date = datetime.datetime.now().strftime("%Y%m%d")
-        previous_date = (datetime.datetime.now() - datetime.timedelta(days=31)).strftime("%Y%m%d")
+        date_format = "%Y%m"
+        current_date = datetime.datetime.now().strftime(date_format)
+        previous_date = (datetime.datetime.now() - datetime.timedelta(days=31)).strftime(date_format)
         current_date_found = False
         previous_date_found = False
         target_sheets = []
         for sheet_name in list(sheets.keys()):
-            if not current_date_found and not previous_date_found:
-                if sheet_name.startswith(previous_date + "快電商"):
+            if not current_date_found or not previous_date_found:
+                if sheet_name.startswith(previous_date + config["flowtide"]["sheet_name_format"]):
                     target_sheets.append(sheet_name)
                     previous_date_found = True
-                elif sheet_name.startswith(current_date + "快電商"):
+                elif sheet_name.startswith(current_date + config["flowtide"]["sheet_name_format"]):
                     target_sheets.append(sheet_name)
                     current_date_found = True
             else:
                 break
+        logger.info(target_sheets)
         return target_sheets
 
     def update_worksheet(self, worksheet, df):

@@ -6,14 +6,18 @@ from excel_hadle import ExcelReader
 from google_drive import C2CGoogleSheet
 from tcat_scraping import Tcat
 from loguru import logger
+import glob
 
 config = json.load(open("config/field_config.json", "r", encoding="utf-8"))
 
 
-def fetch_today_email():
-    today = datetime.datetime.now().strftime("%d-%b-%Y")
+def fetch_email_by_date():
+    today = datetime.datetime.now()
+    previous_day = (today - datetime.timedelta(days=1))
+    date_format = "%d-%b-%Y"
+    previous_day_str = previous_day.strftime(date_format)
     script = GmailConnect(email="bagelshop2025@gmail.com", password="ciyc avqe zlsu bfcg")
-    messages = script.search_emails(today)
+    messages = script.search_emails(previous_day_str)
     for message in messages:
         data = script.parse_email(message)
         if data:
@@ -21,21 +25,27 @@ def fetch_today_email():
 
 
 def delivery_excel_handle():
-    today = datetime.datetime.now().strftime("%Y%m%d")
-    order = ExcelReader(f"order_excel/A442出貨單資料{today}*.xls")
-    data_frame = order.get_data()
-    processed = []
-    order_status = {}
-    for index, row in data_frame.iterrows():
-        tcat_number = row[config["flowtide"]["tcat_number"]]
-        order_number = row[config["flowtide"]["customer_order_number"]]
-        if not pd.isna(tcat_number):
-            tcat_number = str(int(tcat_number))
-            if tcat_number not in processed:
-                processed.append(tcat_number)
-                status = Tcat.order_status(tcat_number)
-                order_status[order_number] = {"status": status, "tcat_number": tcat_number}
-    return order_status
+    try:
+        today = datetime.datetime.now().strftime("%Y%m%d")
+        file_pattern = f"order_excel/{config['c2c']['order_name_format']}*.xls"
+        files = glob.glob(file_pattern)
+        order = ExcelReader(files[0])
+        data_frame = order.get_data()
+        processed = []
+        order_status = {}
+        for index, row in data_frame.iterrows():
+            tcat_number = row[config["flowtide"]["tcat_number"]]
+            order_number = row[config["flowtide"]["customer_order_number"]]
+            if not pd.isna(tcat_number):
+                tcat_number = str(int(tcat_number))
+                if tcat_number not in processed:
+                    processed.append(tcat_number)
+                    status = Tcat.order_status(tcat_number)
+                    order_status[order_number] = {"status": status, "tcat_number": tcat_number}
+        return order_status
+    except Exception as e:
+        logger.error(e)
+        return {}
 
 
 def google_sheet_handle(update_orders):
@@ -83,6 +93,7 @@ def google_sheet_handle(update_orders):
 
 
 if __name__ == "__main__":
-    fetch_today_email()
-    order_status = delivery_excel_handle()
+    fetch_email_by_date()
+    # order_status = delivery_excel_handle()
+    order_status = {}
     google_sheet_handle(order_status)
