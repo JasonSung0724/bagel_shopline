@@ -1,0 +1,16 @@
+{
+    "flowtide":{
+        "customer_order_number":"客戶訂單號碼",
+        "tcat_number":"查貨號碼"
+    },
+    "c2c":{
+        "customer_order_number":"平台訂單編號",
+        "delivery_number":"配送編號-已出貨",
+        "current_status":"狀態回填-已送達",
+        "create_date":"建立時間",
+        "status_name":{
+            "success":"順利送達",
+            "no_data":"尚無資料"
+        }
+    }
+}

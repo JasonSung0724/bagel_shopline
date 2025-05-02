@@ -1,6 +1,7 @@
 import pygsheets
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
+import pandas as pd
 
 
 class C2CGoogleSheet:
@@ -38,3 +39,22 @@ class C2CGoogleSheet:
 
     def get_worksheet_all_values(self, worksheet):
         return worksheet.get_all_values()
+
+    def update_worksheet(self, worksheet, df):
+        try:
+            current_values = worksheet.get_all_values()
+            if not current_values:
+                raise ValueError("工作表為空")
+            current_headers = current_values[0]
+            df = df[current_headers]
+            for col_idx, col_name in enumerate(current_headers):
+                for row_idx in range(len(df)):
+                    current_value = current_values[row_idx + 1][col_idx] if row_idx + 1 < len(current_values) else ""
+                    new_value = str(df.iloc[row_idx, col_idx]) if not pd.isna(df.iloc[row_idx, col_idx]) else ""
+                    if current_value != new_value:
+                        cell = worksheet.cell((row_idx + 2, col_idx + 1))
+                        cell.value = new_value
+            print("成功更新 Google Sheet")
+        except Exception as e:
+            print(f"更新 Google Sheet 時發生錯誤: {str(e)}")
+            raise
