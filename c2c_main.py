@@ -18,30 +18,32 @@ def fetch_email_by_date():
     previous_day_str = previous_day.strftime(date_format)
     script = GmailConnect(email="bagelshop2025@gmail.com", password="ciyc avqe zlsu bfcg")
     messages = script.search_emails(previous_day_str)
+    result = []
     for message in messages:
         data = script.parse_email(message)
-        if data:
-            logger.info(data)
+        if data and "attachments" in data and data["attachments"]:
+            logger.info(data["attachments"][0]["filename"])
+            result.append(data)
+    return result
 
 
-def delivery_excel_handle():
+def delivery_excel_handle(excel_data):
     try:
-        today = datetime.datetime.now().strftime("%Y%m%d")
-        file_pattern = f"order_excel/{config['c2c']['order_name_format']}*.xls"
-        files = glob.glob(file_pattern)
-        order = ExcelReader(files[0])
-        data_frame = order.get_data()
         processed = []
         order_status = {}
-        for index, row in data_frame.iterrows():
-            tcat_number = row[config["flowtide"]["tcat_number"]]
-            order_number = row[config["flowtide"]["customer_order_number"]]
-            if not pd.isna(tcat_number):
-                tcat_number = str(int(tcat_number))
-                if tcat_number not in processed:
-                    processed.append(tcat_number)
-                    status = Tcat.order_status(tcat_number)
-                    order_status[order_number] = {"status": status, "tcat_number": tcat_number}
+        for data in excel_data:
+            _file = data["attachments"][0]["file"]
+            order = ExcelReader(_file)
+            data_frame = order.get_data()
+            for index, row in data_frame.iterrows():
+                tcat_number = row[config["flowtide"]["tcat_number"]]
+                order_number = row[config["flowtide"]["customer_order_number"]]
+                if not pd.isna(tcat_number):
+                    tcat_number = str(int(tcat_number))
+                    if tcat_number not in processed:
+                        processed.append(tcat_number)
+                        status = Tcat.order_status(tcat_number)
+                        order_status[order_number] = {"status": status, "tcat_number": tcat_number}
         return order_status
     except Exception as e:
         logger.error(e)
@@ -93,6 +95,6 @@ def google_sheet_handle(update_orders):
 
 
 if __name__ == "__main__":
-    fetch_email_by_date()
-    order_status = delivery_excel_handle()
+    result = fetch_email_by_date()
+    order_status = delivery_excel_handle(result)
     google_sheet_handle(order_status)

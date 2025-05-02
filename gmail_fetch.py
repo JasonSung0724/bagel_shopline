@@ -45,11 +45,6 @@ class GmailConnect:
         self.mail.close()
         self.mail.logout()
 
-    def download_attach(self, file, filename):
-        filepath = os.path.join("order_excel", filename)
-        with open(filepath, "wb") as f:
-            f.write(file)
-
     def parse_email(self, message_id):
         status, data = self.mail.fetch(message_id, "(RFC822)")
         if status != "OK":
@@ -86,9 +81,9 @@ class GmailConnect:
                         filename = self._decode_header_value(filename)
                         attachment_data = part.get_payload(decode=True)
                         if attachment_data:
-                            self.download_attach(file=attachment_data, filename=filename)
                             attachments.append(
                                 {
+                                    "file": attachment_data,
                                     "filename": filename,
                                     "content_type": content_type,
                                     "size": len(attachment_data),
