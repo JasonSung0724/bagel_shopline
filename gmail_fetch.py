@@ -89,9 +89,9 @@ class GmailConnect:
                                     "size": len(attachment_data),
                                 }
                             )
-        if sender_email == "jason870724@gmail.com":
+        if sender_email == "jackliu.workmail@gmail.com":
             for attach in attachments:
-                if attach and "A442" in attach["filename"]:
+                if attach and "A442_QC_" in attach["filename"]:
                     email_data = {
                         "id": message_id.decode("utf-8"),
                         "subject": subject,

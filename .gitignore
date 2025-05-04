@@ -5,3 +5,4 @@ __pycache__/*
 result.json
 google-cloud-sdk/*
 *.pyc
+test.py

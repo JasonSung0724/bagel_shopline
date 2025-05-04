@@ -46,19 +46,10 @@ class C2CGoogleSheet:
 
     def find_c2c_track_sheet(self, sheets):
         date_format = "%Y%m"
-        current_date = datetime.datetime.now().strftime(date_format)
-        previous_date = (datetime.datetime.now() - datetime.timedelta(days=31)).strftime(date_format)
-        current_date_found = False
-        previous_date_found = False
         target_sheets = []
         for sheet_name in list(sheets.keys()):
-            if not current_date_found or not previous_date_found:
-                if sheet_name.startswith(previous_date + config["flowtide"]["sheet_name_format"]):
-                    target_sheets.append(sheet_name)
-                    previous_date_found = True
-                elif sheet_name.startswith(current_date + config["flowtide"]["sheet_name_format"]):
-                    target_sheets.append(sheet_name)
-                    current_date_found = True
+            if sheet_name.startswith(config["flowtide"]["sheet_name_format"]):
+                target_sheets.append(sheet_name)
             else:
                 break
         logger.info(target_sheets)
@@ -66,19 +57,27 @@ class C2CGoogleSheet:
 
     def update_worksheet(self, worksheet, df):
         try:
-            current_values = worksheet.get_all_values()
-            if not current_values:
-                raise ValueError("工作表為空")
-            current_headers = current_values[0]
-            df = df[current_headers]
-            for col_idx, col_name in enumerate(current_headers):
-                for row_idx in range(len(df)):
-                    current_value = current_values[row_idx + 1][col_idx] if row_idx + 1 < len(current_values) else ""
-                    new_value = str(df.iloc[row_idx, col_idx]) if not pd.isna(df.iloc[row_idx, col_idx]) else ""
-                    if current_value != new_value:
-                        cell = worksheet.cell((row_idx + 2, col_idx + 1))
-                        cell.value = new_value
+            headers = worksheet.get_row(1)
+            headers = [col for col in headers if col != ""]
+            if not headers:
+                raise ValueError("工作表為空，無法獲取標題")
+            df = df[headers]
+            max_cols = worksheet.cols
+            if len(df.columns) > max_cols:
+                logger.warning(f"DataFrame 的列數超過工作表的列數，將截斷多餘的列")
+                df = df.iloc[:, :max_cols]
+            data_without_headers = df.values.tolist()
+            num_rows = len(data_without_headers) + 1
+            num_cols = len(df.columns)
+            end_col_letter = chr(64 + num_cols)
+            worksheet.update_values(
+                crange=f"A2:{end_col_letter}{num_rows}",
+                values=data_without_headers
+            )
             logger.success("成功更新 Google Sheet")
         except Exception as e:
             logger.error(f"更新 Google Sheet 時發生錯誤: {str(e)}")
             raise
+
+
+

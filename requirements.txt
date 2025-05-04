@@ -6,3 +6,4 @@ loguru
 google-api-python-client
 pygsheets
 flask
+gspread

@@ -36,65 +36,103 @@ def delivery_excel_handle(excel_data):
             order = ExcelReader(_file)
             data_frame = order.get_data()
             for index, row in data_frame.iterrows():
-                tcat_number = row[config["flowtide"]["tcat_number"]]
-                order_number = row[config["flowtide"]["customer_order_number"]]
-                if not pd.isna(tcat_number):
-                    tcat_number = str(int(tcat_number))
-                    if tcat_number not in processed:
-                        processed.append(tcat_number)
-                        status = Tcat.order_status(tcat_number)
-                        order_status[order_number] = {"status": status, "tcat_number": tcat_number}
+                if row[config["flowtide"]["mark_field"]].startswith(config["flowtide"]["c2c_mark"]):
+                    tcat_number = row[config["flowtide"]["tcat_number"]]
+                    order_number = row[config["flowtide"]["customer_order_number"]]
+                    if not pd.isna(tcat_number):
+                        tcat_number = str(int(tcat_number))
+                        if tcat_number not in processed:
+                            processed.append(tcat_number)
+                            status = Tcat.order_status(tcat_number)
+                            order_status[order_number] = {"status": status, "tcat_number": tcat_number}
         return order_status
     except Exception as e:
         logger.error(e)
         return {}
 
+class GoogleSheetHandle:
 
-def google_sheet_handle(update_orders):
-    drive = C2CGoogleSheet()
-    sheets = drive.get_all_sheets()
-    target_sheets = drive.find_c2c_track_sheet(sheets)
-    for target_sheet in target_sheets:
-        drive.open_sheet(target_sheet)
-        worksheet = drive.get_worksheet(0)
-        all_values = drive.get_worksheet_all_values(worksheet)
-        df = pd.DataFrame(all_values[1:], columns=all_values[0])
-        update_count = 0
-        try:
-            for index, row in df.iterrows():
-                customer_order_number = row[config["c2c"]["customer_order_number"]]
-                if not pd.isna(row[config["c2c"]["customer_order_number"]]) and row[config["c2c"]["customer_order_number"]].strip():
-                    tcat_number = row[config["c2c"]["delivery_number"]] if not pd.isna(row[config["c2c"]["delivery_number"]]) else None
-                    if not tcat_number and row[config["c2c"]["current_status"]] == config["c2c"]["status_name"]["success"]:
-                        continue
-                    elif tcat_number and row[config["c2c"]["current_status"]] != config["c2c"]["status_name"]["success"]:
-                        update_status = Tcat.order_status(tcat_number)
-                        df.loc[index, config["c2c"]["current_status"]] = update_status
-                        if row[config["c2c"]["current_status"]] != update_status:
-                            logger.debug(f"只更新該單號的狀態 {row[config['c2c']['customer_order_number']]}")
-                            update_count += 1
-                    elif not tcat_number:
-                        if row[config["c2c"]["customer_order_number"]] in update_orders:
-                            logger.debug(f"更新單號及狀態 {row[config['c2c']['customer_order_number']]}")
-                            df.loc[index, config["c2c"]["delivery_number"]] = update_orders[row[config["c2c"]["customer_order_number"]]]["tcat_number"]
-                            status = update_orders[row[config["c2c"]["customer_order_number"]]]["status"]
-                            df.loc[index, config["c2c"]["current_status"]] = status if status else config["c2c"]["status_name"]["no_data"]
-                            update_count += 1
-                        else:
-                            logger.debug(f"逢泰excel中未更新此單號 : {row[config['c2c']['customer_order_number']]}")
-        except Exception as e:
-            logger.warning(f"在Google Sheet處理 {customer_order_number} 訂單時發生錯誤: {e}")
-            raise
+    def __init__(self, update_orders):
+        self.drive = C2CGoogleSheet()
+        self.df = None
+        self.sheets = self.drive.get_all_sheets()
+        self.target_sheets = self.drive.find_c2c_track_sheet(self.sheets)
+        self.current_time = datetime.datetime.now().strftime("%Y%m%d")
+        self.update_orders = update_orders
+        self.ship_date_field_name = config["c2c"]["shipping_date"]
+        self.status_field_name = config["c2c"]["current_status"]
+        self.platform_number_field_name = config["c2c"]["customer_order_number"]
+        self.delivery_number_field_name = config["c2c"]["delivery_number"]
+        self.delivery_succeed = config["c2c"]["status_name"]["success"]
+        self.no_data_str = config["c2c"]["status_name"]["no_data"]
+        self.collected_str = config["c2c"]["status_name"]["collected"]
 
-        logger.success(f"總共更新了 {update_count} 筆資料")
-        if update_count > 0:
-            logger.debug("正在更新 Google Sheet...")
-            drive.update_worksheet(worksheet, df)
+    def status_update(self, index, row, new_status):
+        if new_status != self.no_data_str:
+            self.df.loc[index, self.status_field_name] = new_status
+            if new_status == self.collected_str:
+                self.df.loc[index, self.ship_date_field_name] = self.current_time
+            elif new_status == self.delivery_succeed and not row[self.ship_date_field_name]:
+                self.df.loc[index, self.ship_date_field_name] = self.current_time
+            return True
         else:
-            logger.debug("沒有需要更新的資料")
+            if row[self.ship_date_field_name]:
+                self.df.loc[index, self.ship_date_field_name] = ""
+        return False
+
+    def update_data(self, row, index, tcat_number):
+        row_current_status = row[self.status_field_name]
+        row_platform_number = row[self.platform_number_field_name]
+        if tcat_number and row_current_status == self.delivery_succeed:
+            return False
+        elif tcat_number and row_current_status != self.delivery_succeed:
+            update_status = Tcat.order_status(tcat_number)
+            if row_current_status != update_status:
+                is_update = self.status_update(index=index, row=row, new_status=update_status)
+                return is_update
+        elif not tcat_number:
+            if row_platform_number in self.update_orders:
+                logger.debug(f"更新單號及狀態 {row_platform_number}")
+                self.df.loc[index, self.delivery_number_field_name] = self.update_orders[row_platform_number]["tcat_number"]
+                status = self.update_orders[row_platform_number]["status"]
+                self.status_update(index=index, row=row, new_status=status)
+                return True
+            else:
+                logger.debug(f"逢泰excel中未更新此單號 : {row_platform_number}")
+
+    def process_data_scripts(self):
+        for target_sheet in self.target_sheets:
+            self.drive.open_sheet(target_sheet)
+            worksheet = self.drive.get_worksheet(0)
+            all_values = self.drive.get_worksheet_all_values(worksheet)
+            header = all_values[0]
+            header = [col for col in header if col != ""]
+            header_columns_count = len(header)
+            data = [row[:header_columns_count] for row in all_values[1:]]
+            self.df = pd.DataFrame(data, columns=header)
+            self.df = self.df[~(self.df == "").all(axis=1)]
+            self.df = self.df.reset_index(drop=True)
+            update_count = 0
+            try:
+                for index, row in self.df.iterrows():
+                    customer_order_number = row[config["c2c"]["customer_order_number"]]
+                    if not pd.isna(row[self.platform_number_field_name]) and row[self.platform_number_field_name].strip():
+                        tcat_number = row[self.delivery_number_field_name] if not pd.isna(row[self.delivery_number_field_name]) else None
+                        update_count += 1 if self.update_data(row=row, index=index, tcat_number=tcat_number) else 0
+            except Exception as e:
+                logger.warning(f"在Google Sheet處理 {customer_order_number} 訂單時發生錯誤: {e}")
+                raise
+
+            logger.success(f"總共更新了 {update_count} 筆資料")
+            if update_count > 0:
+                logger.debug("正在更新 Google Sheet...")
+                self.drive.update_worksheet(worksheet, self.df)
+            else:
+                logger.debug("沒有需要更新的資料")
 
 
 if __name__ == "__main__":
     result = fetch_email_by_date()
     order_status = delivery_excel_handle(result)
-    google_sheet_handle(order_status)
+    sheet_handel = GoogleSheetHandle(order_status)
+    sheet_handel.process_data_scripts()
