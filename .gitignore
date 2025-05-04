@@ -6,3 +6,4 @@ result.json
 google-cloud-sdk/*
 *.pyc
 test.py
+bagel_shopline.code-workspace

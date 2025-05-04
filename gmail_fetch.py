@@ -5,9 +5,12 @@ import os
 import datetime
 import re
 import base64
+import json
 from email.utils import parsedate_to_datetime
 from loguru import logger
 
+
+config = json.load(open("config/field_config.json", "r", encoding="utf-8"))
 
 class GmailConnect:
 
@@ -89,7 +92,7 @@ class GmailConnect:
                                     "size": len(attachment_data),
                                 }
                             )
-        if sender_email == "jackliu.workmail@gmail.com":
+        if sender_email == config["flowtide"]["sender_email"]:
             for attach in attachments:
                 if attach and "A442_QC_" in attach["filename"]:
                     email_data = {
