@@ -13,7 +13,7 @@ config = json.load(open("config/field_config.json", "r", encoding="utf-8"))
 
 def fetch_email_by_date():
     today = datetime.datetime.now()
-    previous_day = (today - datetime.timedelta(days=1))
+    previous_day = today - datetime.timedelta(days=1)
     date_format = "%d-%b-%Y"
     previous_day_str = previous_day.strftime(date_format)
     script = GmailConnect(email="bagelshop2025@gmail.com", password="ciyc avqe zlsu bfcg")
@@ -50,6 +50,7 @@ def delivery_excel_handle(excel_data):
         logger.error(e)
         return {}
 
+
 class GoogleSheetHandle:
 
     def __init__(self, update_orders):
@@ -70,10 +71,11 @@ class GoogleSheetHandle:
     def status_update(self, index, row, new_status):
         if new_status != self.no_data_str:
             self.df.loc[index, self.status_field_name] = new_status
-            if new_status == self.collected_str:
-                self.df.loc[index, self.ship_date_field_name] = self.current_time
-            elif new_status == self.delivery_succeed and not row[self.ship_date_field_name]:
-                self.df.loc[index, self.ship_date_field_name] = self.current_time
+            logger.debug(row[self.ship_date_field_name])
+            if pd.isna(row[self.ship_date_field_name]) or row[self.ship_date_field_name].strip() == "":
+                collected_time = Tcat.order_detail_find_collected_time(row[self.delivery_number_field_name])
+                self.df.loc[index, self.ship_date_field_name] = collected_time
+                logger.debug(f"更新 {row[self.platform_number_field_name]} 的集貨時間 {collected_time}")
             return True
         else:
             if row[self.ship_date_field_name]:
@@ -131,8 +133,9 @@ class GoogleSheetHandle:
                 logger.debug("沒有需要更新的資料")
 
 
-# if __name__ == "__main__":
-#     result = fetch_email_by_date()
-#     order_status = delivery_excel_handle(result)
-#     sheet_handel = GoogleSheetHandle(order_status)
-#     sheet_handel.process_data_scripts()
+if __name__ == "__main__":
+    # result = fetch_email_by_date()
+    # order_status = delivery_excel_handle(result)
+    order_status = {}
+    sheet_handel = GoogleSheetHandle(order_status)
+    sheet_handel.process_data_scripts()
