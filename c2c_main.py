@@ -70,13 +70,15 @@ class GoogleSheetHandle:
 
     def status_update(self, index, row, new_status):
         if new_status != self.no_data_str:
-            self.df.loc[index, self.status_field_name] = new_status
-            logger.debug(row[self.ship_date_field_name])
-            if pd.isna(row[self.ship_date_field_name]) or row[self.ship_date_field_name].strip() == "":
-                collected_time = Tcat.order_detail_find_collected_time(row[self.delivery_number_field_name])
-                self.df.loc[index, self.ship_date_field_name] = collected_time
-                logger.debug(f"更新 {row[self.platform_number_field_name]} 的集貨時間 {collected_time}")
-            return True
+            if row[self.status_field_name] != new_status or pd.isna(row[self.ship_date_field_name]) or row[self.ship_date_field_name].strip() == "":
+                if row[self.status_field_name] != new_status:
+                    self.df.loc[index, self.status_field_name] = new_status
+                if pd.isna(row[self.ship_date_field_name]) or row[self.ship_date_field_name].strip() == "":
+                    collected_time = Tcat.order_detail_find_collected_time(row[self.delivery_number_field_name])
+                    self.df.loc[index, self.ship_date_field_name] = collected_time
+                    logger.debug(f"更新 {row[self.platform_number_field_name]} 的集貨時間 {collected_time}")
+                return True
+            return False
         else:
             if row[self.ship_date_field_name]:
                 self.df.loc[index, self.ship_date_field_name] = ""
@@ -86,12 +88,11 @@ class GoogleSheetHandle:
         row_current_status = row[self.status_field_name]
         row_platform_number = row[self.platform_number_field_name]
         if tcat_number and row_current_status == self.delivery_succeed:
-            return False
+            return self.status_update(index=index, row=row, new_status=self.delivery_succeed)
         elif tcat_number and row_current_status != self.delivery_succeed:
             update_status = Tcat.order_status(tcat_number)
-            if row_current_status != update_status:
-                is_update = self.status_update(index=index, row=row, new_status=update_status)
-                return is_update
+            is_update = self.status_update(index=index, row=row, new_status=update_status)
+            return is_update
         elif not tcat_number:
             if row_platform_number in self.update_orders:
                 logger.debug(f"更新單號及狀態 {row_platform_number}")
@@ -134,8 +135,8 @@ class GoogleSheetHandle:
 
 
 if __name__ == "__main__":
-    # result = fetch_email_by_date()
-    # order_status = delivery_excel_handle(result)
+    result = fetch_email_by_date()
+    order_status = delivery_excel_handle(result)
     order_status = {}
     sheet_handel = GoogleSheetHandle(order_status)
     sheet_handel.process_data_scripts()
