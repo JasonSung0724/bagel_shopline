@@ -19,11 +19,12 @@ def fetch_email_by_date():
     script = GmailConnect(email="bagelshop2025@gmail.com", password="ciyc avqe zlsu bfcg")
     messages = script.search_emails(previous_day_str)
     result = []
-    for message in messages:
-        data = script.parse_email(message)
-        if data and "attachments" in data and data["attachments"]:
-            logger.info(data["attachments"][0]["filename"])
-            result.append(data)
+    if messages:
+        for message in messages:
+            data = script.parse_email(message)
+            if data and "attachments" in data and data["attachments"]:
+                logger.info(data["attachments"][0]["filename"])
+                result.append(data)
     return result
 
 
@@ -134,8 +135,8 @@ class GoogleSheetHandle:
                 logger.debug("沒有需要更新的資料")
 
 
-# if __name__ == "__main__":
-#     result = fetch_email_by_date()
-#     order_status = delivery_excel_handle(result)
-#     sheet_handel = GoogleSheetHandle(order_status)
-#     sheet_handel.process_data_scripts()
+if __name__ == "__main__":
+    result = fetch_email_by_date()
+    order_status = delivery_excel_handle(result)
+    sheet_handel = GoogleSheetHandle(order_status)
+    sheet_handel.process_data_scripts()

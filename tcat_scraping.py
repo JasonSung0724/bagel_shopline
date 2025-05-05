@@ -52,7 +52,7 @@ class Tcat:
             session.close()
 
     @classmethod
-    def order_detail_find_collected_time(cls, order_id, retry=3):
+    def order_detail_find_collected_time(cls, order_id, retry=2):
         url = f"https://www.t-cat.com.tw/Inquire/TraceDetail.aspx?BillID={order_id}"
         session = cls._create_session()
         try:
