@@ -50,8 +50,6 @@ class C2CGoogleSheet:
         for sheet_name in list(sheets.keys()):
             if sheet_name.startswith(config["flowtide"]["sheet_name_format"]):
                 target_sheets.append(sheet_name)
-            else:
-                break
         logger.info(target_sheets)
         return target_sheets
 

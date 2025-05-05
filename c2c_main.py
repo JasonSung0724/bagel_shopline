@@ -131,8 +131,8 @@ class GoogleSheetHandle:
                 logger.debug("沒有需要更新的資料")
 
 
-# if __name__ == "__main__":
-#     result = fetch_email_by_date()
-#     order_status = delivery_excel_handle(result)
-#     sheet_handel = GoogleSheetHandle(order_status)
-#     sheet_handel.process_data_scripts()
+if __name__ == "__main__":
+    result = fetch_email_by_date()
+    order_status = delivery_excel_handle(result)
+    sheet_handel = GoogleSheetHandle(order_status)
+    sheet_handel.process_data_scripts()
