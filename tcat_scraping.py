@@ -52,14 +52,46 @@ class Tcat:
             session.close()
 
     @classmethod
-    def order_detail_find_collected_time(cls, order_id, retry=2):
-        url = f"https://www.t-cat.com.tw/Inquire/TraceDetail.aspx?BillID={order_id}"
+    def current_state_update_time(cls, order_id):
+        url = f"https://www.t-cat.com.tw/Inquire/Trace.aspx?method=result&billID={order_id}"
         session = cls._create_session()
         try:
             response = session.get(url, timeout=10, headers=cls.headers)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")
-            template = soup.find("div", id="template")
+            list_box = soup.find("ul", class_="order-list")
+            if list_box:
+                status_element = list_box.find_all("div", class_="col-2")
+                update_time = status_element[2]
+                if update_time:
+                    update_time_text = update_time.text.strip()
+                    try:
+                        dt = datetime.datetime.strptime(update_time_text, "%Y/%m/%d %H:%M")
+                        formatted_date = dt.strftime("%Y%m%d")
+                        return formatted_date
+                    except ValueError as e:
+                        logger.error(f"時間格式轉換錯誤: {e}")
+                        return ""
+            logger.warning(f"無法爬蟲到該訂單的更新時間 {order_id}")
+            return ""
+        except Exception as e:
+            logger.error(f"查詢訂單 {order_id} 更新時間時發生錯誤: {str(e)}")
+            return ""
+        finally:
+            session.close()
+
+
+    @classmethod
+    def order_detail_find_collected_time(cls, order_id, retry=2, current_state=None):
+        url = f"https://www.t-cat.com.tw/Inquire/TraceDetail.aspx?BillID={order_id}"
+        session = cls._create_session()
+        try:
+            if config["c2c"]["status_name"]["collected"] == current_state:
+                return cls.current_state_update_time(order_id)
+            response = session.get(url, timeout=10, headers=cls.headers)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            template = soup.find_all("div", id="template")
             if template:
                 span = soup.find("span", string=config["c2c"]["status_name"]["collected"])
                 if span:
@@ -73,6 +105,7 @@ class Tcat:
                     except ValueError as e:
                         logger.error(f"時間格式轉換錯誤: {e}")
                         return ""
+            logger.warning(f"無法爬蟲到該訂單的集貨時間 {order_id}")
             return ""
         except Exception as e:
             logger.error(f"查詢訂單 {order_id} 收件時間時發生錯誤: {str(e)}")

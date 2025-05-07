@@ -16,8 +16,9 @@ def fetch_email_by_date():
     previous_day = today - datetime.timedelta(days=1)
     date_format = "%d-%b-%Y"
     previous_day_str = previous_day.strftime(date_format)
+    today_str = today.strftime(date_format)
     script = GmailConnect(email="bagelshop2025@gmail.com", password="ciyc avqe zlsu bfcg")
-    messages = script.search_emails(previous_day_str)
+    messages = script.search_emails(today_str)
     result = []
     if messages:
         for message in messages:
@@ -75,9 +76,9 @@ class GoogleSheetHandle:
                 if row[self.status_field_name] != new_status:
                     self.df.loc[index, self.status_field_name] = new_status
                 if pd.isna(row[self.ship_date_field_name]) or row[self.ship_date_field_name].strip() == "":
-                    collected_time = Tcat.order_detail_find_collected_time(row[self.delivery_number_field_name])
+                    collected_time = Tcat.order_detail_find_collected_time(row[self.delivery_number_field_name], current_state=new_status)
                     self.df.loc[index, self.ship_date_field_name] = collected_time
-                    logger.debug(f"更新 {row[self.platform_number_field_name]} 的集貨時間 {collected_time}")
+                    logger.debug(f"更新 {row[self.delivery_number_field_name]} 的集貨時間 {collected_time}")
                 return True
             return False
         else:
@@ -114,7 +115,6 @@ class GoogleSheetHandle:
             header_columns_count = len(header)
             data = [row[:header_columns_count] for row in all_values[1:]]
             self.df = pd.DataFrame(data, columns=header)
-            self.df = self.df[~(self.df == "").all(axis=1)]
             self.df = self.df.reset_index(drop=True)
             update_count = 0
             try:

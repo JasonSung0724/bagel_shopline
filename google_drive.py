@@ -59,23 +59,27 @@ class C2CGoogleSheet:
             headers = [col for col in headers if col != ""]
             if not headers:
                 raise ValueError("工作表為空，無法獲取標題")
-            df = df[headers]
-            max_cols = worksheet.cols
-            if len(df.columns) > max_cols:
-                logger.warning(f"DataFrame 的列數超過工作表的列數，將截斷多餘的列")
-                df = df.iloc[:, :max_cols]
-            data_without_headers = df.values.tolist()
+
+            protected_columns = 12
+            unprotected_headers = headers[protected_columns:]
+            if not unprotected_headers:
+                raise ValueError("無可更新的未受保護欄位")
+            df = df[unprotected_headers]
+            data_without_headers = []
+            for index, row in df.iterrows():
+                if row[config["c2c"]["delivery_number"]] == "":
+                    data_without_headers.append([""] * len(unprotected_headers))
+                else:
+                    data_without_headers.append(row.tolist())
             num_rows = len(data_without_headers) + 1
-            num_cols = len(df.columns)
-            end_col_letter = chr(64 + num_cols)
+            num_cols = len(df.columns)  
+            start_col_letter = chr(64 + protected_columns + 1)
+            end_col_letter = chr(64 + protected_columns + num_cols)
             worksheet.update_values(
-                crange=f"A2:{end_col_letter}{num_rows}",
+                crange=f"{start_col_letter}2:{end_col_letter}{num_rows}",
                 values=data_without_headers
             )
             logger.success("成功更新 Google Sheet")
         except Exception as e:
             logger.error(f"更新 Google Sheet 時發生錯誤: {str(e)}")
             raise
-
-
-
