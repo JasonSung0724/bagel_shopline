@@ -140,7 +140,7 @@ class GoogleSheetHandle:
         target_rows = len(target_sheet_data_filtered)
         backup_rows = len(backup_data_filtered)
         if target_rows == backup_rows:
-            message = f"有效行數相同, 正式表{target_rows}行, 備份表{backup_rows})行"
+            message = f"有效行數相同, 正式表{target_rows}行, 備份表{backup_rows}行"
             logger.info(message)
             return True, message
         else:
@@ -150,6 +150,7 @@ class GoogleSheetHandle:
 
 
     def process_data_scripts(self):
+        notify = False
         for target_sheet in self.target_sheets:
 
             backup_sheet_name = config["flowtide"]["backup_sheet_name_format"]
@@ -176,6 +177,7 @@ class GoogleSheetHandle:
                         update_count += 1 if self.update_data(row=row, index=index, tcat_number=tcat_number) else 0
             except Exception as e:
                 logger.warning(f"在Google Sheet處理 {customer_order_number} 訂單時發生錯誤: {e}")
+                line_push_message(message=f"在Google Sheet處理 {customer_order_number} 訂單時發生錯誤: {e}")
                 raise
 
             logger.success(f"總共更新了 {update_count} 筆資料")
@@ -183,9 +185,12 @@ class GoogleSheetHandle:
                 logger.debug("正在更新 Google Sheet...")
                 if self.drive.update_worksheet(original_worksheet, self.df):
                     result, message = self.check_result(target_sheet, backup_sheet_name)
-                    line_push_message(message=f"成功更新了 {update_count} 筆資料\n{message}")
+                    has_flowtide_excel = "今天有收到逢泰Excel" if self.update_orders else "今天(沒有)收到逢泰Excel"
+                    logger.success(f"成功更新了 {update_count} 筆資料\n{message}\n{has_flowtide_excel}")
+                    notify = line_push_message(message=f"{has_flowtide_excel}\n成功更新了 {update_count} 筆資料\n{message}")
             else:
-                line_push_message(message="執行完畢 沒有更新任何資料")
+                if not notify:
+                    notify = line_push_message(message="執行完畢 沒有更新任何資料")
                 logger.debug("沒有需要更新的資料")
     
     
