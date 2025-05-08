@@ -80,6 +80,7 @@ class C2CGoogleSheet:
                 values=data_without_headers
             )
             logger.success("成功更新 Google Sheet")
+            return True
         except Exception as e:
             logger.error(f"更新 Google Sheet 時發生錯誤: {str(e)}")
             raise

@@ -7,30 +7,31 @@ from google_drive import C2CGoogleSheet
 from tcat_scraping import Tcat
 from loguru import logger
 import glob
+import requests
+from linebot.v3.messaging import Configuration, ApiClient, MessagingApi
+from linebot.v3.messaging import TextMessage, PushMessageRequest
 
 config = json.load(open("config/field_config.json", "r", encoding="utf-8"))
 
-# def line_push_message(message):
-#     url = 'https://api.line.me/v2/bot/message/push'
-#     headers = {
-#         'Content-Type': 'application/json',
-#         'Authorization': 'Bearer {YOUR_CHANNEL_ACCESS_TOKEN}'
-#     }
-#     data = {
-#         'to': user_id,
-#         'messages': [
-#             {
-#                 'type': 'text',
-#                 'text': message
-#             }
-#         ]
-#     }
-#     response = requests.post(url, headers=headers, data=json.dumps(data))
 
-#     print(f"Status Code: {response.status_code}")
-#     print(f"Response: {response.text}")
-
-#     return response.status_code
+def line_push_message(message):
+    with open("config/config.json", "r") as f:
+        settings = json.load(f)
+    token = settings["line_access_token"]
+    configuration = Configuration(access_token=token)
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
+        try:
+            push_message_request = PushMessageRequest(
+                to=settings["group_id"],
+                messages=[TextMessage(text=message)]
+            )
+            response = line_bot_api.push_message(push_message_request)
+            print(f"訊息已成功發送: {response}")
+            return True
+        except Exception as e:
+            print(f"發送訊息時發生錯誤: {e}")
+            return False
 
 
 def fetch_email_by_date():
@@ -126,6 +127,27 @@ class GoogleSheetHandle:
                 return True
             else:
                 logger.debug(f"逢泰excel中未更新此單號 : {row_platform_number}")
+    
+    def check_result(self, target_sheet, backup_sheet):
+        self.drive.open_sheet(target_sheet)
+        target_worksheet = self.drive.get_worksheet(0)
+        target_sheet_data = target_worksheet.get_all_values()
+        self.drive.open_sheet(backup_sheet)
+        backup_worksheet = self.drive.get_worksheet(0)
+        backup_data = backup_worksheet.get_all_values()
+        target_sheet_data_filtered = [row for row in target_sheet_data if any(cell.strip() if isinstance(cell, str) else cell for cell in row)]
+        backup_data_filtered = [row for row in backup_data if any(cell.strip() if isinstance(cell, str) else cell for cell in row)]
+        target_rows = len(target_sheet_data_filtered)
+        backup_rows = len(backup_data_filtered)
+        if target_rows == backup_rows:
+            message = f"有效行數相同, 正式表{target_rows}行, 備份表{backup_rows})行"
+            logger.info(message)
+            return True, message
+        else:
+            message = f"有效行數不同, 正式表{target_rows}行，備份表{backup_rows}行"
+            logger.info(message)
+            return False, message
+
 
     def process_data_scripts(self):
         for target_sheet in self.target_sheets:
@@ -159,9 +181,14 @@ class GoogleSheetHandle:
             logger.success(f"總共更新了 {update_count} 筆資料")
             if update_count > 0:
                 logger.debug("正在更新 Google Sheet...")
-                self.drive.update_worksheet(original_worksheet, self.df)
+                if self.drive.update_worksheet(original_worksheet, self.df):
+                    result, message = self.check_result(target_sheet, backup_sheet_name)
+                    line_push_message(message=f"成功更新了 {update_count} 筆資料\n{message}")
             else:
+                line_push_message(message="執行完畢 沒有更新任何資料")
                 logger.debug("沒有需要更新的資料")
+    
+    
 
 
 if __name__ == "__main__":
