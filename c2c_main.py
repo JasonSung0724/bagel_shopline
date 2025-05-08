@@ -181,16 +181,16 @@ class GoogleSheetHandle:
                 raise
 
             logger.success(f"總共更新了 {update_count} 筆資料")
+            has_flowtide_excel = "今天有收到逢泰Excel" if self.update_orders else "今天(沒有)收到逢泰Excel"
             if update_count > 0:
                 logger.debug("正在更新 Google Sheet...")
                 if self.drive.update_worksheet(original_worksheet, self.df):
                     result, message = self.check_result(target_sheet, backup_sheet_name)
-                    has_flowtide_excel = "今天有收到逢泰Excel" if self.update_orders else "今天(沒有)收到逢泰Excel"
                     logger.success(f"成功更新了 {update_count} 筆資料\n{message}\n{has_flowtide_excel}")
                     notify = line_push_message(message=f"{has_flowtide_excel}\n成功更新了 {update_count} 筆資料\n{message}")
             else:
                 if not notify:
-                    notify = line_push_message(message="執行完畢 沒有更新任何資料")
+                    notify = line_push_message(message=f"\n{has_flowtide_excel}\n執行完畢 沒有更新任何資料")
                 logger.debug("沒有需要更新的資料")
     
     
