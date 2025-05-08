@@ -107,9 +107,16 @@ class GoogleSheetHandle:
 
     def process_data_scripts(self):
         for target_sheet in self.target_sheets:
+
+            backup_sheet_name = config["flowtide"]["backup_sheet_name_format"]
+            self.drive.open_sheet(backup_sheet_name)
+            backup_worksheet = self.drive.get_worksheet(0)
+
             self.drive.open_sheet(target_sheet)
-            worksheet = self.drive.get_worksheet(0)
-            all_values = self.drive.get_worksheet_all_values(worksheet)
+            original_worksheet = self.drive.get_worksheet(0)
+            all_values = self.drive.get_worksheet_all_values(original_worksheet)
+            backup_worksheet.update_values(crange=f"A1:{chr(64 + len(all_values[0]))}{len(all_values)}", values=all_values)
+
             header = all_values[0]
             header = [col for col in header if col != ""]
             header_columns_count = len(header)
@@ -130,7 +137,7 @@ class GoogleSheetHandle:
             logger.success(f"總共更新了 {update_count} 筆資料")
             if update_count > 0:
                 logger.debug("正在更新 Google Sheet...")
-                self.drive.update_worksheet(worksheet, self.df)
+                self.drive.update_worksheet(original_worksheet, self.df)
             else:
                 logger.debug("沒有需要更新的資料")
 
