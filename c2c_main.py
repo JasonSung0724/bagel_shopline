@@ -10,6 +10,28 @@ import glob
 
 config = json.load(open("config/field_config.json", "r", encoding="utf-8"))
 
+# def line_push_message(message):
+#     url = 'https://api.line.me/v2/bot/message/push'
+#     headers = {
+#         'Content-Type': 'application/json',
+#         'Authorization': 'Bearer {YOUR_CHANNEL_ACCESS_TOKEN}'
+#     }
+#     data = {
+#         'to': user_id,
+#         'messages': [
+#             {
+#                 'type': 'text',
+#                 'text': message
+#             }
+#         ]
+#     }
+#     response = requests.post(url, headers=headers, data=json.dumps(data))
+
+#     print(f"Status Code: {response.status_code}")
+#     print(f"Response: {response.text}")
+
+#     return response.status_code
+
 
 def fetch_email_by_date():
     today = datetime.datetime.now()
