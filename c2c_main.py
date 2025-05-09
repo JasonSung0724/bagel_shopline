@@ -6,8 +6,6 @@ from excel_hadle import ExcelReader
 from google_drive import C2CGoogleSheet
 from tcat_scraping import Tcat
 from loguru import logger
-import glob
-import requests
 from linebot.v3.messaging import Configuration, ApiClient, MessagingApi
 from linebot.v3.messaging import TextMessage, PushMessageRequest
 
