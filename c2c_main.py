@@ -4,32 +4,44 @@ import json
 from gmail_fetch import GmailConnect
 from excel_hadle import ExcelReader
 from google_drive import C2CGoogleSheet
+from config.config import ConfigManager
 from tcat_scraping import Tcat
 from loguru import logger
 from linebot.v3.messaging import Configuration, ApiClient, MessagingApi
 from linebot.v3.messaging import TextMessage, PushMessageRequest
 
-config = json.load(open("config/field_config.json", "r", encoding="utf-8"))
+config = ConfigManager()
 
+class MessageSender():
 
-def line_push_message(message):
-    with open("config/config.json", "r") as f:
-        settings = json.load(f)
-    token = settings["line_access_token"]
-    configuration = Configuration(access_token=token)
-    with ApiClient(configuration) as api_client:
-        line_bot_api = MessagingApi(api_client)
-        try:
-            push_message_request = PushMessageRequest(
-                to=settings["group_id"],
-                messages=[TextMessage(text=message)]
-            )
-            response = line_bot_api.push_message(push_message_request)
-            print(f"訊息已成功發送: {response}")
-            return True
-        except Exception as e:
-            print(f"發送訊息時發生錯誤: {e}")
-            return False
+    def __init__(self):
+        with open("config/config.json", "r") as f:
+            self.settings = json.load(f)
+        self.line_access_token = self.settings["line_access_token"]
+        self.group_id = self.settings["group_id"]
+        self.message = None
+
+    def line_push_message(self):
+        configuration = Configuration(access_token=self.line_access_token)
+        with ApiClient(configuration) as api_client:
+            line_bot_api = MessagingApi(api_client)
+            try:
+                push_message_request = PushMessageRequest(
+                    to=self.group_id,
+                    messages=[TextMessage(text=self.message)]
+                )
+                response = line_bot_api.push_message(push_message_request)
+                logger.success(f"訊息已成功發送: {response}")
+                return True
+            except Exception as e:
+                logger.warning(f"發送訊息時發生錯誤: {e}")
+                return False
+    
+    def add_message(self, message):
+        self.message = self.message + "\n" + str(message) if self.message else str(message)
+
+    def clear_message(self):
+        self.message = None
 
 
 def fetch_email_by_date():
@@ -59,9 +71,9 @@ def delivery_excel_handle(excel_data):
             order = ExcelReader(_file)
             data_frame = order.get_data()
             for index, row in data_frame.iterrows():
-                if row[config["flowtide"]["mark_field"]].startswith(config["flowtide"]["c2c_mark"]):
-                    tcat_number = row[config["flowtide"]["tcat_number"]]
-                    order_number = row[config["flowtide"]["customer_order_number"]]
+                if row[config.flowtide_mark_field].startswith(config.flowtide_c2c_mark):
+                    tcat_number = row[config.flowtide_tcat_number]
+                    order_number = row[config.flowtide_order_number]
                     if not pd.isna(tcat_number):
                         tcat_number = str(int(tcat_number))
                         if tcat_number not in processed:
@@ -83,13 +95,13 @@ class GoogleSheetHandle:
         self.target_sheets = self.drive.find_c2c_track_sheet(self.sheets)
         self.current_time = datetime.datetime.now().strftime("%Y%m%d")
         self.update_orders = update_orders
-        self.ship_date_field_name = config["c2c"]["shipping_date"]
-        self.status_field_name = config["c2c"]["current_status"]
-        self.platform_number_field_name = config["c2c"]["customer_order_number"]
-        self.delivery_number_field_name = config["c2c"]["delivery_number"]
-        self.delivery_succeed = config["c2c"]["status_name"]["success"]
-        self.no_data_str = config["c2c"]["status_name"]["no_data"]
-        self.collected_str = config["c2c"]["status_name"]["collected"]
+        self.ship_date_field_name = config.c2c_shipping_date
+        self.status_field_name = config.c2c_current_status
+        self.platform_number_field_name = config.c2c_order_number
+        self.delivery_number_field_name = config.c2c_delivery_number
+        self.delivery_succeed = config.c2c_status_success
+        self.no_data_str = config.c2c_status_no_data
+        self.collected_str = config.c2c_status_collected
 
     def status_update(self, index, row, new_status):
         if new_status != self.no_data_str:
@@ -147,11 +159,10 @@ class GoogleSheetHandle:
             return False, message
 
 
-    def process_data_scripts(self):
-        notify = False
+    def process_data_scripts(self, msg_instance):
         for target_sheet in self.target_sheets:
-
-            backup_sheet_name = config["flowtide"]["backup_sheet_name_format"]
+            msg_instance.add_message(f"處理 {target_sheet} Google Sheet")
+            backup_sheet_name = config.flowdite_backup_sheet
             self.drive.open_sheet(backup_sheet_name)
             backup_worksheet = self.drive.get_worksheet(0)
 
@@ -169,13 +180,15 @@ class GoogleSheetHandle:
             update_count = 0
             try:
                 for index, row in self.df.iterrows():
-                    customer_order_number = row[config["c2c"]["customer_order_number"]]
+                    customer_order_number = row[config.c2c_order_number]
                     if not pd.isna(row[self.platform_number_field_name]) and row[self.platform_number_field_name].strip():
                         tcat_number = row[self.delivery_number_field_name] if not pd.isna(row[self.delivery_number_field_name]) else None
                         update_count += 1 if self.update_data(row=row, index=index, tcat_number=tcat_number) else 0
             except Exception as e:
                 logger.warning(f"在Google Sheet處理 {customer_order_number} 訂單時發生錯誤: {e}")
-                line_push_message(message=f"在Google Sheet處理 {customer_order_number} 訂單時發生錯誤: {e}")
+                msg_instance.add_message(f"在Google Sheet處理 {customer_order_number} 訂單時發生錯誤: {e}")
+                msg_instance.line_push_message()
+                msg_instance.clear_message()
                 raise
 
             logger.success(f"總共更新了 {update_count} 筆資料")
@@ -185,17 +198,16 @@ class GoogleSheetHandle:
                 if self.drive.update_worksheet(original_worksheet, self.df):
                     result, message = self.check_result(target_sheet, backup_sheet_name)
                     logger.success(f"成功更新了 {update_count} 筆資料\n{message}\n{has_flowtide_excel}")
-                    notify = line_push_message(message=f"{has_flowtide_excel}\n成功更新了 {update_count} 筆資料\n{message}")
+                    msg_instance.add_message(f"{has_flowtide_excel}\n成功更新了 {update_count} 筆資料\n{message}")
             else:
-                if not notify:
-                    notify = line_push_message(message=f"\n{has_flowtide_excel}\n執行完畢 沒有更新任何資料")
+                msg_instance.add_message(f"{has_flowtide_excel}\n執行完畢 沒有更新任何資料")
                 logger.debug("沒有需要更新的資料")
-    
-    
+        msg_instance.line_push_message()
 
 
 if __name__ == "__main__":
+    msg = MessageSender()
     result = fetch_email_by_date()
     order_status = delivery_excel_handle(result)
     sheet_handel = GoogleSheetHandle(order_status)
-    sheet_handel.process_data_scripts()
+    sheet_handel.process_data_scripts(msg)
