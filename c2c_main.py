@@ -25,17 +25,17 @@ class MessageSender():
         configuration = Configuration(access_token=self.line_access_token)
         with ApiClient(configuration) as api_client:
             line_bot_api = MessagingApi(api_client)
-            try:
-                push_message_request = PushMessageRequest(
-                    to=self.group_id,
-                    messages=[TextMessage(text=self.message)]
-                )
-                response = line_bot_api.push_message(push_message_request)
-                logger.success(f"訊息已成功發送: {response}")
-                return True
-            except Exception as e:
-                logger.warning(f"發送訊息時發生錯誤: {e}")
-                return False
+            # try:
+            #     push_message_request = PushMessageRequest(
+            #         to=self.group_id,
+            #         messages=[TextMessage(text=self.message)]
+            #     )
+            #     response = line_bot_api.push_message(push_message_request)
+            #     logger.success(f"訊息已成功發送: {response}")
+            #     return True
+            # except Exception as e:
+            #     logger.warning(f"發送訊息時發生錯誤: {e}")
+            #     return False
     
     def add_message(self, message):
         self.message = self.message + "\n" + str(message) if self.message else str(message)
@@ -44,7 +44,7 @@ class MessageSender():
         self.message = None
 
 
-def fetch_email_by_date():
+def fetch_email_by_date(msg_instance):
     today = datetime.datetime.now()
     previous_day = today - datetime.timedelta(days=1)
     date_format = "%d-%b-%Y"
@@ -59,6 +59,8 @@ def fetch_email_by_date():
             if data and "attachments" in data and data["attachments"]:
                 logger.info(data["attachments"][0]["filename"])
                 result.append(data)
+    has_flowtide_excel = "今天有收到逢泰Excel\n" if result else "今天(沒有)收到逢泰Excel\n"
+    msg_instance.add_message(has_flowtide_excel)
     return result
 
 
@@ -192,22 +194,21 @@ class GoogleSheetHandle:
                 raise
 
             logger.success(f"總共更新了 {update_count} 筆資料")
-            has_flowtide_excel = "今天有收到逢泰Excel" if self.update_orders else "今天(沒有)收到逢泰Excel"
             if update_count > 0:
                 logger.debug("正在更新 Google Sheet...")
                 if self.drive.update_worksheet(original_worksheet, self.df):
                     result, message = self.check_result(target_sheet, backup_sheet_name)
                     logger.success(f"成功更新了 {update_count} 筆資料\n{message}\n{has_flowtide_excel}")
-                    msg_instance.add_message(f"{has_flowtide_excel}\n成功更新了 {update_count} 筆資料\n{message}")
+                    msg_instance.add_message(f"成功更新了 {update_count} 筆資料\n{message}")
             else:
-                msg_instance.add_message(f"{has_flowtide_excel}\n執行完畢 沒有更新任何資料")
+                msg_instance.add_message(f"執行完畢 沒有更新任何資料")
                 logger.debug("沒有需要更新的資料")
         msg_instance.line_push_message()
 
 
-# if __name__ == "__main__":
-#     msg = MessageSender()
-#     result = fetch_email_by_date()
-#     order_status = delivery_excel_handle(result)
-#     sheet_handel = GoogleSheetHandle(order_status)
-#     sheet_handel.process_data_scripts(msg)
+if __name__ == "__main__":
+    msg = MessageSender()
+    result = fetch_email_by_date(msg)
+    order_status = delivery_excel_handle(result)
+    sheet_handel = GoogleSheetHandle(order_status)
+    sheet_handel.process_data_scripts(msg)
