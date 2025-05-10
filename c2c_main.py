@@ -205,9 +205,9 @@ class GoogleSheetHandle:
         msg_instance.line_push_message()
 
 
-if __name__ == "__main__":
-    msg = MessageSender()
-    result = fetch_email_by_date()
-    order_status = delivery_excel_handle(result)
-    sheet_handel = GoogleSheetHandle(order_status)
-    sheet_handel.process_data_scripts(msg)
+# if __name__ == "__main__":
+#     msg = MessageSender()
+#     result = fetch_email_by_date()
+#     order_status = delivery_excel_handle(result)
+#     sheet_handel = GoogleSheetHandle(order_status)
+#     sheet_handel.process_data_scripts(msg)
