@@ -10,7 +10,7 @@ def run_task():
     if custom_header != 'BagelShopC2C':
         return 'Unauthorized', 401
     msg = MessageSender()
-    result = fetch_email_by_date()
+    result = fetch_email_by_date(msg)
     order_status = delivery_excel_handle(result)
     sheet_handel = GoogleSheetHandle(order_status)
     sheet_handel.process_data_scripts(msg)

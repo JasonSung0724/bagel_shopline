@@ -25,17 +25,17 @@ class MessageSender():
         configuration = Configuration(access_token=self.line_access_token)
         with ApiClient(configuration) as api_client:
             line_bot_api = MessagingApi(api_client)
-            # try:
-            #     push_message_request = PushMessageRequest(
-            #         to=self.group_id,
-            #         messages=[TextMessage(text=self.message)]
-            #     )
-            #     response = line_bot_api.push_message(push_message_request)
-            #     logger.success(f"訊息已成功發送: {response}")
-            #     return True
-            # except Exception as e:
-            #     logger.warning(f"發送訊息時發生錯誤: {e}")
-            #     return False
+            try:
+                push_message_request = PushMessageRequest(
+                    to=self.group_id,
+                    messages=[TextMessage(text=self.message)]
+                )
+                response = line_bot_api.push_message(push_message_request)
+                logger.success(f"訊息已成功發送: {response}")
+                return True
+            except Exception as e:
+                logger.warning(f"發送訊息時發生錯誤: {e}")
+                return False
     
     def add_message(self, message):
         self.message = self.message + "\n" + str(message) if self.message else str(message)
@@ -198,7 +198,7 @@ class GoogleSheetHandle:
                 logger.debug("正在更新 Google Sheet...")
                 if self.drive.update_worksheet(original_worksheet, self.df):
                     result, message = self.check_result(target_sheet, backup_sheet_name)
-                    logger.success(f"成功更新了 {update_count} 筆資料\n{message}\n{has_flowtide_excel}")
+                    logger.success(f"成功更新了 {update_count} 筆資料\n{message}\n")
                     msg_instance.add_message(f"成功更新了 {update_count} 筆資料\n{message}")
             else:
                 msg_instance.add_message(f"執行完畢 沒有更新任何資料")
