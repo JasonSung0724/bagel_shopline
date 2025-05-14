@@ -11,7 +11,7 @@ def run_task():
         return 'Unauthorized', 401
     msg = MessageSender()
     result = fetch_email_by_date(msg)
-    order_status = delivery_excel_handle(result)
+    order_status = delivery_excel_handle(result, msg)
     sheet_handel = GoogleSheetHandle(order_status)
     sheet_handel.process_data_scripts(msg)
     return 'Task completed', 200

@@ -6,8 +6,9 @@ import datetime
 import time
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from src.config.config import ConfigManager
 
-config = json.load(open("config/field_config.json", "r", encoding="utf-8"))
+CONFIG = ConfigManager()
 
 
 class Tcat:
@@ -44,10 +45,10 @@ class Tcat:
                     return status_text
             else:
                 logger.warning(f"訂單 {order_id} 狀態 : 暫無資料")
-                return config["c2c"]["status_name"]["no_data"]
+                return CONFIG.c2c_status_no_data
         except Exception as e:
             logger.error(f"查詢訂單 {order_id} 狀態時發生錯誤: {str(e)}")
-            return config["c2c"]["status_name"]["no_data"]
+            return CONFIG.c2c_status_no_data
         finally:
             session.close()
 
@@ -86,7 +87,7 @@ class Tcat:
         url = f"https://www.t-cat.com.tw/Inquire/TraceDetail.aspx?BillID={order_id}"
         session = cls._create_session()
         try:
-            if config["c2c"]["status_name"]["collected"] == current_state:
+            if CONFIG.c2c_status_collected == current_state:
                 return cls.current_state_update_time(order_id)
             response = session.get(url, timeout=10, headers=cls.headers)
             response.raise_for_status()

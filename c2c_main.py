@@ -1,24 +1,24 @@
 import pandas as pd
 import datetime
 import json
-from gmail_fetch import GmailConnect
-from excel_hadle import ExcelReader
-from google_drive import C2CGoogleSheet
-from config.config import ConfigManager
-from tcat_scraping import Tcat
+from src.gmail_fetch import GmailConnect
+from src.excel_hadle import ExcelReader
+from src.google_drive import C2CGoogleSheet
+from src.config.config import ConfigManager, SettingsManager
+from src.tcat_scraping import Tcat
 from loguru import logger
 from linebot.v3.messaging import Configuration, ApiClient, MessagingApi
 from linebot.v3.messaging import TextMessage, PushMessageRequest
 
-config = ConfigManager()
+CONFIG = ConfigManager()
+SETTINGS = SettingsManager()
 
 class MessageSender():
 
     def __init__(self):
-        with open("config/config.json", "r") as f:
-            self.settings = json.load(f)
-        self.line_access_token = self.settings["line_access_token"]
-        self.group_id = self.settings["group_id"]
+        self.settings = SettingsManager()
+        self.line_access_token = SETTINGS.line_access_token
+        self.group_id = SETTINGS.group_id
         self.message = None
 
     def line_push_message(self):
@@ -50,7 +50,7 @@ def fetch_email_by_date(msg_instance):
     date_format = "%d-%b-%Y"
     previous_day_str = previous_day.strftime(date_format)
     today_str = today.strftime(date_format)
-    script = GmailConnect(email="bagelshop2025@gmail.com", password="ciyc avqe zlsu bfcg")
+    script = GmailConnect(email=SETTINGS.bot_gmail, password=SETTINGS.bot_app_password)
     messages = script.search_emails(today_str)
     result = []
     if messages:
@@ -64,7 +64,7 @@ def fetch_email_by_date(msg_instance):
     return result
 
 
-def delivery_excel_handle(excel_data):
+def delivery_excel_handle(excel_data, msg_instance):
     try:
         processed = []
         order_status = {}
@@ -73,15 +73,18 @@ def delivery_excel_handle(excel_data):
             order = ExcelReader(_file)
             data_frame = order.get_data()
             for index, row in data_frame.iterrows():
-                if row[config.flowtide_mark_field].startswith(config.flowtide_c2c_mark):
-                    tcat_number = row[config.flowtide_tcat_number]
-                    order_number = row[config.flowtide_order_number]
+                if row[CONFIG.flowtide_mark_field].startswith(CONFIG.flowtide_c2c_mark):
+                    tcat_number = row[CONFIG.flowtide_tcat_number]
+                    order_number = row[CONFIG.flowtide_order_number]
                     if not pd.isna(tcat_number):
                         tcat_number = str(int(tcat_number))
                         if tcat_number not in processed:
                             processed.append(tcat_number)
                             status = Tcat.order_status(tcat_number)
                             order_status[order_number] = {"status": status, "tcat_number": tcat_number}
+        if excel_data and not processed:
+            logger.warning("逢泰Excel中沒有C2C訂單")
+            msg_instance.add_message("逢泰Excel中沒有C2C訂單\n")
         return order_status
     except Exception as e:
         logger.error(e)
@@ -97,13 +100,13 @@ class GoogleSheetHandle:
         self.target_sheets = self.drive.find_c2c_track_sheet(self.sheets)
         self.current_time = datetime.datetime.now().strftime("%Y%m%d")
         self.update_orders = update_orders
-        self.ship_date_field_name = config.c2c_shipping_date
-        self.status_field_name = config.c2c_current_status
-        self.platform_number_field_name = config.c2c_order_number
-        self.delivery_number_field_name = config.c2c_delivery_number
-        self.delivery_succeed = config.c2c_status_success
-        self.no_data_str = config.c2c_status_no_data
-        self.collected_str = config.c2c_status_collected
+        self.ship_date_field_name = CONFIG.c2c_shipping_date
+        self.status_field_name = CONFIG.c2c_current_status
+        self.platform_number_field_name = CONFIG.c2c_order_number
+        self.delivery_number_field_name = CONFIG.c2c_delivery_number
+        self.delivery_succeed = CONFIG.c2c_status_success
+        self.no_data_str = CONFIG.c2c_status_no_data
+        self.collected_str = CONFIG.c2c_status_collected
 
     def status_update(self, index, row, new_status):
         if new_status != self.no_data_str:
@@ -164,7 +167,7 @@ class GoogleSheetHandle:
     def process_data_scripts(self, msg_instance):
         for target_sheet in self.target_sheets:
             msg_instance.add_message(f"處理 {target_sheet} Google Sheet")
-            backup_sheet_name = config.flowdite_backup_sheet
+            backup_sheet_name = CONFIG.flowdite_backup_sheet
             self.drive.open_sheet(backup_sheet_name)
             backup_worksheet = self.drive.get_worksheet(0)
 
@@ -182,7 +185,7 @@ class GoogleSheetHandle:
             update_count = 0
             try:
                 for index, row in self.df.iterrows():
-                    customer_order_number = row[config.c2c_order_number]
+                    customer_order_number = row[CONFIG.c2c_order_number]
                     if not pd.isna(row[self.platform_number_field_name]) and row[self.platform_number_field_name].strip():
                         tcat_number = row[self.delivery_number_field_name] if not pd.isna(row[self.delivery_number_field_name]) else None
                         update_count += 1 if self.update_data(row=row, index=index, tcat_number=tcat_number) else 0
@@ -209,6 +212,6 @@ class GoogleSheetHandle:
 if __name__ == "__main__":
     msg = MessageSender()
     result = fetch_email_by_date(msg)
-    order_status = delivery_excel_handle(result)
+    order_status = delivery_excel_handle(result, msg)
     sheet_handel = GoogleSheetHandle(order_status)
     sheet_handel.process_data_scripts(msg)

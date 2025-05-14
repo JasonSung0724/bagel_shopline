@@ -5,15 +5,17 @@ import pandas as pd
 import datetime
 from loguru import logger
 import json
+from src.config.config import ConfigManager, SettingsManager
 
-config = json.load(open("config/field_config.json", "r", encoding="utf-8"))
+CONFIG = ConfigManager()
+SETTINGS = SettingsManager()
 
 class C2CGoogleSheet:
 
     def __init__(self):
         self.sht = None
         self.scopes = ["https://www.googleapis.com/auth/drive"]
-        self.service_account_file = r"config/mybagel-458109-30f35338f350.json"
+        self.service_account_file = SETTINGS.service_account_file
         self.credentials = service_account.Credentials.from_service_account_file(self.service_account_file, scopes=self.scopes)
         self.service = build("drive", "v3", credentials=self.credentials)
         self.gc = pygsheets.authorize(service_file=self.service_account_file)
@@ -48,7 +50,7 @@ class C2CGoogleSheet:
         date_format = "%Y%m"
         target_sheets = []
         for sheet_name in list(sheets.keys()):
-            if sheet_name.startswith(config["flowtide"]["sheet_name_format"]):
+            if sheet_name.startswith(CONFIG.flowtide_sheet_name_format):
                 target_sheets.append(sheet_name)
         logger.info(target_sheets)
         return target_sheets
@@ -67,7 +69,7 @@ class C2CGoogleSheet:
             df = df[unprotected_headers]
             data_without_headers = []
             for index, row in df.iterrows():
-                if row[config["c2c"]["delivery_number"]] == "":
+                if row[CONFIG.c2c_delivery_number] == "":
                     data_without_headers.append([""] * len(unprotected_headers))
                 else:
                     data_without_headers.append(row.tolist())

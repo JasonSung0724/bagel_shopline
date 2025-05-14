@@ -1,5 +1,5 @@
 import pandas as pd
-from tcat_scraping import Tcat
+from src.tcat_scraping import Tcat
 import io
 
 class ExcelReader:
