@@ -19,6 +19,10 @@ class Tcat:
     }
 
     @classmethod
+    def get_query_url(cls, order_id):
+        return f"https://www.t-cat.com.tw/Inquire/Trace.aspx?method=result&billID={order_id}"
+
+    @classmethod
     def _create_session(cls):
         session = requests.Session()
         retry = Retry(total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
@@ -29,7 +33,7 @@ class Tcat:
 
     @classmethod
     def order_status(cls, order_id):
-        url = f"https://www.t-cat.com.tw/Inquire/Trace.aspx?method=result&billID={order_id}"
+        url = cls.get_query_url(order_id)
         session = cls._create_session()
         try:
             response = session.get(url, timeout=10, headers=cls.headers)
@@ -94,7 +98,7 @@ class Tcat:
             soup = BeautifulSoup(response.text, "html.parser")
             template = soup.find_all("div", id="template")
             if template:
-                span = soup.find("span", string=config["c2c"]["status_name"]["collected"])
+                span = soup.find("span", string=CONFIG.c2c_status_collected)
                 if span:
                     tr = span.find_parent("tr")
                     td = tr.find_all("td")

@@ -1,17 +1,18 @@
 import requests
 import json
 from loguru import logger
+from src.config.config import ConfigManager, SettingsManager
 
 
 class ShopLine:
 
-    def __init__(self, order_number):
-        with open("config.json", "r") as f:
-            config = json.load(f)
-        self.token = config["ShopLineToken"]
+    def __init__(self, order_number=None):
+        self.settings = SettingsManager()
+        self.token = self.settings.shopline_token
         self.header = {
             "Authorization": f"Bearer {self.token}",
             "accept": "application/json",
+            "Content-Type": "application/json",
         }
         self.domain = "https://open.shopline.io"
         self.order_number = order_number
@@ -20,14 +21,21 @@ class ShopLine:
         self.setup()
 
     def setup(self):
-        self.order_detail = self.query_order(self.order_number)
-        self.order_id = self.order_detail["items"][0]["id"]
+        try:
+            if self.order_number:
+                self.order_detail = self.query_order(self.order_number)
+                self.order_id = self.order_detail["items"][0]["id"]
+            else:
+                return None
+        except TypeError as e:
+            logger.error(f"Order {self.order_number} 不存在")
+            return None
 
     def response_handler(self, response):
         if response.status_code == 200:
             try:
                 response_data = response.json()
-                logger.debug(response_data)
+                logger.debug("Get response data")
                 return response_data
             except json.JSONDecodeError:
                 logger.error("JSON 解碼錯誤")
@@ -42,7 +50,7 @@ class ShopLine:
         return self.response_handler(response)
 
     def get_order(self):
-        url = f"{self.domain}/v1/orders/:{self.order_id}"
+        url = f"{self.domain}/v1/orders/{self.order_id}"
         response = requests.get(url=url, headers=self.header)
         if response.status_code == 410:
             logger.error(f"{self.order_id} 此 Order 封存")
@@ -54,21 +62,33 @@ class ShopLine:
     def update_delivery_status(self, status, notify):
         # pending, shipping, shipped, arrived, collected, returned, returning
         url = f"{self.domain}/v1/orders/{self.order_id}/order_delivery_status"
+        print(f"Url : {url}")
         payload = {"id": self.order_id, "status": status, "mail_notify": notify}
-        response = requests.put(url=url, headers=self.header, data=payload)
+        print(f"Header : {self.header}")
+        print(f"Payload : {payload}")
+        response = requests.patch(url=url, headers=self.header, data=json.dumps(payload))
+        print(f"Response : {response}")
+        print(response.json())
         return self.response_handler(response)
 
     def update_order_status(self, status):
         # pending, confirmed, completed, cancelled
         url = f"{self.domain}/v1/orders/{self.order_id}/status"
         payload = {"id": self.order_id, "mail_notify": False, "status": status}
-        response = requests.patch(url=url, headers=self.header, data=payload)
+        response = requests.patch(url=url, headers=self.header, data=json.dumps(payload))
         return self.response_handler(response)
 
-    def update_order(self):
-        url = f"{self.domain}/v1/orders/{self.order_id}/status"
-        payload = {"mail_notify": False, "status": "completed"}
-        response = requests.patch(url=url, headers=self.header, data=payload)
+    def update_order(self, tracking_number, tracking_url):
+        url = f"{self.domain}/v1/orders/{self.order_id}"
+
+        payload = {
+            "tracking_number": tracking_number,
+            "tracking_url": tracking_url,
+            "delivery_provider_name": {
+                "zh-hant": "黑貓宅急便",
+            }
+        }
+        response = requests.patch(url=url, headers=self.header, data=json.dumps(payload))
         return self.response_handler(response)
 
     def search_order(self, specific_conditions: dict):
@@ -110,6 +130,3 @@ class ShopLine:
         url = f"{self.domain}/v1/delivery_options/{self.order_id}/stores_info"
 
 
-shop = ShopLine("20250425025210474")
-with open("result.json", "w") as f:
-    json.dump(shop.order_detail, f, indent=4, ensure_ascii=False)

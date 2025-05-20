@@ -1,6 +1,7 @@
 import os
 from flask import Flask, request
 from c2c_main import fetch_email_by_date, GoogleSheetHandle, delivery_excel_handle, MessageSender
+from src.config.config import ConfigManager
 
 app = Flask(__name__)
 
@@ -9,8 +10,9 @@ def run_task():
     custom_header = request.headers.get('X-Auth')
     if custom_header != 'BagelShopC2C':
         return 'Unauthorized', 401
+    CONFIG = ConfigManager()
     msg = MessageSender()
-    result = fetch_email_by_date(msg)
+    result = fetch_email_by_date(msg, CONFIG.flowtide_sender_email)
     order_status = delivery_excel_handle(result, msg)
     sheet_handel = GoogleSheetHandle(order_status)
     sheet_handel.process_data_scripts(msg)

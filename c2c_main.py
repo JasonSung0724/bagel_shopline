@@ -7,6 +7,7 @@ from src.google_drive import C2CGoogleSheet
 from src.config.config import ConfigManager, SettingsManager
 from src.tcat_scraping import Tcat
 from loguru import logger
+from src.shopline import ShopLine
 from linebot.v3.messaging import Configuration, ApiClient, MessagingApi
 from linebot.v3.messaging import TextMessage, PushMessageRequest
 
@@ -44,27 +45,28 @@ class MessageSender():
         self.message = None
 
 
-def fetch_email_by_date(msg_instance):
-    today = datetime.datetime.now()
-    previous_day = today - datetime.timedelta(days=1)
-    date_format = "%d-%b-%Y"
-    previous_day_str = previous_day.strftime(date_format)
-    today_str = today.strftime(date_format)
+def fetch_email_by_date(msg_instance, target_sender_email):
     script = GmailConnect(email=SETTINGS.bot_gmail, password=SETTINGS.bot_app_password)
-    messages = script.search_emails(today_str)
-    result = []
-    if messages:
-        for message in messages:
-            data = script.parse_email(message)
-            if data and "attachments" in data and data["attachments"]:
-                logger.info(data["attachments"][0]["filename"])
-                result.append(data)
+    result = script.get_attachments(target_sender_email)
     has_flowtide_excel = "今天有收到逢泰Excel\n" if result else "今天(沒有)收到逢泰Excel\n"
     msg_instance.add_message(has_flowtide_excel)
     return result
 
 
-def delivery_excel_handle(excel_data, msg_instance):
+def delivery_excel_handle(excel_data, msg_instance, platform="c2c"):
+
+    def _check_platform_order(row):
+        if platform == "c2c":
+            return row[CONFIG.flowtide_mark_field].startswith(CONFIG.flowtide_c2c_mark)
+        elif platform == "shopline":
+            return row[CONFIG.flowtide_order_number].startswith("#") and row[CONFIG.flowtide_tcat_name] == "TCAT"
+        
+    def _get_platform_order_number(row):
+        if platform == "c2c":
+            return row[CONFIG.flowtide_order_number]
+        elif platform == "shopline":
+            return row[CONFIG.flowtide_order_number].split("#")[1]
+        
     try:
         processed = []
         order_status = {}
@@ -73,9 +75,9 @@ def delivery_excel_handle(excel_data, msg_instance):
             order = ExcelReader(_file)
             data_frame = order.get_data()
             for index, row in data_frame.iterrows():
-                if row[CONFIG.flowtide_mark_field].startswith(CONFIG.flowtide_c2c_mark):
+                if _check_platform_order(row):
                     tcat_number = row[CONFIG.flowtide_tcat_number]
-                    order_number = row[CONFIG.flowtide_order_number]
+                    order_number = _get_platform_order_number(row)
                     if not pd.isna(tcat_number):
                         tcat_number = str(int(tcat_number))
                         if tcat_number not in processed:
@@ -83,12 +85,42 @@ def delivery_excel_handle(excel_data, msg_instance):
                             status = Tcat.order_status(tcat_number)
                             order_status[order_number] = {"status": status, "tcat_number": tcat_number}
         if excel_data and not processed:
-            logger.warning("逢泰Excel中沒有C2C訂單")
-            msg_instance.add_message("逢泰Excel中沒有C2C訂單\n")
+            logger.warning(f"逢泰Excel中沒有 {platform.capitalize()} 訂單")
+            msg_instance.add_message(f"逢泰Excel中沒有 {platform.capitalize()} 訂單\n")
         return order_status
     except Exception as e:
         logger.error(e)
         return {}
+
+def shopline_update_order_scripts(update_orders:dict, msg_instance:MessageSender):
+    with open("src/config/status_map.json", "r") as f:
+        status_map = json.load(f)
+    tracking_info_updated_count = 0
+    updated_delivery_status_count = 0
+    def _check_shopline_status(tcat_status:str):
+        for key, value in status_map.items():
+            if tcat_status in value:
+                return key
+        return None
+    
+    for order_number, order_info in update_orders.items():
+        tcat_number = order_info["tcat_number"]
+        delivery_status = Tcat.order_status(tcat_number)
+        shop = ShopLine(order_number)
+        order_detail = shop.get_order()
+        tcat_tracking_number = order_detail["delivery_data"]["tracking_number"]
+        original_delivery_status = order_detail["order_delivery"]["status"]
+        if not tcat_tracking_number:
+            order_updated = shop.update_order(tracking_number=tcat_number, tracking_url=Tcat.get_query_url(tcat_number))
+            tracking_info_updated_count += 1
+        cur_delivery_status = _check_shopline_status(delivery_status)
+        if cur_delivery_status and original_delivery_status != cur_delivery_status:
+            shop.update_delivery_status(status=cur_delivery_status, notify=True)
+            updated_delivery_status_count += 1
+            logger.info(f"更新 {order_number} 的訂單狀態 - ShopLine Id : {shop.order_id}")
+            
+        logger.success(f"更新追蹤資訊 {tracking_info_updated_count} 筆, 更新訂單狀態 {updated_delivery_status_count} 筆")
+        msg_instance.add_message(f"更新追蹤資訊 {tracking_info_updated_count} 筆, 更新訂單狀態 {updated_delivery_status_count} 筆")
 
 
 class GoogleSheetHandle:
@@ -211,7 +243,8 @@ class GoogleSheetHandle:
 
 if __name__ == "__main__":
     msg = MessageSender()
-    result = fetch_email_by_date(msg)
-    order_status = delivery_excel_handle(result, msg)
-    sheet_handel = GoogleSheetHandle(order_status)
-    sheet_handel.process_data_scripts(msg)
+    # result = fetch_email_by_date(msg, CONFIG.flowtide_sender_email, platform="c2c")
+    # order_status = delivery_excel_handle(result, msg)
+    # sheet_handel = GoogleSheetHandle(order_status)
+    # sheet_handel.process_data_scripts(msg)
+    result = fetch_email_by_date(msg, CONFIG.flowtide_sender_email, platform="shopline")

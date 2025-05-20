@@ -8,3 +8,4 @@ pygsheets
 flask
 gspread
 line-bot-sdk==3.17.1
+playwright

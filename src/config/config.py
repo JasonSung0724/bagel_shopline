@@ -18,6 +18,8 @@ class ConfigManager:
         self.flowtide_c2c_mark = self.config["flowtide"]["c2c_mark"]
         self.flowtide_tcat_number = self.config["flowtide"]["tcat_number"]
         self.flowtide_order_number = self.config["flowtide"]["customer_order_number"]
+        self.flowtide_tcat_name = self.config["flowtide"]["tcat_name"]
+        
         self.c2c_shipping_date = self.config["c2c"]["shipping_date"]
         self.c2c_current_status = self.config["c2c"]["current_status"]
         self.c2c_order_number = self.config["c2c"]["customer_order_number"]
@@ -27,6 +29,9 @@ class ConfigManager:
         self.c2c_status_collected = self.config["c2c"]["status_name"]["collected"]
         self.flowtide_sender_email = self.config["flowtide"]["sender_email"]
         self.flowtide_sheet_name_format = self.config["flowtide"]["sheet_name_format"]
+
+        self.shopline_sender_email = self.config["shopline"]["sender_email"]
+        self.shopline_mail_subject = self.config["shopline"]["mail_subject"]
 
 class SettingsManager:
 
@@ -44,7 +49,8 @@ class SettingsManager:
         self.group_id = self.settings["group_id"]
         self.bot_gmail = self.settings["GmailAddress"]
         self.bot_app_password = self.settings["APPPassword"]
-        
+        self.shopline_token = self.settings["ShopLineToken"]
+
         # Service account file path
         self.service_account_file = os.path.join(current_dir, "mybagel-458109-30f35338f350.json")
 
