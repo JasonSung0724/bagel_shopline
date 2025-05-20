@@ -1,0 +1,804 @@
+{
+    "id": "68281a7883f5d800116176fc",
+    "order_number": "20250517051120852",
+    "system_order_number": "20250517051120852",
+    "merchant_order_number": null,
+    "status": "completed",
+    "order_remarks": "",
+    "order_payment": {
+        "id": "68281a7983f5d80011617705",
+        "payment_method_id": "6538d138e7f26b001abb6c28",
+        "payment_type": "bank_transfer",
+        "name_translations": {
+            "en": "Bank Transfer",
+            "zh-hant": "\u9280\u884c\u8f49\u5e33\uff0fATM"
+        },
+        "status": "pending",
+        "payment_fee": {
+            "cents": 0,
+            "currency_symbol": "NT$",
+            "currency_iso": "TWD",
+            "label": "",
+            "dollars": 0.0
+        },
+        "total": {
+            "cents": 190,
+            "currency_symbol": "NT$",
+            "currency_iso": "TWD",
+            "label": "NT$190",
+            "dollars": 190.0
+        },
+        "paid_at": null,
+        "updated_at": "2025-05-17T05:11:22.528+00:00",
+        "created_at": "2025-05-17T05:11:21.117+00:00",
+        "payment_data": {},
+        "last_four_digits": "",
+        "ref_payment_id": null,
+        "payment_slips_setting": {
+            "enabled": true,
+            "days_of_guest_view": 1
+        }
+    },
+    "order_delivery": {
+        "id": "68281a7983f5d80011617706",
+        "delivery_option_id": "68281a2f3451b7000c4f5d7b",
+        "platform": "custom",
+        "status": "arrived",
+        "delivery_status": "pending",
+        "name_translations": {
+            "en": "",
+            "zh-hant": "\uff08TEST\uff09\u4f4e\u6eab\u5b85\u914d\uff08\u53f0\u7063\u672c\u5cf6\uff09\uff08\u4e0b\u55ae\u5f8c 1~5 \u500b\u5de5\u4f5c\u5929\u5167\u51fa\u8ca8\uff09"
+        },
+        "total": {
+            "cents": 190,
+            "currency_symbol": "NT$",
+            "currency_iso": "TWD",
+            "label": "NT$190",
+            "dollars": 190.0
+        },
+        "shipped_at": "2025-05-19T13:14:22.720+00:00",
+        "arrived_at": "2025-05-20T15:46:08.010+00:00",
+        "collected_at": null,
+        "returned_at": null,
+        "updated_at": "2025-05-20T15:46:08.032+00:00",
+        "remark": null,
+        "request_accepted_at": null,
+        "request_authorized_at": null,
+        "request_submitted_at": null,
+        "requested_fmt_at": null,
+        "require_expired_upload": false,
+        "require_storeclosed_upload": false,
+        "return_order_id": null,
+        "store_closed_at": null,
+        "storeclosed_upload_at": null,
+        "exp_type": null,
+        "delivery_type": "custom",
+        "requires_customer_address": true
+    },
+    "delivery_address": {
+        "country_code": "TW",
+        "country": "\u53f0\u7063",
+        "city": "\u65b0\u5317\u5e02",
+        "state": null,
+        "postcode": "220",
+        "address_1": "\u74b0\u6cb3\u5357\u8def36\u865f",
+        "address_2": "\u677f\u6a4b\u5340",
+        "key": null,
+        "layer1": null,
+        "layer2": null,
+        "layer3": null,
+        "district": null,
+        "logistic_codes": [
+            "1200003",
+            "1200044"
+        ],
+        "recipient_name": "\u5ed6\u67cf\u6bc5",
+        "recipient_phone": "0980004436",
+        "recipient_phone_country_code": "886",
+        "remarks": null
+    },
+    "delivery_data": {
+        "hk_sfplus_home_region": null,
+        "location_code": null,
+        "location_name": null,
+        "location_short_name": null,
+        "name_translations": {
+            "zh-hant": "\u9ed1\u8c93\u5b85\u6025\u4fbf"
+        },
+        "store_address": null,
+        "url": "https://www.t-cat.com.tw/Inquire/Trace.aspx?method=result&billID=907131129663",
+        "tracking_number": "907131129663",
+        "scheduled_delivery_date": null,
+        "time_slot_key": "\u4efb\u4f55\u6642\u6bb5",
+        "time_slot_translations": null,
+        "instore_pickup": false,
+        "target_channel_id": null,
+        "store_address_detail": {}
+    },
+    "cart_attributes": {
+        "cart_id": "8e7ec6def9e84ec5b4793594bfb39428",
+        "affiliate_data": {},
+        "shop_session_id": ""
+    },
+    "customer_id": "655a28b27a11f4000d360ff1",
+    "customer_name": "\u5289\u5b87\u6615 Jack",
+    "customer_email": "aassxiang@gmail.com",
+    "customer_phone": "0933885752",
+    "customer_phone_country_code": "886",
+    "customer_info": {
+        "gender": "",
+        "birthday": "1993-02-11",
+        "birth_year": 1993,
+        "birth_month": 2,
+        "birth_day": 11,
+        "custom_data": []
+    },
+    "currency_iso": "TWD",
+    "subtotal": {
+        "cents": 1169,
+        "currency_symbol": "NT$",
+        "currency_iso": "TWD",
+        "label": "NT$1,169",
+        "dollars": 1169.0
+    },
+    "order_discount": {
+        "cents": 117,
+        "currency_symbol": "NT$",
+        "currency_iso": "TWD",
+        "label": "NT$117",
+        "dollars": 117.0
+    },
+    "user_credit": {
+        "cents": 1052,
+        "currency_symbol": "NT$",
+        "currency_iso": "TWD",
+        "label": "NT$1,052",
+        "dollars": 1052.0
+    },
+    "total_tax_fee": {
+        "cents": 0,
+        "currency_symbol": "NT$",
+        "currency_iso": "TWD",
+        "label": "",
+        "dollars": 0.0
+    },
+    "total": {
+        "cents": 190,
+        "currency_symbol": "NT$",
+        "currency_iso": "TWD",
+        "label": "NT$190",
+        "dollars": 190.0
+    },
+    "order_points": 0,
+    "order_points_to_cash": {
+        "cents": 0,
+        "currency_symbol": "NT$",
+        "currency_iso": "TWD",
+        "label": "",
+        "dollars": 0.0
+    },
+    "invoice": {
+        "tax_id": "",
+        "mailing_address": "",
+        "invoice_type": "0",
+        "buyer_name": "",
+        "carrier_type": "0",
+        "carrier_number": "",
+        "n_p_o_b_a_n": "",
+        "invoice_tax_type": "",
+        "invoice_number": "",
+        "invoice_status": "",
+        "invoice_date": null,
+        "invoice_cancelled_at": null
+    },
+    "invoices": [],
+    "subtotal_items": [
+        {
+            "id": "68281a7983f5d80011617700",
+            "item_type": "ProductSet",
+            "item_data": {
+                "cart_item_id": "dc36f6c52f7949b9b8d0e7dae9744f12",
+                "promotion_id": "",
+                "parent_item_ids": [],
+                "triggering_item_id": "",
+                "order_promotion_items": {},
+                "order_discounted_price": {
+                    "cents": 95,
+                    "currency_symbol": "NT$",
+                    "currency_iso": "TWD",
+                    "label": "NT$95",
+                    "dollars": 95.0
+                },
+                "applied_order_promotion_discounts": [
+                    {
+                        "promotion_id": "6540ca2178527f0014fbba19",
+                        "discount": {
+                            "cents": 95,
+                            "currency_symbol": "NT$",
+                            "currency_iso": "TWD",
+                            "label": "NT$95",
+                            "dollars": 95.0
+                        }
+                    }
+                ],
+                "is_exclude_promotion": false,
+                "is_exclude_user_credit": false,
+                "is_exclude_member_point": false,
+                "has_exclude_promotion_tag": false,
+                "custom_discounted_amount": {
+                    "cents": 0,
+                    "currency_symbol": "NT$",
+                    "currency_iso": "TWD",
+                    "label": "",
+                    "dollars": 0.0
+                },
+                "custom_discounted_amount_items": [],
+                "user_credit_ratio_amount": {
+                    "cents": 854,
+                    "currency_symbol": "NT$",
+                    "currency_iso": "TWD",
+                    "label": "NT$854",
+                    "dollars": 854.0
+                },
+                "selected_child_products": [
+                    {
+                        "child_product_id": "68220c8122ee34000c0702b6",
+                        "child_variation_id": "68220c81766c6e000a6c1464",
+                        "quantity": 1,
+                        "stock_id": ""
+                    },
+                    {
+                        "child_product_id": "68220c8122ee34000c0702b6",
+                        "child_variation_id": "68220c81766c6e000a6c146a",
+                        "quantity": 5,
+                        "stock_id": ""
+                    },
+                    {
+                        "child_product_id": "68220c8122ee34000c0702b6",
+                        "child_variation_id": "68220c81766c6e000a6c1468",
+                        "quantity": 1,
+                        "stock_id": ""
+                    }
+                ]
+            },
+            "item_id": "682212b69861c5000d4bb3a8",
+            "item_variation_id": "",
+            "item_variation_key": "",
+            "item_price": {
+                "cents": 949,
+                "currency_symbol": "NT$",
+                "currency_iso": "TWD",
+                "label": "NT$949",
+                "dollars": 949.0
+            },
+            "price": {
+                "cents": 1000,
+                "currency_symbol": "NT$",
+                "currency_iso": "TWD",
+                "label": "NT$1,000",
+                "dollars": 1000.0
+            },
+            "price_sale": {
+                "cents": 949,
+                "currency_symbol": "NT$",
+                "currency_iso": "TWD",
+                "label": "NT$949",
+                "dollars": 949.0
+            },
+            "cost": {
+                "cents": 0,
+                "currency_symbol": "NT$",
+                "currency_iso": "TWD",
+                "label": "NT$0",
+                "dollars": 0.0
+            },
+            "ref_data": null,
+            "media": {
+                "images": {
+                    "original": {
+                        "width": 1080.0,
+                        "height": 1080.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/68221269cf4302000e2f1265/original.png?1747063400"
+                    },
+                    "favicon_small": {
+                        "width": 1080.0,
+                        "height": 1080.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/68221269cf4302000e2f1265/original.png?1747063400"
+                    },
+                    "favicon": {
+                        "width": 1080.0,
+                        "height": 1080.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/68221269cf4302000e2f1265/original.png?1747063400"
+                    },
+                    "favicon_large": {
+                        "width": 1080.0,
+                        "height": 1080.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/68221269cf4302000e2f1265/original.png?1747063400"
+                    },
+                    "transparent_thumb": {
+                        "width": 1080.0,
+                        "height": 1080.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/68221269cf4302000e2f1265/original.png?1747063400"
+                    },
+                    "transparent_large": {
+                        "width": 1080.0,
+                        "height": 1080.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/68221269cf4302000e2f1265/original.png?1747063400"
+                    },
+                    "transparent_xlarge": {
+                        "width": 1080.0,
+                        "height": 1080.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/68221269cf4302000e2f1265/original.png?1747063400"
+                    },
+                    "thumb": {
+                        "width": 1080.0,
+                        "height": 1080.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/68221269cf4302000e2f1265/original.png?1747063400"
+                    },
+                    "source": {
+                        "width": 1080.0,
+                        "height": 1080.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/68221269cf4302000e2f1265/original.png?1747063400"
+                    }
+                },
+                "_id": "68221269cf4302000e2f1265",
+                "alt_translations": {},
+                "blurhash": "UBKmRl%$_NV@-pMxS$X9tRxuIpxt%LniNbnh"
+            },
+            "product_subscription_id": null,
+            "title_translations": {
+                "zh-hant": "\u3010\u4efb\u907814\u5165$949\u3011\u6e1b\u91a3\u8c9d\u679c\u9ad4\u9a57\u7d44"
+            },
+            "fields_translations": {},
+            "sku": "",
+            "is_preorder": false,
+            "preorder_note_translations": {},
+            "quantity": 1,
+            "total": {
+                "cents": 949,
+                "currency_symbol": "NT$",
+                "currency_iso": "TWD",
+                "label": "NT$949",
+                "dollars": 949.0
+            },
+            "order_discounted_price": {
+                "cents": 95,
+                "currency_symbol": "NT$",
+                "currency_iso": "TWD",
+                "label": "NT$95",
+                "dollars": 95.0
+            },
+            "discounted_price": null,
+            "created_by": "admin",
+            "object_data": {
+                "gender": "unisex",
+                "age_group": "all_ages",
+                "adult": "no",
+                "condition": "new",
+                "status": "active",
+                "cart_tag_id": "652beb3524c5d00014b63deb",
+                "weight": 0.0,
+                "barcode_type": "Code 128",
+                "max_order_quantity": -1,
+                "gtin": "096796390107"
+            },
+            "child_products": [
+                {
+                    "title_translations": {
+                        "zh-hant": "\u3010\u4efb\u907814\u5165$949\u3011"
+                    },
+                    "weight": 0.0,
+                    "id": "68220c8122ee34000c0702b6",
+                    "variation_id": "68220c81766c6e000a6c1464",
+                    "fields_translations": {
+                        "en": [
+                            ""
+                        ],
+                        "zh-hant": [
+                            "\u4f4e\u7cd6\u8349\u8393\u4e73\u916a\u8c9d\u679c\uff08\u5169\u5165\uff09"
+                        ]
+                    },
+                    "price": {
+                        "cents": 145.0,
+                        "currency_iso": "TWD",
+                        "label": "NT$145"
+                    },
+                    "price_sale": {
+                        "cents": 0,
+                        "currency_symbol": "NT$",
+                        "currency_iso": "TWD",
+                        "label": "NT$0",
+                        "dollars": 0.0
+                    },
+                    "sku": "bagel001-2EA"
+                },
+                {
+                    "title_translations": {
+                        "zh-hant": "\u3010\u4efb\u907814\u5165$949\u3011"
+                    },
+                    "weight": 0.0,
+                    "id": "68220c8122ee34000c0702b6",
+                    "variation_id": "68220c81766c6e000a6c1468",
+                    "fields_translations": {
+                        "en": [
+                            ""
+                        ],
+                        "zh-hant": [
+                            "\u7d93\u5178\u8f15\u76c8\u539f\u5473\u8c9d\u679c\uff08\u5169\u5165\uff09"
+                        ]
+                    },
+                    "price": {
+                        "cents": 110.0,
+                        "currency_iso": "TWD",
+                        "label": "NT$110"
+                    },
+                    "price_sale": {
+                        "cents": 0,
+                        "currency_symbol": "NT$",
+                        "currency_iso": "TWD",
+                        "label": "NT$0",
+                        "dollars": 0.0
+                    },
+                    "sku": "bagel005-2EA"
+                },
+                {
+                    "title_translations": {
+                        "zh-hant": "\u3010\u4efb\u907814\u5165$949\u3011"
+                    },
+                    "weight": 0.0,
+                    "id": "68220c8122ee34000c0702b6",
+                    "variation_id": "68220c81766c6e000a6c146a",
+                    "fields_translations": {
+                        "en": [
+                            ""
+                        ],
+                        "zh-hant": [
+                            "\u6cd5\u5f0fAOP\u6975\u81f4\u5976\u6cb9\u8c9d\u679c\uff08\u5169\u5165\uff09"
+                        ]
+                    },
+                    "price": {
+                        "cents": 155.0,
+                        "currency_iso": "TWD",
+                        "label": "NT$155"
+                    },
+                    "price_sale": {
+                        "cents": 0,
+                        "currency_symbol": "NT$",
+                        "currency_iso": "TWD",
+                        "label": "NT$0",
+                        "dollars": 0.0
+                    },
+                    "sku": "bagel007-2EA"
+                }
+            ]
+        },
+        {
+            "id": "68281a7983f5d80011617701",
+            "item_type": "Product",
+            "item_data": {
+                "cart_item_id": "35043320e62a4054af4e7883ad2e928d",
+                "promotion_id": "",
+                "parent_item_ids": [],
+                "triggering_item_id": "",
+                "order_promotion_items": {},
+                "order_discounted_price": {
+                    "cents": 22,
+                    "currency_symbol": "NT$",
+                    "currency_iso": "TWD",
+                    "label": "NT$22",
+                    "dollars": 22.0
+                },
+                "applied_order_promotion_discounts": [
+                    {
+                        "promotion_id": "6540ca2178527f0014fbba19",
+                        "discount": {
+                            "cents": 22,
+                            "currency_symbol": "NT$",
+                            "currency_iso": "TWD",
+                            "label": "NT$22",
+                            "dollars": 22.0
+                        }
+                    }
+                ],
+                "is_exclude_promotion": false,
+                "is_exclude_user_credit": false,
+                "is_exclude_member_point": false,
+                "has_exclude_promotion_tag": false,
+                "custom_discounted_amount": {
+                    "cents": 0,
+                    "currency_symbol": "NT$",
+                    "currency_iso": "TWD",
+                    "label": "",
+                    "dollars": 0.0
+                },
+                "custom_discounted_amount_items": [],
+                "user_credit_ratio_amount": {
+                    "cents": 198,
+                    "currency_symbol": "NT$",
+                    "currency_iso": "TWD",
+                    "label": "NT$198",
+                    "dollars": 198.0
+                }
+            },
+            "item_id": "653217db76a7b7001d608226",
+            "item_variation_id": "",
+            "item_variation_key": "",
+            "item_price": {
+                "cents": 110,
+                "currency_symbol": "NT$",
+                "currency_iso": "TWD",
+                "label": "NT$110",
+                "dollars": 110.0
+            },
+            "price": {
+                "cents": 110,
+                "currency_symbol": "NT$",
+                "currency_iso": "TWD",
+                "label": "NT$110",
+                "dollars": 110.0
+            },
+            "price_sale": {
+                "cents": 0,
+                "currency_symbol": "NT$",
+                "currency_iso": "TWD",
+                "label": "NT$0",
+                "dollars": 0.0
+            },
+            "cost": {
+                "cents": 0,
+                "currency_symbol": "NT$",
+                "currency_iso": "TWD",
+                "label": "NT$0",
+                "dollars": 0.0
+            },
+            "ref_data": null,
+            "media": {
+                "images": {
+                    "original": {
+                        "width": 750.0,
+                        "height": 750.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/675080c2696fc800114d3fc5/original.jpg?1733329090"
+                    },
+                    "favicon_small": {
+                        "width": 750.0,
+                        "height": 750.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/675080c2696fc800114d3fc5/original.jpg?1733329090"
+                    },
+                    "favicon": {
+                        "width": 750.0,
+                        "height": 750.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/675080c2696fc800114d3fc5/original.jpg?1733329090"
+                    },
+                    "favicon_large": {
+                        "width": 750.0,
+                        "height": 750.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/675080c2696fc800114d3fc5/original.jpg?1733329090"
+                    },
+                    "transparent_thumb": {
+                        "width": 750.0,
+                        "height": 750.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/675080c2696fc800114d3fc5/original.jpg?1733329090"
+                    },
+                    "transparent_large": {
+                        "width": 750.0,
+                        "height": 750.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/675080c2696fc800114d3fc5/original.jpg?1733329090"
+                    },
+                    "transparent_xlarge": {
+                        "width": 750.0,
+                        "height": 750.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/675080c2696fc800114d3fc5/original.jpg?1733329090"
+                    },
+                    "thumb": {
+                        "width": 750.0,
+                        "height": 750.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/675080c2696fc800114d3fc5/original.jpg?1733329090"
+                    },
+                    "source": {
+                        "width": 750.0,
+                        "height": 750.0,
+                        "url": "https://img.shoplineapp.com/media/image_clips/675080c2696fc800114d3fc5/original.jpg?1733329090"
+                    }
+                },
+                "_id": "675080c2696fc800114d3fc5",
+                "alt_translations": {},
+                "blurhash": "UKHw=R?^kXT0-:IUROxtohNfwH%1R*xvo2M|"
+            },
+            "product_subscription_id": null,
+            "title_translations": {
+                "zh-hant": "\u7d93\u5178\u8f15\u76c8\u539f\u5473\u8c9d\u679c (\u5169\u5165)"
+            },
+            "fields_translations": {},
+            "sku": "bagel005-2EA",
+            "is_preorder": false,
+            "preorder_note_translations": {},
+            "quantity": 2,
+            "total": {
+                "cents": 220,
+                "currency_symbol": "NT$",
+                "currency_iso": "TWD",
+                "label": "NT$220",
+                "dollars": 220.0
+            },
+            "order_discounted_price": {
+                "cents": 22,
+                "currency_symbol": "NT$",
+                "currency_iso": "TWD",
+                "label": "NT$22",
+                "dollars": 22.0
+            },
+            "discounted_price": null,
+            "created_by": "admin",
+            "object_data": {
+                "gender": "unisex",
+                "age_group": "all_ages",
+                "adult": "no",
+                "condition": "new",
+                "status": "active",
+                "cart_tag_id": "652beb3524c5d00014b63deb",
+                "weight": 0.0,
+                "barcode_type": "Code 128",
+                "max_order_quantity": -1,
+                "gtin": "21243056"
+            }
+        }
+    ],
+    "promotion_items": [
+        {
+            "id": "68281a7883f5d800116176ff",
+            "discountable_amount": null,
+            "discounted_amount": {
+                "cents": 117,
+                "currency_symbol": "NT$",
+                "currency_iso": "TWD",
+                "label": "NT$117",
+                "dollars": 117.0
+            },
+            "subtotal_after": {
+                "cents": 1052,
+                "currency_symbol": "NT$",
+                "currency_iso": "TWD",
+                "label": "NT$1,052",
+                "dollars": 1052.0
+            },
+            "promotion": {
+                "_id": "6540ca2178527f0014fbba19",
+                "addon_product_id": null,
+                "available_channel_ids": [],
+                "available_platforms": [
+                    "ec",
+                    "retail"
+                ],
+                "banner_media_ids": [],
+                "codes": [],
+                "coupon_generated_by": null,
+                "coupon_type": null,
+                "created_at": "2023-10-31T09:34:25.177Z",
+                "description_translations": {},
+                "discount_amount": null,
+                "discount_on": "order",
+                "discount_percentage": 10.0,
+                "discount_type": "percentage",
+                "discountable_category_ids": [],
+                "discountable_product_ids": [],
+                "discountable_quantity": null,
+                "discounted_point": null,
+                "discounted_price": null,
+                "draw_end_at": null,
+                "draw_from": null,
+                "draw_start_at": null,
+                "drew_coupon_count": 0,
+                "end_at": null,
+                "extended_promotion_id": null,
+                "first_purchase_only": false,
+                "for_affiliate_campaign": false,
+                "is_accumulated": false,
+                "max_use_count": 0,
+                "membership_tier_id": "6540c62d2ee23a0020bd897a",
+                "merchant_id": "652beb35931dcd0042ce172c",
+                "min_price_type": "subtotal",
+                "multiple_code": false,
+                "requires_membership": false,
+                "seo_description_translations": {},
+                "seo_enabled": true,
+                "seo_keywords": null,
+                "seo_title_translations": {},
+                "show_coupon": false,
+                "start_at": null,
+                "status": "hidden",
+                "term_translations": {},
+                "title_translations": {},
+                "updated_at": "2025-05-17T05:10:07.504Z",
+                "use_count": 352,
+                "user_max_use_count": 0,
+                "whitelisted_tag_contents": [],
+                "cart_tag_id": null,
+                "cart_tag_translations": null,
+                "coupon_code": "",
+                "is_extend_promotion": false,
+                "id": "6540ca2178527f0014fbba19"
+            },
+            "updated_at": "2025-05-17T05:11:20.950+00:00",
+            "created_at": "2025-05-17T05:11:20.950+00:00",
+            "item_data": null,
+            "promotion_conditions_data": [],
+            "coupon_code": null
+        }
+    ],
+    "custom_data": [],
+    "custom_discount_items": [],
+    "affiliate_data": {},
+    "ref_order_id": "",
+    "ref_customer_id": "",
+    "channel": {},
+    "parent_order_id": "",
+    "child_order_ids": [],
+    "split_at": null,
+    "confirmed_at": "2025-05-20T15:48:57.863+00:00",
+    "created_from": "shop",
+    "created_by": "shop",
+    "updated_at": "2025-05-20T15:48:57.895+00:00",
+    "created_at": "2025-05-17T05:11:20.880+00:00",
+    "edited_at": null,
+    "skip_fulfillment": false,
+    "utm_data": {},
+    "ga_tracked": false,
+    "order_comments": [],
+    "order_notes": [
+        {
+            "owner_type": "Merchant",
+            "value": "5/18\u6b64\u55ae\u70ba\u6e2c\u8a66\u55ae\uff0c\u4e0d\u7528\u51fa\u8ca8",
+            "time": "2025-05-18T09:55:06.591Z"
+        },
+        {
+            "owner_type": "Merchant",
+            "value": "5/18\u5df2\u554f\u8001\u95c6\u662f\u7b49\u9867\u5ba2\u5b8c\u6210\u4ed8\u6b3e\u5728\u51fa\u8ca8\u55ce?",
+            "time": "2025-05-18T08:44:16.523Z"
+        }
+    ],
+    "payment_slips": [],
+    "order_source": {
+        "id": "655cb88b5123c60014130615",
+        "type": "storefront",
+        "source_id": null,
+        "name": null
+    },
+    "tags": [],
+    "inclusive_tax_info": {},
+    "cart_page_id": null,
+    "is_guest_checkout": false,
+    "applied_tax_info": {
+        "sales": {},
+        "delivery": {}
+    },
+    "default_warehouse_id": null,
+    "return_from_order_id": null,
+    "membership_tier_data": {
+        "_id": "6540c62d2ee23a0020bd897a",
+        "coupon_ids": [],
+        "created_at": "2023-10-31T09:17:33.119Z",
+        "level": 3,
+        "merchant_id": "652beb35931dcd0042ce172c",
+        "name_translations": {
+            "zh-hant": "\u6e1b\u91a3\u5927\u5e2b"
+        },
+        "status": "active",
+        "updated_at": "2023-10-31T09:34:25.010Z",
+        "wapos_id": "144804fa-beb1-4b42-aaa8-9130f36be246"
+    },
+    "product_subscription_period": null,
+    "checkout_object_data": {
+        "_id": "68281a7883f5d800116176fb",
+        "number": "C20250517051120851",
+        "current_total": {
+            "cents": 190,
+            "currency_symbol": "NT$",
+            "currency_iso": "TWD",
+            "label": "NT$190",
+            "dollars": 190.0
+        },
+        "order_ids": [
+            "68281a7883f5d800116176fc"
+        ]
+    }
+}

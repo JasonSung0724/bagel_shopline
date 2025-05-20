@@ -7,7 +7,7 @@
         "tcat_number":"託運單號",
         "mark_field":"備註",
         "c2c_mark":"減醣市集 X 快電商 C2C BUY",
-        "tcat_name" : "TCAT"
+        "delivery_company" : "託運車隊"
     },
     "c2c":{
         "order_name_format":"A442出貨單資料",

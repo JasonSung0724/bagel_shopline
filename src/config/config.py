@@ -18,7 +18,7 @@ class ConfigManager:
         self.flowtide_c2c_mark = self.config["flowtide"]["c2c_mark"]
         self.flowtide_tcat_number = self.config["flowtide"]["tcat_number"]
         self.flowtide_order_number = self.config["flowtide"]["customer_order_number"]
-        self.flowtide_tcat_name = self.config["flowtide"]["tcat_name"]
+        self.flowtide_delivery_company = self.config["flowtide"]["delivery_company"]
         
         self.c2c_shipping_date = self.config["c2c"]["shipping_date"]
         self.c2c_current_status = self.config["c2c"]["current_status"]

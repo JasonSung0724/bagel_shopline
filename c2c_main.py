@@ -57,7 +57,7 @@ def delivery_excel_handle(excel_data, msg_instance, platform="c2c"):
         if platform == "c2c":
             return row[CONFIG.flowtide_mark_field].startswith(CONFIG.flowtide_c2c_mark)
         elif platform == "shopline":
-            return row[CONFIG.flowtide_order_number].startswith("#") and row[CONFIG.flowtide_tcat_name] == "TCAT"
+            return row[CONFIG.flowtide_order_number].startswith("#") and row[CONFIG.flowtide_delivery_company] == "TCAT"
 
     def _get_platform_order_number(row):
         if platform == "c2c":
@@ -94,39 +94,86 @@ def delivery_excel_handle(excel_data, msg_instance, platform="c2c"):
         logger.error(e)
         return {}
 
+class ShopLineOrderScripts():
 
-def shopline_update_order_scripts(update_orders: dict, msg_instance: MessageSender):
-    with open("src/config/status_map.json", "r") as f:
-        status_map = json.load(f)
-    tracking_info_updated_count = 0
-    updated_delivery_status_count = 0
+    def __init__(self, msg_instance: MessageSender=None, mail_result: list=None):
+        self.msg_instance = msg_instance
+        self.tracking_info_updated_count = 0
+        self.updated_delivery_status_count = 0
+        self.mail_result = mail_result
+        with open("src/config/status_map.json", "r") as f:
+            self.status_map = json.load(f)
 
-    def _check_shopline_status(tcat_status: str):
-        for key, value in status_map.items():
+    def _check_shopline_status(self, tcat_status:str):
+        for key, value in self.status_map.items():
             if tcat_status in value:
-                return key
+                return key 
         logger.warning(f"未找到 {tcat_status} 的對應狀態")
         return None
+    
+    def _update_order_status(self, order_id: str, order_number: str, tcat_status: str, original_delivery_status: str, shop: ShopLine):
+        cur_delivery_status = self._check_shopline_status(tcat_status)
+        if cur_delivery_status and original_delivery_status != cur_delivery_status:
+            if shop.update_delivery_status(status=cur_delivery_status, order_id=order_id):
+                self.updated_delivery_status_count += 1
+                logger.info(f"更新 {order_number} 的訂單狀態 - ShopLine Id : {order_id}")
+                if cur_delivery_status == "arrived":
+                    shop.update_order_status(status="completed", order_id=order_id)
+                if cur_delivery_status == "returned":
+                    shop.update_order_status(status="cancelled", order_id=order_id)
 
-    for order_number, order_info in update_orders.items():
-        tcat_number = order_info["tcat_number"]
-        delivery_status = Tcat.order_status(tcat_number)
-        shop = ShopLine(order_number)
-        order_detail = shop.check_order_delivery_option()
-        if order_detail:
-            tcat_tracking_number = order_detail["delivery_data"]["tracking_number"]
-            original_delivery_status = order_detail["order_delivery"]["status"]
-            if not tcat_tracking_number:
-                shop.update_order(tracking_number=tcat_number, tracking_url=Tcat.get_query_url(tcat_number))
-                tracking_info_updated_count += 1
-            cur_delivery_status = _check_shopline_status(delivery_status)
-            if cur_delivery_status and original_delivery_status != cur_delivery_status:
-                shop.update_delivery_status(status=cur_delivery_status, notify=True)
-                updated_delivery_status_count += 1
-                logger.info(f"更新 {order_number} 的訂單狀態 - ShopLine Id : {shop.order_id}")
-        logger.success(f"更新追蹤資訊 {tracking_info_updated_count} 筆, 更新訂單狀態 {updated_delivery_status_count} 筆")
-        msg_instance.add_message(f"ShopLine訂單-更新追蹤資訊 {tracking_info_updated_count} 筆, 更新訂單狀態 {updated_delivery_status_count} 筆")
+    def shopline_update_order_scripts(self, update_orders: dict):     
+        for order_number, order_info in update_orders.items():
+            shop = ShopLine(order_number)
+            order_detail = shop.check_order_delivery_option()
+            if order_detail:
+                tcat_number = order_info["tcat_number"]
+                tcat_status = order_info["status"]
+                tcat_tracking_number = order_detail["delivery_data"]["tracking_number"]
+                original_delivery_status = order_detail["order_delivery"]["status"]
+                order_id = order_detail["id"]
+                if not tcat_tracking_number:
+                    shop.update_order_tracking_info(tracking_number=tcat_number, tracking_url=Tcat.get_query_url(tcat_number))
+                    self.tracking_info_updated_count += 1
+                self._update_order_status(order_id=order_id, order_number=order_number, tcat_status=tcat_status, original_delivery_status=original_delivery_status, shop=shop)
 
+    def _process_outstanding_order(self, orders, shop: ShopLine):
+        for order in orders:
+            tracking_number = order["delivery_data"]["tracking_number"]
+            original_delivery_status = order["order_delivery"]["status"]
+            order_id = order["id"]
+            order_number = order["order_number"]
+            if tracking_number:
+                tcat_status = Tcat.order_status(tracking_number)
+                self._update_order_status(order_id=order_id, order_number=order_number, tcat_status=tcat_status, original_delivery_status=original_delivery_status, shop=shop)
+            else:
+                self.msg_instance.add_message(f"未找到 {order['order_number']} 的托運單號")
+                logger.warning(f"未找到 {order['order_number']} 的托運單號")
+    
+    def update_outstanding_shopline_order(self):
+        shop = ShopLine()
+        process_page = 1
+        all_orders = []
+        total_pages = None
+        while True:
+            orders = shop.get_outstanding_orders(page=process_page)
+            process_page += 1
+            all_orders.extend(orders["items"])
+            if not total_pages:
+                total_pages = orders["pagination"]["total_pages"]
+            if process_page >= total_pages:
+                break
+        self._process_outstanding_order(all_orders, shop)
+        
+    def run_scripts(self):
+        shopline_order_status = delivery_excel_handle(self.mail_result, self.msg_instance, platform="shopline")
+        self.shopline_update_order_scripts(shopline_order_status)
+        logger.success(f"更新追蹤資訊 {self.tracking_info_updated_count} 筆, 更新訂單狀態 {self.updated_delivery_status_count} 筆")
+        self.msg_instance.add_message(f"ShopLine訂單-更新追蹤資訊 {self.tracking_info_updated_count} 筆, 更新訂單狀態 {self.updated_delivery_status_count} 筆")
+
+    def run_update_outstanding_shopline_order(self):
+        self.update_outstanding_shopline_order()
+        logger.success(f"更新訂單狀態 {self.updated_delivery_status_count} 筆")
 
 class GoogleSheetHandle:
 
@@ -252,7 +299,7 @@ if __name__ == "__main__":
     sheet_handel = GoogleSheetHandle(c2c_order_status)
     sheet_handel.process_data_scripts(msg)
 
-    shopline_order_status = delivery_excel_handle(result, msg, platform="shopline")
-    shopline_update_order_scripts(shopline_order_status, msg)
+    shopline_order_scripts = ShopLineOrderScripts(mail_result=result, msg_instance=msg)
+    shopline_order_scripts.run_scripts()
 
     msg.line_push_message()

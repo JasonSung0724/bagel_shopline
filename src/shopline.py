@@ -24,8 +24,8 @@ class ShopLine:
     def setup(self):
         try:
             if self.order_number:
-                self.order_detail = self.query_order(self.order_number)
-                self.order_id = self.order_detail["items"][0]["id"]
+                self.order_detail = self.query_order(self.order_number)["items"][0]
+                self.order_id = self.order_detail["id"]
             else:
                 return None
         except TypeError as e:
@@ -36,15 +36,17 @@ class ShopLine:
         if response.status_code == 200:
             try:
                 response_data = response.json()
-                logger.debug("Get response data")
+                logger.debug("Request Succeed")
                 return response_data
             except json.JSONDecodeError:
                 logger.error("JSON 解碼錯誤")
         elif response.status_code == 401:
             logger.error("Token 錯誤")
+            return None
         else:
             logger.error(f"{response.status_code} : {response.text}")
-
+            return None
+        
     def get_token_info(self):
         url = f"{self.domain}/v1/token/info"
         response = requests.get(url=url, headers=self.header)
@@ -60,21 +62,25 @@ class ShopLine:
         else:
             return self.response_handler(response)
 
-    def update_delivery_status(self, status, notify):
+    def update_delivery_status(self, status, order_id=None, notify=False):
         # pending, shipping, shipped, arrived, collected, returned, returning
-        url = f"{self.domain}/v1/orders/{self.order_id}/order_delivery_status"
-        payload = {"id": self.order_id, "status": status, "mail_notify": notify}
+        if not order_id:
+            order_id = self.order_id
+        url = f"{self.domain}/v1/orders/{order_id}/order_delivery_status"
+        payload = {"id": order_id, "status": status, "mail_notify": notify}
         response = requests.patch(url=url, headers=self.header, data=json.dumps(payload))
         return self.response_handler(response)
 
-    def update_order_status(self, status):
+    def update_order_status(self, status, order_id=None, notify=False):
         # pending, confirmed, completed, cancelled
-        url = f"{self.domain}/v1/orders/{self.order_id}/status"
-        payload = {"id": self.order_id, "mail_notify": False, "status": status}
+        if not order_id:
+            order_id = self.order_id
+        url = f"{self.domain}/v1/orders/{order_id}/status"
+        payload = {"id": order_id, "mail_notify": notify, "status": status}
         response = requests.patch(url=url, headers=self.header, data=json.dumps(payload))
         return self.response_handler(response)
 
-    def update_order(self, tracking_number, tracking_url):
+    def update_order_tracking_info(self, tracking_number, tracking_url):
         url = f"{self.domain}/v1/orders/{self.order_id}"
 
         payload = {
@@ -112,7 +118,6 @@ class ShopLine:
                 query_params.append(f"{key}={value}")
         query_string = "&".join(query_params)
         full_url = f"{url}?{query_string}"
-        logger.info(f"Search order url: {full_url}")
         response = requests.get(url=full_url, headers=self.header)
         return self.response_handler(response)
 
@@ -127,11 +132,18 @@ class ShopLine:
     def update_delivery_options(self):
         url = f"{self.domain}/v1/delivery_options/{self.order_id}/stores_info"
 
-    def get_outstanding_orders(self):
-        return self.search_order({"delivery_option_id": self.custome_delivery_method, "delivery_statuses[]":["pending", "shipping","shipped", "returning", "returned"]})
+    def get_outstanding_orders(self, page=None):
+        search_params = {"per_page": 200, "delivery_option_id": self.custome_delivery_method, "delivery_statuses[]":["pending", "shipping","shipped", "returning", "returned"]}
+        if page:
+            search_params["page"] = page
+        return self.search_order(search_params)
     
     def check_order_delivery_option(self):
-        order_detail = self.get_order()
+        if self.order_detail: 
+            order_detail = self.order_detail
+        else:
+            order_detail = self.get_order()
+
         if order_detail["order_delivery"]["delivery_option_id"] == self.custome_delivery_method:
             return order_detail
         return None
