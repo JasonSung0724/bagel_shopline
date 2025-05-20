@@ -84,7 +84,3 @@ class ShoplineBackoffice:
 async def main():
     shopline_backoffice = ShoplineBackoffice()
     await shopline_backoffice.login()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

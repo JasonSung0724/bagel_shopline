@@ -39,18 +39,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 安裝 Playwright
-RUN pip install --no-cache-dir playwright
-
-# 只安裝 Chromium 瀏覽器以節省空間
-RUN playwright install chromium --with-deps
-
 # 複製應用程式代碼
 COPY . .
 
-# 設定環境變數
-ENV PYTHONUNBUFFERED=1
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-
-# 設定啟動命令
 CMD ["python", "app.py"]
