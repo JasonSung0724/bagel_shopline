@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 
 @app.route("/flowtide_excel_handle", methods=["POST"])
-def run_task():
+def flowtide_excel_handle():
     custom_header = request.headers.get("X-Auth")
     if custom_header != "BagelShopC2C":
         return "Unauthorized", 401
@@ -28,7 +28,7 @@ def run_task():
     return "Task completed", 200
 
 @app.route("/shopline_outstanding_order_update", methods=["POST"])
-def run_task():
+def shopline_outstanding_order_update():
     custom_header = request.headers.get("X-Auth")
     if custom_header != "BagelShopC2C":
         return "Unauthorized", 401
