@@ -28,7 +28,7 @@ def run_task():
     return "Task completed", 200
 
 
-@app.route("/return_ip")
+@app.route("/return_ip", methods=["GET"])
 def get_ip():
     response = requests.get("https://httpbin.org/ip")
     return f"Your IP is: {response.json()['origin']}"
