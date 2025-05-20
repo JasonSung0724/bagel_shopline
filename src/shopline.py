@@ -18,6 +18,7 @@ class ShopLine:
         self.order_number = order_number
         self.order_detail = {}
         self.order_id = ""
+        self.custome_delivery_method = "68281a2f3451b7000c4f5d7b"
         self.setup()
 
     def setup(self):
@@ -62,13 +63,8 @@ class ShopLine:
     def update_delivery_status(self, status, notify):
         # pending, shipping, shipped, arrived, collected, returned, returning
         url = f"{self.domain}/v1/orders/{self.order_id}/order_delivery_status"
-        print(f"Url : {url}")
         payload = {"id": self.order_id, "status": status, "mail_notify": notify}
-        print(f"Header : {self.header}")
-        print(f"Payload : {payload}")
         response = requests.patch(url=url, headers=self.header, data=json.dumps(payload))
-        print(f"Response : {response}")
-        print(response.json())
         return self.response_handler(response)
 
     def update_order_status(self, status):
@@ -107,14 +103,16 @@ class ShopLine:
         """
         url = f"{self.domain}/v1/orders/search"
         query_params = []
-
         for key, value in specific_conditions.items():
             if value:
                 if isinstance(value, list):
-                    value = ",".join(value)
+                    for option in value:
+                        query_params.append(f"{key}={option}")
+                    break
                 query_params.append(f"{key}={value}")
         query_string = "&".join(query_params)
         full_url = f"{url}?{query_string}"
+        logger.info(f"Search order url: {full_url}")
         response = requests.get(url=full_url, headers=self.header)
         return self.response_handler(response)
 
@@ -129,4 +127,12 @@ class ShopLine:
     def update_delivery_options(self):
         url = f"{self.domain}/v1/delivery_options/{self.order_id}/stores_info"
 
+    def get_outstanding_orders(self):
+        return self.search_order({"delivery_option_id": self.custome_delivery_method, "delivery_statuses[]":["pending", "shipping","shipped", "returning", "returned"]})
+    
+    def check_order_delivery_option(self):
+        order_detail = self.get_order()
+        if order_detail["order_delivery"]["delivery_option_id"] == self.custome_delivery_method:
+            return order_detail
+        return None
 

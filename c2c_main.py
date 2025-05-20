@@ -112,18 +112,18 @@ def shopline_update_order_scripts(update_orders: dict, msg_instance: MessageSend
         tcat_number = order_info["tcat_number"]
         delivery_status = Tcat.order_status(tcat_number)
         shop = ShopLine(order_number)
-        order_detail = shop.get_order()
-        tcat_tracking_number = order_detail["delivery_data"]["tracking_number"]
-        original_delivery_status = order_detail["order_delivery"]["status"]
-        if not tcat_tracking_number:
-            shop.update_order(tracking_number=tcat_number, tracking_url=Tcat.get_query_url(tcat_number))
-            tracking_info_updated_count += 1
-        cur_delivery_status = _check_shopline_status(delivery_status)
-        if cur_delivery_status and original_delivery_status != cur_delivery_status:
-            shop.update_delivery_status(status=cur_delivery_status, notify=True)
-            updated_delivery_status_count += 1
-            logger.info(f"更新 {order_number} 的訂單狀態 - ShopLine Id : {shop.order_id}")
-
+        order_detail = shop.check_order_delivery_option()
+        if order_detail:
+            tcat_tracking_number = order_detail["delivery_data"]["tracking_number"]
+            original_delivery_status = order_detail["order_delivery"]["status"]
+            if not tcat_tracking_number:
+                shop.update_order(tracking_number=tcat_number, tracking_url=Tcat.get_query_url(tcat_number))
+                tracking_info_updated_count += 1
+            cur_delivery_status = _check_shopline_status(delivery_status)
+            if cur_delivery_status and original_delivery_status != cur_delivery_status:
+                shop.update_delivery_status(status=cur_delivery_status, notify=True)
+                updated_delivery_status_count += 1
+                logger.info(f"更新 {order_number} 的訂單狀態 - ShopLine Id : {shop.order_id}")
         logger.success(f"更新追蹤資訊 {tracking_info_updated_count} 筆, 更新訂單狀態 {updated_delivery_status_count} 筆")
         msg_instance.add_message(f"ShopLine訂單-更新追蹤資訊 {tracking_info_updated_count} 筆, 更新訂單狀態 {updated_delivery_status_count} 筆")
 
