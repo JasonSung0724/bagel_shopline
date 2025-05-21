@@ -12,37 +12,44 @@ def flowtide_excel_handle():
     custom_header = request.headers.get("X-Auth")
     if custom_header != "BagelShopC2C":
         return "Unauthorized", 401
-    CONFIG = ConfigManager()
-    msg = MessageSender()
+    try:
+        CONFIG = ConfigManager()
+        msg = MessageSender()
 
-    result = fetch_email_by_date(msg, CONFIG.flowtide_sender_email)
-    c2c_order_status = delivery_excel_handle(result, msg, platform="c2c")
-    sheet_handel = GoogleSheetHandle(c2c_order_status)
-    sheet_handel.process_data_scripts(msg)
+        result = fetch_email_by_date(msg, CONFIG.flowtide_sender_email)
+        c2c_order_status = delivery_excel_handle(result, msg, platform="c2c")
+        sheet_handel = GoogleSheetHandle(c2c_order_status)
+        sheet_handel.process_data_scripts(msg)
 
-    shopline_order_scripts = ShopLineOrderScripts(mail_result=result, msg_instance=msg)
-    shopline_order_scripts.run_scripts()
+        shopline_order_scripts = ShopLineOrderScripts(mail_result=result, msg_instance=msg)
+        shopline_order_scripts.run_scripts()
 
-    msg.line_push_message()
+        msg.line_push_message()
 
-    return "Task completed", 200
+        return "Task completed", 200
+
+    except Exception as e:
+        return f"Error: {e}", 500
+
 
 @app.route("/shopline_outstanding_order_update", methods=["POST"])
 def shopline_outstanding_order_update():
     custom_header = request.headers.get("X-Auth")
     if custom_header != "BagelShopC2C":
         return "Unauthorized", 401
-    CONFIG = ConfigManager()
-    
-    shopline_order_scripts = ShopLineOrderScripts()
-    shopline_order_scripts.run_update_outstanding_shopline_order()
+    try:
+        shopline_order_scripts = ShopLineOrderScripts()
+        shopline_order_scripts.run_update_outstanding_shopline_order()
 
-    return "Task completed", 200
+        return "Task completed", 200
+    except Exception as e:
+        return f"Error: {e}", 500
+
 
 @app.route("/return_ip", methods=["GET"])
 def get_ip():
     response = requests.get("https://httpbin.org/ip")
-    return f"Your IP is: {response.json()['origin']}"
+    return f"Server IP is: {response.json()['origin']}"
 
 
 if __name__ == "__main__":
