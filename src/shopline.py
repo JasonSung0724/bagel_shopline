@@ -32,6 +32,14 @@ class ShopLine:
             logger.error(f"Order {self.order_number} 不存在")
             return None
 
+    def get_public_ip(self):
+        try:
+            response = requests.get("https://api.ipify.org?format=json")
+            return response.json()["ip"]
+        except Exception as e:
+            logger.error(f"獲取 IP 地址時發生錯誤: {e}")
+            return "無法獲取 IP 地址"
+
     def response_handler(self, response):
         if response.status_code == 200:
             try:
@@ -41,12 +49,13 @@ class ShopLine:
             except json.JSONDecodeError:
                 logger.error("JSON 解碼錯誤")
         elif response.status_code == 401:
-            logger.error("Token 錯誤")
+            current_ip = self.get_public_ip()
+            logger.error(f"Token 錯誤 - 當前 IP: {current_ip}")
             return None
         else:
             logger.error(f"{response.status_code} : {response.text}")
             return None
-        
+
     def get_token_info(self):
         url = f"{self.domain}/v1/token/info"
         response = requests.get(url=url, headers=self.header)
@@ -88,7 +97,7 @@ class ShopLine:
             "tracking_url": tracking_url,
             "delivery_provider_name": {
                 "zh-hant": "黑貓宅急便",
-            }
+            },
         }
         response = requests.patch(url=url, headers=self.header, data=json.dumps(payload))
         return self.response_handler(response)
@@ -133,13 +142,17 @@ class ShopLine:
         url = f"{self.domain}/v1/delivery_options/{self.order_id}/stores_info"
 
     def get_outstanding_orders(self, page=None):
-        search_params = {"per_page": 200, "delivery_option_id": self.custome_delivery_method, "delivery_statuses[]":["pending", "shipping","shipped", "returning", "returned"]}
+        search_params = {
+            "per_page": 200,
+            "delivery_option_id": self.custome_delivery_method,
+            "delivery_statuses[]": ["pending", "shipping", "shipped", "returning", "returned"],
+        }
         if page:
             search_params["page"] = page
         return self.search_order(search_params)
-    
+
     def check_order_delivery_option(self):
-        if self.order_detail: 
+        if self.order_detail:
             order_detail = self.order_detail
         else:
             order_detail = self.get_order()
@@ -147,4 +160,3 @@ class ShopLine:
         if order_detail["order_delivery"]["delivery_option_id"] == self.custome_delivery_method:
             return order_detail
         return None
-
