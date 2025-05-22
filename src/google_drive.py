@@ -1,14 +1,12 @@
 import pygsheets
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
-import pandas as pd
-import datetime
 from loguru import logger
-import json
 from src.config.config import ConfigManager, SettingsManager
 
 CONFIG = ConfigManager()
 SETTINGS = SettingsManager()
+
 
 class C2CGoogleSheet:
 
@@ -74,13 +72,10 @@ class C2CGoogleSheet:
                 else:
                     data_without_headers.append(row.tolist())
             num_rows = len(data_without_headers) + 1
-            num_cols = len(df.columns)  
+            num_cols = len(df.columns)
             start_col_letter = chr(64 + protected_columns + 1)
             end_col_letter = chr(64 + protected_columns + num_cols)
-            worksheet.update_values(
-                crange=f"{start_col_letter}2:{end_col_letter}{num_rows}",
-                values=data_without_headers
-            )
+            worksheet.update_values(crange=f"{start_col_letter}2:{end_col_letter}{num_rows}", values=data_without_headers)
             logger.success("成功更新 Google Sheet")
             return True
         except Exception as e:

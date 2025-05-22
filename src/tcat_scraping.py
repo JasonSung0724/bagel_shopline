@@ -1,7 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
 from loguru import logger
-import json
 import datetime
 import time
 from requests.adapters import HTTPAdapter
