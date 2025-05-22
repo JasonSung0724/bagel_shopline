@@ -94,9 +94,10 @@ def delivery_excel_handle(excel_data, msg_instance, platform="c2c"):
         logger.error(e)
         return {}
 
-class ShopLineOrderScripts():
 
-    def __init__(self, msg_instance: MessageSender=None, mail_result: list=None):
+class ShopLineOrderScripts:
+
+    def __init__(self, msg_instance: MessageSender = None, mail_result: list = None):
         self.msg_instance = msg_instance
         self.tracking_info_updated_count = 0
         self.updated_delivery_status_count = 0
@@ -104,13 +105,13 @@ class ShopLineOrderScripts():
         with open("src/config/status_map.json", "r") as f:
             self.status_map = json.load(f)
 
-    def _check_shopline_status(self, tcat_status:str):
+    def _check_shopline_status(self, tcat_status: str):
         for key, value in self.status_map.items():
             if tcat_status in value:
-                return key 
+                return key
         logger.warning(f"未找到 {tcat_status} 的對應狀態")
         return None
-    
+
     def _update_order_status(self, order_id: str, order_number: str, tcat_status: str, original_delivery_status: str, shop: ShopLine):
         cur_delivery_status = self._check_shopline_status(tcat_status)
         if cur_delivery_status and original_delivery_status != cur_delivery_status:
@@ -122,7 +123,7 @@ class ShopLineOrderScripts():
                 if cur_delivery_status == "returned":
                     shop.update_order_status(status="cancelled", order_id=order_id)
 
-    def shopline_update_order_scripts(self, update_orders: dict):     
+    def shopline_update_order_scripts(self, update_orders: dict):
         for order_number, order_info in update_orders.items():
             shop = ShopLine(order_number)
             order_detail = shop.check_order_delivery_option()
@@ -135,7 +136,9 @@ class ShopLineOrderScripts():
                 if not tcat_tracking_number:
                     shop.update_order_tracking_info(tracking_number=tcat_number, tracking_url=Tcat.get_query_url(tcat_number))
                     self.tracking_info_updated_count += 1
-                self._update_order_status(order_id=order_id, order_number=order_number, tcat_status=tcat_status, original_delivery_status=original_delivery_status, shop=shop)
+                self._update_order_status(
+                    order_id=order_id, order_number=order_number, tcat_status=tcat_status, original_delivery_status=original_delivery_status, shop=shop
+                )
 
     def _process_outstanding_order(self, orders, shop: ShopLine):
         for order in orders:
@@ -145,11 +148,13 @@ class ShopLineOrderScripts():
             order_number = order["order_number"]
             if tracking_number:
                 tcat_status = Tcat.order_status(tracking_number)
-                self._update_order_status(order_id=order_id, order_number=order_number, tcat_status=tcat_status, original_delivery_status=original_delivery_status, shop=shop)
+                self._update_order_status(
+                    order_id=order_id, order_number=order_number, tcat_status=tcat_status, original_delivery_status=original_delivery_status, shop=shop
+                )
             else:
                 self.msg_instance.add_message(f"未找到 {order['order_number']} 的托運單號")
                 logger.warning(f"未找到 {order['order_number']} 的托運單號")
-    
+
     def update_outstanding_shopline_order(self):
         shop = ShopLine()
         process_page = 1
@@ -164,7 +169,7 @@ class ShopLineOrderScripts():
             if process_page >= total_pages:
                 break
         self._process_outstanding_order(all_orders, shop)
-        
+
     def run_scripts(self):
         shopline_order_status = delivery_excel_handle(self.mail_result, self.msg_instance, platform="shopline")
         self.shopline_update_order_scripts(shopline_order_status)
@@ -174,6 +179,7 @@ class ShopLineOrderScripts():
     def run_update_outstanding_shopline_order(self):
         self.update_outstanding_shopline_order()
         logger.success(f"更新訂單狀態 {self.updated_delivery_status_count} 筆")
+
 
 class GoogleSheetHandle:
 
@@ -294,17 +300,15 @@ class GoogleSheetHandle:
                 logger.debug("沒有需要更新的資料")
 
 
-if __name__ == "__main__":
-    # msg = MessageSender()
+# if __name__ == "__main__":
+#     msg = MessageSender()
 
-    # result = fetch_email_by_date(msg, CONFIG.flowtide_sender_email)
-    # c2c_order_status = delivery_excel_handle(result, msg, platform="c2c")
-    # sheet_handel = GoogleSheetHandle(c2c_order_status)
-    # sheet_handel.process_data_scripts(msg)
+#     result = fetch_email_by_date(msg, CONFIG.flowtide_sender_email)
+#     c2c_order_status = delivery_excel_handle(result, msg, platform="c2c")
+#     sheet_handel = GoogleSheetHandle(c2c_order_status)
+#     sheet_handel.process_data_scripts(msg)
 
-    # shopline_order_scripts = ShopLineOrderScripts(mail_result=result, msg_instance=msg)
-    # shopline_order_scripts.run_scripts()
+#     shopline_order_scripts = ShopLineOrderScripts(mail_result=result, msg_instance=msg)
+#     shopline_order_scripts.run_scripts()
 
-    # msg.line_push_message()
-
-    print(Tcat.order_detail_find_collected_time("907131131503"))
+#     msg.line_push_message()

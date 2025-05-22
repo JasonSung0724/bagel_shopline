@@ -85,7 +85,6 @@ class Tcat:
         finally:
             session.close()
 
-
     @classmethod
     def order_detail_find_collected_time(cls, order_id, retry=2, current_state=None):
 
@@ -97,22 +96,30 @@ class Tcat:
             response = session.get(url, timeout=10, headers=cls.headers)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")
-            
+
             table = soup.find("table", id="resultTable")
             if table:
                 table_data = table.find_all("tr")
+                timeline = []
+
+                def _parse_time(time: str):
+                    date = time.split(" ")[0]
+                    return date.replace("/", "")
+
                 for block in table_data:
                     arrived = block.find("strong")
                     arrive_time = block.find_all("span", class_="bl12")
-                    print(arrive_time)
-                    logger.info(f"arrived: {arrived}, arrive_time: {arrive_time}")
-                    continue
-                    if arrived:
-                        logger.info(arrived.text.strip())
-                    status = block.find("span", class_="bl12")
-                    if status:
-                        logger.info(status.text.strip())
-                    
+                    if arrived and arrive_time:
+                        timeline.append({"status": arrived.text.strip(), "time": _parse_time(arrive_time[1].text.strip())})
+                    else:
+                        record = block.find_all("span", class_="bl12")
+                        if record:
+                            timeline.append({"status": record[0].text.strip(), "time": _parse_time(record[1].text.strip())})
+
+                for s in timeline:
+                    if s["status"] == CONFIG.c2c_status_collected:
+                        return s["time"]
+                return timeline[-1]["time"]
 
             logger.warning(f"無法爬蟲到該訂單的集貨時間 {order_id}")
             return ""
