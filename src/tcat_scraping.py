@@ -88,6 +88,7 @@ class Tcat:
 
     @classmethod
     def order_detail_find_collected_time(cls, order_id, retry=2, current_state=None):
+
         url = f"https://www.t-cat.com.tw/Inquire/TraceDetail.aspx?BillID={order_id}"
         session = cls._create_session()
         try:
@@ -96,20 +97,23 @@ class Tcat:
             response = session.get(url, timeout=10, headers=cls.headers)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")
-            template = soup.find_all("div", id="template")
-            if template:
-                span = soup.find("span", string=CONFIG.c2c_status_collected)
-                if span:
-                    tr = span.find_parent("tr")
-                    td = tr.find_all("td")
-                    update_time = td[1].text.strip()
-                    try:
-                        dt = datetime.datetime.strptime(update_time, "%Y/%m/%d %H:%M")
-                        formatted_date = dt.strftime("%Y%m%d")
-                        return formatted_date
-                    except ValueError as e:
-                        logger.error(f"時間格式轉換錯誤: {e}")
-                        return ""
+            
+            table = soup.find("table", id="resultTable")
+            if table:
+                table_data = table.find_all("tr")
+                for block in table_data:
+                    arrived = block.find("strong")
+                    arrive_time = block.find_all("span", class_="bl12")
+                    print(arrive_time)
+                    logger.info(f"arrived: {arrived}, arrive_time: {arrive_time}")
+                    continue
+                    if arrived:
+                        logger.info(arrived.text.strip())
+                    status = block.find("span", class_="bl12")
+                    if status:
+                        logger.info(status.text.strip())
+                    
+
             logger.warning(f"無法爬蟲到該訂單的集貨時間 {order_id}")
             return ""
         except Exception as e:

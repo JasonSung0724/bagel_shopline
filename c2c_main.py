@@ -199,9 +199,13 @@ class GoogleSheetHandle:
                     self.df.loc[index, self.status_field_name] = new_status
                 if pd.isna(row[self.ship_date_field_name]) or row[self.ship_date_field_name].strip() == "":
                     collected_time = Tcat.order_detail_find_collected_time(row[self.delivery_number_field_name], current_state=new_status)
-                    self.df.loc[index, self.ship_date_field_name] = collected_time
-                    logger.debug(f"更新 {row[self.delivery_number_field_name]} 的集貨時間 {collected_time}")
-                return True
+                    if collected_time:
+                        self.df.loc[index, self.ship_date_field_name] = collected_time
+                        logger.debug(f"更新 {row[self.delivery_number_field_name]} 的集貨時間 {collected_time}")
+                        return True
+                    else:
+                        logger.warning(f"未找到 {row[self.delivery_number_field_name]} 的集貨時間")
+                        return False
             return False
         else:
             if row[self.ship_date_field_name]:
@@ -222,8 +226,7 @@ class GoogleSheetHandle:
                 logger.debug(f"更新單號及狀態 {row_platform_number}")
                 self.df.loc[index, self.delivery_number_field_name] = self.update_orders[row_platform_number]["tcat_number"]
                 status = self.update_orders[row_platform_number]["status"]
-                self.status_update(index=index, row=row, new_status=status)
-                return True
+                return self.status_update(index=index, row=row, new_status=status)
             else:
                 logger.debug(f"逢泰excel中未更新此單號 : {row_platform_number}")
 
@@ -291,15 +294,17 @@ class GoogleSheetHandle:
                 logger.debug("沒有需要更新的資料")
 
 
-# if __name__ == "__main__":
-#     msg = MessageSender()
+if __name__ == "__main__":
+    # msg = MessageSender()
 
-#     result = fetch_email_by_date(msg, CONFIG.flowtide_sender_email)
-#     c2c_order_status = delivery_excel_handle(result, msg, platform="c2c")
-#     sheet_handel = GoogleSheetHandle(c2c_order_status)
-#     sheet_handel.process_data_scripts(msg)
+    # result = fetch_email_by_date(msg, CONFIG.flowtide_sender_email)
+    # c2c_order_status = delivery_excel_handle(result, msg, platform="c2c")
+    # sheet_handel = GoogleSheetHandle(c2c_order_status)
+    # sheet_handel.process_data_scripts(msg)
 
-#     shopline_order_scripts = ShopLineOrderScripts(mail_result=result, msg_instance=msg)
-#     shopline_order_scripts.run_scripts()
+    # shopline_order_scripts = ShopLineOrderScripts(mail_result=result, msg_instance=msg)
+    # shopline_order_scripts.run_scripts()
 
-#     msg.line_push_message()
+    # msg.line_push_message()
+
+    print(Tcat.order_detail_find_collected_time("907131131503"))
