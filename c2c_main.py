@@ -102,7 +102,7 @@ class ShopLineOrderScripts:
         self.tracking_info_updated_count = 0
         self.updated_delivery_status_count = 0
         self.mail_result = mail_result
-        with open("src/config/status_map.json", "r") as f:
+        with open("src/config/status_map.json", "r", encoding="utf-8") as f:
             self.status_map = json.load(f)
 
     def _check_shopline_status(self, tcat_status: str):
@@ -301,14 +301,5 @@ class GoogleSheetHandle:
 
 
 # if __name__ == "__main__":
-#     msg = MessageSender()
-
-#     result = fetch_email_by_date(msg, CONFIG.flowtide_sender_email)
-#     c2c_order_status = delivery_excel_handle(result, msg, platform="c2c")
-#     sheet_handel = GoogleSheetHandle(c2c_order_status)
-#     sheet_handel.process_data_scripts(msg)
-
-#     shopline_order_scripts = ShopLineOrderScripts(mail_result=result, msg_instance=msg)
-#     shopline_order_scripts.run_scripts()
-
-#     msg.line_push_message()
+#     shopline_order_scripts = ShopLineOrderScripts()
+#     shopline_order_scripts.run_update_outstanding_shopline_order()
