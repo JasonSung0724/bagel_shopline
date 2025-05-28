@@ -163,7 +163,8 @@ class ShopLineOrderScripts:
         while True:
             orders = shop.get_outstanding_orders(page=process_page)
             process_page += 1
-            all_orders.extend(orders["items"])
+            if orders["items"]:
+                all_orders.extend(orders["items"])
             if not total_pages:
                 total_pages = orders["pagination"]["total_pages"]
             if process_page >= total_pages:
