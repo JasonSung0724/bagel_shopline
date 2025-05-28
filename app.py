@@ -40,7 +40,8 @@ def shopline_outstanding_order_update():
     if custom_header != "BagelShopC2C":
         return "Unauthorized", 401
     try:
-        shopline_order_scripts = ShopLineOrderScripts()
+        msg = MessageSender()
+        shopline_order_scripts = ShopLineOrderScripts(msg_instance=msg)
         shopline_order_scripts.run_update_outstanding_shopline_order()
 
         return "Task completed", 200
