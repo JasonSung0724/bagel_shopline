@@ -3,6 +3,7 @@ import requests
 from flask import Flask, request
 from c2c_main import fetch_email_by_date, GoogleSheetHandle, delivery_excel_handle, MessageSender, ShopLineOrderScripts
 from src.config.config import ConfigManager
+from loguru import logger
 
 app = Flask(__name__)
 
@@ -29,6 +30,7 @@ def flowtide_excel_handle():
         return "Task completed", 200
 
     except Exception as e:
+        logger.error(f"Error: {e}")
         return f"Error: {e}", 500
 
 
@@ -43,6 +45,7 @@ def shopline_outstanding_order_update():
 
         return "Task completed", 200
     except Exception as e:
+        logger.error(f"Error: {e}")
         return f"Error: {e}", 500
 
 

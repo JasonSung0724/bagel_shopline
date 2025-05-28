@@ -162,6 +162,7 @@ class ShopLineOrderScripts:
         total_pages = None
         while True:
             orders = shop.get_outstanding_orders(page=process_page)
+            logger.info(f"待處理訂單頁數: {orders['pagination']['total_count']}")
             process_page += 1
             if orders["items"]:
                 all_orders.extend(orders["items"])
