@@ -19,6 +19,7 @@ class ShopLine:
         self.order_detail = {}
         self.order_id = ""
         self.custome_delivery_method = "68281a2f3451b7000c4f5d7b"
+        self.shopline_tcat_delivery_method = "68281a2f3451b7000c4f5d7b"
         self.setup()
 
     def setup(self):
@@ -149,6 +150,14 @@ class ShopLine:
         }
         if page:
             search_params["page"] = page
+        return self.search_order(search_params)
+
+    def get_outstanding_shopline_delivery_order(self):
+        search_params = {
+            "per_page": 10,
+            "delivery_option_id": self.shopline_tcat_delivery_method,
+            "status": "pending",
+        }
         return self.search_order(search_params)
 
     def check_order_delivery_option(self):

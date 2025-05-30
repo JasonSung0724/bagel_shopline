@@ -7,6 +7,7 @@ from src.config.config import SettingsManager, ConfigManager
 SETTINGS = SettingsManager()
 CONFIG = ConfigManager()
 
+
 class ShoplineBackoffice:
     def __init__(self):
         self.browser = None
@@ -15,7 +16,7 @@ class ShoplineBackoffice:
         self.login_url = "https://sso.shoplineapp.com/users/sign_in"
         self.username = "bagelshop2025@gmail.com"
         self.password = "!Bagel2025Shop"
-    
+
     async def fetch_verification_code(self):
         script = GmailConnect(email=SETTINGS.bot_gmail, password=SETTINGS.bot_app_password)
         code = script.get_shopline_verification_code(self.official_email)
@@ -24,7 +25,7 @@ class ShoplineBackoffice:
         else:
             logger.error("無法獲取 Shopline 驗證碼")
         return code
-    
+
     async def wait_for_2fa_or_dashboard(self):
         """等待並處理可能出現的二步驟驗證或直接進入dashboard"""
         try:
@@ -34,7 +35,8 @@ class ShoplineBackoffice:
             code = await self.fetch_verification_code()
             await self.page.fill("#code", code)
             await self.page.click("//input[@type='submit']")
-            await self.page.wait_for_url("**/dashboard**", timeout=300000)
+            await self.page.wait_for_load_state("domcontentloaded")
+            await self.page.query_selector("//*[@data-e2e-id='nav_top_nav']")
             logger.success("驗證碼驗證成功！")
         except TimeoutError:
             try:
@@ -48,13 +50,10 @@ class ShoplineBackoffice:
     async def login(self):
         try:
             async with async_playwright() as p:
-                self.browser = await p.chromium.launch(
-                    headless=False,
-                    args=['--disable-dev-shm-usage']
-                )
+                self.browser = await p.chromium.launch(headless=False, args=["--disable-dev-shm-usage"])
                 context = await self.browser.new_context(
-                    viewport={'width': 1920, 'height': 1080},
-                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+                    viewport={"width": 1920, "height": 1080},
+                    user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
                 )
                 self.page = await context.new_page()
                 self.page.set_default_timeout(30000)
@@ -81,6 +80,11 @@ class ShoplineBackoffice:
         except Exception as e:
             logger.error(f"登入過程發生錯誤: {str(e)}")
 
+
 async def main():
     shopline_backoffice = ShoplineBackoffice()
     await shopline_backoffice.login()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
