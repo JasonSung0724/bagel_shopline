@@ -1,5 +1,3 @@
-import pytest
-import allure
 import time
 import json
 from loguru import logger
@@ -14,7 +12,6 @@ from selenium.common.exceptions import StaleElementReferenceException
 from selenium.common.exceptions import ElementClickInterceptedException
 from selenium.common.exceptions import ElementNotInteractableException
 from selenium.common.exceptions import TimeoutException
-from allure_commons.types import AttachmentType
 from urllib.parse import urlparse
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -27,7 +24,6 @@ class Component:
         self.desc = locator[1] if desc == None else desc
 
 
-@pytest.mark.usefixtures("driver_init")
 class BaseHandler:
     timeout = 5
 
@@ -68,7 +64,6 @@ class BaseHandler:
             return WebDriverWait(self.driver, self.timeout, 1).until(EC.presence_of_element_located(loc.locator))
         except (NoSuchElementException, TimeoutException):
             logger.warning(f"{loc.desc} element is not found")
-            self.screenshot(name=f"{loc.desc} element is not found")
             raise NoSuchElementException(f"' {loc.desc} ' element is not found. ")
 
     def find_elements(self, loc, wait=True, *args, **kwargs):
@@ -80,7 +75,6 @@ class BaseHandler:
             return self.driver.find_elements(*loc.locator)
         except (NoSuchElementException, TimeoutException):
             logger.warning(f"{loc.desc} element is not found")
-            self.screenshot(name=f"{loc.desc} element is not found")
             raise NoSuchElementException(f"' {loc.desc} ' element is not found. ")
 
     def wait_for_attribute_to_be_removed(self, loc, attribute, timeout=10):
@@ -133,7 +127,6 @@ class BaseHandler:
             return WebDriverWait(self.driver, timeout, poll_frequency).until(wait_condition(ele))
         except TimeoutException:
             logger.warning(f"'{name}' element is not found")
-            self.screenshot(name=f"element is not found '{name}'")
             raise TimeoutException(f"Element not found for WebElement {name} and {child_loc} after {timeout} seconds")
         except Exception as e:
             error_msg = f"Wait for element exception error '{name}': {str(e)}"
@@ -144,7 +137,6 @@ class BaseHandler:
         try:
             return WebDriverWait(ele, self.timeout, 1).until(EC.presence_of_element_located(child_loc.locator))
         except:
-            self.screenshot(name=f"element is not found {child_loc.desc}")
             raise NoSuchElementException(f"' {child_loc.desc} ' element is not found. ")
 
     def find_child_elements(self, loc, child_loc, *args, **kwargs):
@@ -152,7 +144,6 @@ class BaseHandler:
         try:
             return WebDriverWait(ele, self.timeout, 1).until(EC.presence_of_all_elements_located(child_loc.locator))
         except:
-            self.screenshot(name=f"element is not found: {child_loc.desc}")
             raise NoSuchElementException(f"' {child_loc.desc} ' element is not found. ")
 
     def is_visiable(self, loc, *args, **kargs):
@@ -162,7 +153,6 @@ class BaseHandler:
             try:
                 return self.find_element(loc=loc).is_displayed()
             except:
-                self.screenshot(name=f"{loc.desc} element is not found")
                 raise NoSuchElementException(f"' {loc.desc} ' element is not found. ")
 
     def move_to_element(self, loc):
@@ -224,11 +214,10 @@ class BaseHandler:
             try:
                 msg = msg if msg else self.get_element_text(ele)
                 msg = "NoText" if not msg else msg
-                with allure.step(f"Click : {msg}"):
-                    if srcoll:
-                        self.scroll_to_view(loc=ele)
-                    ele.click()
-                    logger.debug(f"Click : {msg}")
+                if srcoll:
+                    self.scroll_to_view(loc=ele)
+                ele.click()
+                logger.debug(f"Click : {msg}")
             except (ElementClickInterceptedException, ElementNotInteractableException):
                 logger.warning(f"Element '{msg}' was intercepted - handled by Actionchains class")
                 ActionChains(self.driver).move_to_element(ele).click().perform()
@@ -278,8 +267,7 @@ class BaseHandler:
     def get_current_url(self):
         self.web_wait()
         url = self.driver.current_url
-        with allure.step(f"Get current url {url}"):
-            return url
+        return url
 
     def get_coordinates(self, loc):
         ele = self.find_element(loc=loc)
@@ -298,31 +286,11 @@ class BaseHandler:
         self.driver.refresh()
         self.web_wait()
 
-    def assertion(self, expr, screen_shot=True, msg="", **kwargs):
-        ret = pytest.assume(expr, msg)
-        if kwargs:
-            kwargs_str = json.dumps(kwargs, indent=2)
-            allure.attach(body=str(kwargs_str), name=msg, attachment_type=AttachmentType.TEXT)
-        result = "[FAIlDED]" if not expr else "[PASSED]"
-        with allure.step(result + msg):
-            if not expr:
-                logger.error(f"Verify : {msg}")
-                self.screenshot(name=f"{result + msg}")
-                return None
-            logger.success(f"Verify : {msg}")
-            if screen_shot:
-                self.screenshot(name=result + msg)
-            return None
-
     def exec_js(self, js_string, element=None):
         if element:
             self.driver.execute_script(js_string, element)
         else:
             self.driver.execute_script(js_string)
-
-    def screenshot(self, name):
-        with allure.step(name):
-            allure.attach(body=self.driver.get_screenshot_as_png(), name=name, attachment_type=AttachmentType.PNG)
 
     def web_wait(self):
         return WebDriverWait(self.driver, self.timeout).until(

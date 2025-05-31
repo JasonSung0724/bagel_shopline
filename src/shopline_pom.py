@@ -3,7 +3,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
 import json
 from selenium.webdriver.common.keys import Keys
-
+from loguru import logger
 
 class ShopLinePOM(BaseHandler):
 
@@ -24,6 +24,9 @@ class ShopLinePOM(BaseHandler):
     delivery_date_time = Component(locator=(By.XPATH, "//div[@ng-show='order.delivery_data.time_slot_key']"))
     delivery_info_form = Component(locator=(By.XPATH, "//form[@id='orderDeliveryForm']"))
     update_success_notify = Component(locator=(By.XPATH, "//*[@class='ui-pnotify-title' and text()='訂單已更新']"))
+    phone_code_dropdown = Component(locator=(By.XPATH, "(//*[@class='country-code'])[2]"))
+    open_phone_code_dropdown = Component(locator=(By.XPATH, "(//*[@class='iti__arrow'])[2]"))
+    tw_phone_code = Component(locator=(By.XPATH, "((//*[@aria-label='List of countries'])[2]//*[@data-country-code='tw'])[1]"))
 
     def fetch_delivery_info(self):
         return self.wait_for_element(self.delivery_info, wait_type="visibility").text
@@ -36,6 +39,10 @@ class ShopLinePOM(BaseHandler):
         info_list = delivery_info.split("\n")
         if field == "postal_code":
             return info_list[1]
+        elif field == "city":
+            return info_list[2].split(" ")[0]
+        elif field == "region":
+            return info_list[2].split(" ")[1]
         elif field == "address":
             return info_list[3]
 
@@ -52,26 +59,42 @@ class ShopLinePOM(BaseHandler):
         return None
 
     def select_city(self, city):
-        print(f"Select city: {city}")
         select_element = self.find_element(self.selector_recipient_city)
         select = Select(select_element)
         select.select_by_visible_text(city)
         self.wait_for_attribute_to_be_removed(self.selector_recipient_region, "disabled")
         self.time_sleep(0.5)
 
-    def select_region(self, postal_code):
+    def select_phone_code(self):
+        phone_code_dropdown = self.find_elements(self.phone_code_dropdown, wait=False)
+        if not phone_code_dropdown:
+            self.click(self.open_phone_code_dropdown)
+            self.click(self.wait_for_element(loc=self.tw_phone_code, wait_type="visibility"))
+            return
+        phone_code = phone_code_dropdown[0].text
+        logger.info(f"Phone code: {phone_code}")
+
+    def select_region(self, postal_code=None, region=None):
         select_element = self.find_element(self.selector_recipient_region)
         select = Select(select_element)
         for option in select.options:
+            if region in option.text:
+                select.select_by_visible_text(option.text)
+                logger.info(f"Select region by region: {option.text}")
+                return
+        for option in select.options:
             if option.text.startswith(postal_code):
                 select.select_by_visible_text(option.text)
-                break
+                logger.info(f"Select region by postal_code: {option.text}")
+                return
 
     def select_delivery_time(self, delivery_date_time):
         select_element = self.find_element(self.selector_delivery_time)
         select = Select(select_element)
         if " - " in delivery_date_time:
             delivery_date_time = delivery_date_time.replace(" - ", "~")
+        if not delivery_date_time:
+            delivery_date_time = "任何時段"
         select.select_by_visible_text(delivery_date_time)
 
     def save_delivery_info(self):

@@ -19,7 +19,7 @@ class ShopLine:
         self.order_detail = {}
         self.order_id = ""
         self.custome_delivery_method = "68281a2f3451b7000c4f5d7b"
-        self.shopline_tcat_delivery_method = "68281a2f3451b7000c4f5d7b"
+        self.shopline_tcat_delivery_method = "653a404c30939a000e82c000"
         self.setup()
 
     def setup(self):
@@ -62,8 +62,10 @@ class ShopLine:
         response = requests.get(url=url, headers=self.header)
         return self.response_handler(response)
 
-    def get_order(self):
-        url = f"{self.domain}/v1/orders/{self.order_id}"
+    def get_order(self, order_id=None):
+        if not order_id:
+            order_id = self.order_id
+        url = f"{self.domain}/v1/orders/{order_id}"
         response = requests.get(url=url, headers=self.header)
         if response.status_code == 410:
             logger.error(f"{self.order_id} 此 Order 封存")
@@ -128,6 +130,7 @@ class ShopLine:
                 query_params.append(f"{key}={value}")
         query_string = "&".join(query_params)
         full_url = f"{url}?{query_string}"
+        logger.info(f"Full Search URL: {full_url}")
         response = requests.get(url=full_url, headers=self.header)
         return self.response_handler(response)
 
@@ -156,7 +159,22 @@ class ShopLine:
         search_params = {
             "per_page": 10,
             "delivery_option_id": self.shopline_tcat_delivery_method,
-            "status": "pending",
+            "delivery_statuse":"pending",
+            "payment_status": "completed",
+            "created_after": "2024-12-01 00:00:00",
+            "created_before": "2025-05-01 00:00:00",
+        }
+        return self.search_order(search_params)
+    
+    def get_outstanding_shopline_delivery_order2(self):
+        search_params = {
+            "per_page": 10,
+            "delivery_option_id": self.shopline_tcat_delivery_method,
+            "delivery_statuse":"pending",
+            "status":"cancelled",
+            "payment_statues[]": ["failed", "expired"],
+            "created_after": "2024-12-01 00:00:00",
+            "created_before": "2025-05-01 00:00:00",
         }
         return self.search_order(search_params)
 
@@ -169,3 +187,9 @@ class ShopLine:
         if order_detail["order_delivery"]["delivery_option_id"] == self.custome_delivery_method:
             return order_detail
         return None
+    
+    def update_order_tag(self, order_id):
+        url = f"{self.domain}/v1/orders/{order_id}/tags"
+        payload = {"tags": ["Edited Delivery Method Automation"]}
+        response = requests.put(url=url, headers=self.header, data=json.dumps(payload))
+        return self.response_handler(response)
