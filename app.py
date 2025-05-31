@@ -54,12 +54,6 @@ def shopline_outstanding_order_update():
         logger.error(f"Error: {e}")
         return f"Error: {e}", 500
 
-
-@app.route("/return_ip", methods=["GET"])
-def get_ip():
-    response = requests.get("https://httpbin.org/ip")
-    return f"Server IP is: {response.json()['origin']}"
-
 @app.route("/return_ip", methods=["GET"])
 def get_ip():
     try:
