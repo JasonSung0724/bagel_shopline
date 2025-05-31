@@ -7,6 +7,11 @@ from loguru import logger
 
 app = Flask(__name__)
 
+proxy_url = os.environ.get("QUOTAGUARDSTATIC_URL")
+proxies = {
+    "http": proxy_url,
+    "https": proxy_url,
+}
 
 @app.route("/flowtide_excel_handle", methods=["POST"])
 def flowtide_excel_handle():
@@ -54,6 +59,15 @@ def shopline_outstanding_order_update():
 def get_ip():
     response = requests.get("https://httpbin.org/ip")
     return f"Server IP is: {response.json()['origin']}"
+
+@app.route("/return_ip", methods=["GET"])
+def get_ip():
+    try:
+        response = requests.get("https://httpbin.org/ip", proxies=proxies)
+        return f"Server IP is: {response.json()['origin']}"
+    except requests.RequestException as e:
+        logger.error(f"Error fetching IP: {e}")
+        return f"Error fetching IP: {e}", 500
 
 
 if __name__ == "__main__":

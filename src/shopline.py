@@ -2,7 +2,13 @@ import requests
 import json
 from loguru import logger
 from src.config.config import ConfigManager, SettingsManager
+import os
 
+proxy_url = os.environ.get("QUOTAGUARDSTATIC_URL")
+proxies = {
+    "http": proxy_url,
+    "https": proxy_url,
+}
 
 class ShopLine:
 
@@ -35,7 +41,7 @@ class ShopLine:
 
     def get_public_ip(self):
         try:
-            response = requests.get("https://api.ipify.org?format=json")
+            response = requests.get("https://api.ipify.org?format=json", proxies=proxies)
             return response.json()["ip"]
         except Exception as e:
             logger.error(f"獲取 IP 地址時發生錯誤: {e}")
@@ -59,14 +65,14 @@ class ShopLine:
 
     def get_token_info(self):
         url = f"{self.domain}/v1/token/info"
-        response = requests.get(url=url, headers=self.header)
+        response = requests.get(url=url, headers=self.header, proxies=proxies)
         return self.response_handler(response)
 
     def get_order(self, order_id=None):
         if not order_id:
             order_id = self.order_id
         url = f"{self.domain}/v1/orders/{order_id}"
-        response = requests.get(url=url, headers=self.header)
+        response = requests.get(url=url, headers=self.header, proxies=proxies)
         if response.status_code == 410:
             logger.error(f"{self.order_id} 此 Order 封存")
         elif response.status_code == 404:
@@ -80,7 +86,7 @@ class ShopLine:
             order_id = self.order_id
         url = f"{self.domain}/v1/orders/{order_id}/order_delivery_status"
         payload = {"id": order_id, "status": status, "mail_notify": notify}
-        response = requests.patch(url=url, headers=self.header, data=json.dumps(payload))
+        response = requests.patch(url=url, headers=self.header, data=json.dumps(payload), proxies=proxies)
         return self.response_handler(response)
 
     def update_order_status(self, status, order_id=None, notify=False):
@@ -89,7 +95,7 @@ class ShopLine:
             order_id = self.order_id
         url = f"{self.domain}/v1/orders/{order_id}/status"
         payload = {"id": order_id, "mail_notify": notify, "status": status}
-        response = requests.patch(url=url, headers=self.header, data=json.dumps(payload))
+        response = requests.patch(url=url, headers=self.header, data=json.dumps(payload), proxies=proxies)
         return self.response_handler(response)
 
     def update_order_tracking_info(self, tracking_number, tracking_url):
@@ -102,7 +108,7 @@ class ShopLine:
                 "zh-hant": "黑貓宅急便",
             },
         }
-        response = requests.patch(url=url, headers=self.header, data=json.dumps(payload))
+        response = requests.patch(url=url, headers=self.header, data=json.dumps(payload), proxies=proxies)
         return self.response_handler(response)
 
     def search_order(self, specific_conditions: dict):
@@ -131,12 +137,12 @@ class ShopLine:
         query_string = "&".join(query_params)
         full_url = f"{url}?{query_string}"
         logger.info(f"Full Search URL: {full_url}")
-        response = requests.get(url=full_url, headers=self.header)
+        response = requests.get(url=full_url, headers=self.header, proxies=proxies)
         return self.response_handler(response)
 
     def get_order_delivery(self):
         url = f"{self.domain}/v1/order_deliveries/{self.order_id}"
-        response = requests.get(url=url, headers=self.header)
+        response = requests.get(url=url, headers=self.header, proxies=proxies)
         return self.response_handler(response)
 
     def query_order(self, query):
@@ -191,5 +197,5 @@ class ShopLine:
     def update_order_tag(self, order_id):
         url = f"{self.domain}/v1/orders/{order_id}/tags"
         payload = {"tags": ["Edited Delivery Method Automation"]}
-        response = requests.put(url=url, headers=self.header, data=json.dumps(payload))
+        response = requests.put(url=url, headers=self.header, data=json.dumps(payload), proxies=proxies)
         return self.response_handler(response)
