@@ -177,6 +177,17 @@ class ShopLine:
             "created_before": "2025-05-01 00:00:00",
         }
         return self.search_order(search_params)
+    
+    def get_outstanding_shopline_delivery_order3(self):
+        search_params = {
+            "per_page": 10,
+            "delivery_option_id": self.shopline_tcat_delivery_method,
+            "delivery_statuse":"pending",
+            "payment_status": "completed",
+            "created_after": "2025-05-01 00:00:00",
+            "created_before": "2025-05-21 00:00:00",
+        }
+        return self.search_order(search_params)
 
     def check_order_delivery_option(self):
         if self.order_detail:

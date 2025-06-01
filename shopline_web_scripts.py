@@ -41,7 +41,7 @@ class ShopLineScripts(ShopLinePOM):
         self.shop = ShopLine()
 
     def get_pending_orders(self):
-        return self.shop.get_outstanding_shopline_delivery_order2()
+        return self.shop.get_outstanding_shopline_delivery_order3()
 
     def open_order_detail_view(self, order_id):
         # order_id = self.order_detail()
@@ -82,8 +82,8 @@ class ShopLineScripts(ShopLinePOM):
                     self.open_order_detail_view(order_id)
                     if self.edit_delivery_info_scripts():
                         self.shop.update_order_tag(order_id=order_id)
-                        self.shop.update_delivery_status(order_id=order_id, status="returned", notify=False)
-                        # self.shop.update_order_status(order_id=order_id, status="cancelled", notify=False)
+                        self.shop.update_delivery_status(order_id=order_id, status="collected", notify=False)
+                        self.shop.update_order_status(order_id=order_id, status="completed", notify=False)
         except Exception as e:
             logger.error(f"Error: {e}")
             self.open_url("https://admin.shoplineapp.com/admin/carbs/overview/pos")
