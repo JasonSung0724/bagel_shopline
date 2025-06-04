@@ -307,9 +307,3 @@ class GoogleSheetHandle:
             else:
                 msg_instance.add_message(f"執行完畢 沒有更新任何資料")
                 logger.debug("沒有需要更新的資料")
-
-
-# if __name__ == "__main__":
-#     msg = MessageSender()
-#     shopline_order_scripts = ShopLineOrderScripts(msg_instance=msg)
-#     shopline_order_scripts.run_update_outstanding_shopline_order()
