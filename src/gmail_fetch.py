@@ -10,6 +10,7 @@ from src.config.config import ConfigManager
 
 CONFIG = ConfigManager()
 
+
 class GmailConnect:
 
     def __init__(self, email, password):
@@ -45,7 +46,7 @@ class GmailConnect:
     def connect_close(self):
         self.mail.close()
         self.mail.logout()
-    
+
     def get_attachments(self, target_sender_email):
         messages = self._fetch_email()
         result = []
@@ -56,31 +57,31 @@ class GmailConnect:
                     logger.info(data["attachments"][0]["filename"])
                     result.append(data)
         return result
-    
+
     def _fetch_email(self):
         today = datetime.datetime.now()
         previous_day = today - datetime.timedelta(days=1)
         date_format = "%d-%b-%Y"
         previous_day_str = previous_day.strftime(date_format)
         today_str = today.strftime(date_format)
-        messages = self.search_emails(today_str)
+        messages = self.search_emails(previous_day_str)
         return messages
-    
+
     def get_shopline_verification_code(self, target_sender_email):
         messages = self._fetch_email()
         result = []
         if messages:
             for message in messages:
                 data = self.parse_email_shopline_verification_code(message, target_sender_email)
-                if  data and "subject" in data and ("code" in data["subject"] or "驗證碼" in data["subject"]):
+                if data and "subject" in data and ("code" in data["subject"] or "驗證碼" in data["subject"]):
                     result.append(data)
         if result:
             mail = max(result, key=lambda x: x["date"])
-            code = re.search(r'\d{6}', mail["subject"])
+            code = re.search(r"\d{6}", mail["subject"])
             if code:
                 return code.group(0)
         return None
-    
+
     def parse_email(self, message_id, target_sender_email):
         status, data = self.mail.fetch(message_id, "(RFC822)")
         if status != "OK":
@@ -137,7 +138,7 @@ class GmailConnect:
                     }
                     return email_data
         return None
-    
+
     def parse_email_shopline_verification_code(self, message_id, target_sender_email):
         status, data = self.mail.fetch(message_id, "(RFC822)")
         raw_email = data[0][1]

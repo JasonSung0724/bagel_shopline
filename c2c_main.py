@@ -85,10 +85,11 @@ def delivery_excel_handle(excel_data, msg_instance, platform="c2c"):
                             status = Tcat.order_status(tcat_number)
                             order_status[order_number] = {"status": status, "tcat_number": tcat_number}
         if excel_data and not processed:
-            logger.warning(f"逢泰Excel中沒有 {platform.capitalize()} 訂單")
-            msg_instance.add_message(f"逢泰Excel中沒有 {platform.capitalize()} 訂單\n")
+            logger.warning(f"逢泰Excel中沒有 {platform.upper()} 訂單")
+            msg_instance.add_message(f"逢泰Excel中沒有 {platform.upper()} 訂單\n")
             return {}
-        msg_instance.add_message(f"{platform.capitalize()}訂單-總計 {order_count} 筆\n黑貓託運單號共 {len(processed)} 筆")
+        msg_instance.add_message(f"{platform.upper()}訂單-總計 {order_count} 筆\n黑貓託運單號共 {len(processed)} 筆")
+        logger.info(f"Get Order Info\n{order_status}")
         return order_status
     except Exception as e:
         logger.error(e)
@@ -260,7 +261,7 @@ class GoogleSheetHandle:
 
     def process_data_scripts(self, msg_instance):
         for target_sheet in self.target_sheets:
-            msg_instance.add_message(f"處理 {target_sheet} Google Sheet")
+            msg_instance.add_message(f"處理 {target_sheet}\n")
             backup_sheet_name = CONFIG.flowdite_backup_sheet
             self.drive.open_sheet(backup_sheet_name)
             backup_worksheet = self.drive.get_worksheet(0)
@@ -280,8 +281,8 @@ class GoogleSheetHandle:
             try:
                 for index, row in self.df.iterrows():
                     customer_order_number = row[CONFIG.c2c_order_number]
-                    logger.debug(f"處理 {customer_order_number} 訂單")
-                    if not pd.isna(row[CONFIG.c2c_order_number]) and row[CONFIG.c2c_order_number].strip():
+                    if not pd.isna(customer_order_number) and customer_order_number.strip():
+                        logger.debug(f"處理 {customer_order_number} 訂單")
                         tcat_number = row[self.delivery_number_field_name] if not pd.isna(row[self.delivery_number_field_name]) else None
                         update_count += 1 if self.update_data(row=row, index=index, tcat_number=tcat_number) else 0
             except Exception as e:
