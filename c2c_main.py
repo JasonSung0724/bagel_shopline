@@ -280,7 +280,8 @@ class GoogleSheetHandle:
             try:
                 for index, row in self.df.iterrows():
                     customer_order_number = row[CONFIG.c2c_order_number]
-                    if not pd.isna(row[self.platform_number_field_name]) and row[self.platform_number_field_name].strip():
+                    logger.debug(f"處理 {customer_order_number} 訂單")
+                    if not pd.isna(row[CONFIG.c2c_order_number]) and row[CONFIG.c2c_order_number].strip():
                         tcat_number = row[self.delivery_number_field_name] if not pd.isna(row[self.delivery_number_field_name]) else None
                         update_count += 1 if self.update_data(row=row, index=index, tcat_number=tcat_number) else 0
             except Exception as e:
@@ -306,4 +307,3 @@ class GoogleSheetHandle:
 #     msg = MessageSender()
 #     shopline_order_scripts = ShopLineOrderScripts(msg_instance=msg)
 #     shopline_order_scripts.run_update_outstanding_shopline_order()
-
