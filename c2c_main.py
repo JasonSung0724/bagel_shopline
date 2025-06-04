@@ -264,7 +264,7 @@ class GoogleSheetHandle:
 
     def process_data_scripts(self, msg_instance):
         for target_sheet in self.target_sheets:
-            msg_instance.add_message(f"處理 {target_sheet}\n")
+            msg_instance.add_message(f"Google Sheet : {target_sheet}")
             backup_sheet_name = CONFIG.flowdite_backup_sheet
             self.drive.open_sheet(backup_sheet_name)
             backup_worksheet = self.drive.get_worksheet(0)
@@ -300,8 +300,8 @@ class GoogleSheetHandle:
                 logger.debug("正在更新 Google Sheet...")
                 if self.drive.update_worksheet(original_worksheet, self.df):
                     result, message = self.check_result(target_sheet, backup_sheet_name)
-                    logger.success(f"成功更新了 {update_count} 筆資料\n{message}\n")
-                    msg_instance.add_message(f"成功更新了 {update_count} 筆資料")
+                    logger.success(f"成功更新了 {update_count} 筆資料\n{message}")
+                    msg_instance.add_message(f"成功更新了 {update_count} 筆資料\n")
                     if not result:
                         msg_instance.add_message(f"更新後的資料與備份資料數量不一致\n{message}")
             else:
