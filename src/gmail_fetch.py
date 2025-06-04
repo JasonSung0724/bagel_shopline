@@ -64,7 +64,7 @@ class GmailConnect:
         date_format = "%d-%b-%Y"
         previous_day_str = previous_day.strftime(date_format)
         today_str = today.strftime(date_format)
-        messages = self.search_emails(previous_day_str)
+        messages = self.search_emails(today_str)
         return messages
 
     def get_shopline_verification_code(self, target_sender_email):

@@ -46,7 +46,10 @@ class MessageSender:
 def fetch_email_by_date(msg_instance, target_sender_email):
     script = GmailConnect(email=SETTINGS.bot_gmail, password=SETTINGS.bot_app_password)
     result = script.get_attachments(target_sender_email)
-    has_flowtide_excel = "今天有收到逢泰Excel\n" if result else "今天(沒有)收到逢泰Excel\n"
+    today = datetime.datetime.now()
+    date_format = "%d-%b-%Y"
+    today_str = today.strftime(date_format)
+    has_flowtide_excel = f"今天有收到逢泰Excel ({today_str})\n" if result else f"今天沒有收到逢泰Excel ({today_str})\n"
     msg_instance.add_message(has_flowtide_excel)
     return result
 
@@ -88,7 +91,7 @@ def delivery_excel_handle(excel_data, msg_instance, platform="c2c"):
             logger.warning(f"逢泰Excel中沒有 {platform.upper()} 訂單")
             msg_instance.add_message(f"逢泰Excel中沒有 {platform.upper()} 訂單\n")
             return {}
-        msg_instance.add_message(f"{platform.upper()}訂單-總計 {order_count} 筆\n黑貓託運單號共 {len(processed)} 筆")
+        msg_instance.add_message(f"{platform.upper()}訂單-總計 {order_count} 筆,黑貓託運單號共 {len(processed)} 筆")
         logger.info(f"Get Order Info\n{order_status}")
         return order_status
     except Exception as e:
@@ -298,7 +301,9 @@ class GoogleSheetHandle:
                 if self.drive.update_worksheet(original_worksheet, self.df):
                     result, message = self.check_result(target_sheet, backup_sheet_name)
                     logger.success(f"成功更新了 {update_count} 筆資料\n{message}\n")
-                    msg_instance.add_message(f"成功更新了 {update_count} 筆資料\n{message}")
+                    msg_instance.add_message(f"成功更新了 {update_count} 筆資料")
+                    if not result:
+                        msg_instance.add_message(f"更新後的資料與備份資料數量不一致\n{message}")
             else:
                 msg_instance.add_message(f"執行完畢 沒有更新任何資料")
                 logger.debug("沒有需要更新的資料")
