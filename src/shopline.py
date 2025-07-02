@@ -4,6 +4,7 @@ from loguru import logger
 from src.config.config import ConfigManager, SettingsManager
 import os
 
+
 class ShopLine:
 
     def __init__(self, order_number=None):
@@ -126,8 +127,8 @@ class ShopLine:
                 if isinstance(value, list):
                     for option in value:
                         query_params.append(f"{key}={option}")
-                    break
-                query_params.append(f"{key}={value}")
+                else:
+                    query_params.append(f"{key}={value}")
         query_string = "&".join(query_params)
         full_url = f"{url}?{query_string}"
         logger.info(f"Full Search URL: {full_url}")
@@ -153,36 +154,37 @@ class ShopLine:
         }
         if page:
             search_params["page"] = page
+        logger.info(f"Search Params: {search_params}")
         return self.search_order(search_params)
 
     def get_outstanding_shopline_delivery_order(self):
         search_params = {
             "per_page": 10,
             "delivery_option_id": self.shopline_tcat_delivery_method,
-            "delivery_statuse":"pending",
+            "delivery_statuse": "pending",
             "payment_status": "completed",
             "created_after": "2024-12-01 00:00:00",
             "created_before": "2025-05-01 00:00:00",
         }
         return self.search_order(search_params)
-    
+
     def get_outstanding_shopline_delivery_order2(self):
         search_params = {
             "per_page": 10,
             "delivery_option_id": self.shopline_tcat_delivery_method,
-            "delivery_statuse":"pending",
-            "status":"cancelled",
+            "delivery_statuse": "pending",
+            "status": "cancelled",
             "payment_statues[]": ["failed", "expired"],
             "created_after": "2024-12-01 00:00:00",
             "created_before": "2025-05-01 00:00:00",
         }
         return self.search_order(search_params)
-    
+
     def get_outstanding_shopline_delivery_order3(self):
         search_params = {
             "per_page": 10,
             "delivery_option_id": self.shopline_tcat_delivery_method,
-            "delivery_statuse":"pending",
+            "delivery_statuse": "pending",
             "payment_status": "completed",
             "created_after": "2025-05-01 00:00:00",
             "created_before": "2025-05-21 00:00:00",
@@ -198,7 +200,7 @@ class ShopLine:
         if order_detail["order_delivery"]["delivery_option_id"] == self.custome_delivery_method:
             return order_detail
         return None
-    
+
     def update_order_tag(self, order_id):
         url = f"{self.domain}/v1/orders/{order_id}/tags"
         payload = {"tags": ["Edited Delivery Method Automation"]}

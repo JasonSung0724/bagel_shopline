@@ -163,17 +163,23 @@ class ShopLineOrderScripts:
         shop = ShopLine()
         process_page = 1
         all_orders = []
-        total_pages = None
+        total_count = None
+
         while True:
             orders = shop.get_outstanding_orders(page=process_page)
-            logger.info(f"待處理訂單總數: {orders['pagination']['total_count']}")
-            process_page += 1
+            if not orders or "pagination" not in orders:
+                logger.error(f"第 {process_page} 頁 API 響應無效")
+                break
+            if process_page == 1:
+                total_count = orders["pagination"]["total_count"]
+                logger.info(f"待處理訂單總數: {total_count}")
             if orders["items"]:
                 all_orders.extend(orders["items"])
-            if not total_pages:
-                total_pages = orders["pagination"]["total_pages"]
-            if process_page >= total_pages:
+                logger.debug(f"第 {process_page} 頁獲取到 {len(orders['items'])} 筆訂單")
+            if len(all_orders) >= total_count:
                 break
+            process_page += 1
+        logger.info(f"總共獲取到 {len(all_orders)} 筆待處理訂單")
         self._process_outstanding_order(all_orders, shop)
 
     def run_scripts(self):
