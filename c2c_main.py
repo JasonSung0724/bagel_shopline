@@ -237,14 +237,18 @@ class GoogleSheetHandle:
             return self.status_update(index=index, row=row, new_status=self.delivery_succeed)
         elif tcat_number and row_current_status != self.delivery_succeed:
             update_status = Tcat.order_status(tcat_number)
-            is_update = self.status_update(index=index, row=row, new_status=update_status)
-            return is_update
+            result = self.status_update(index=index, row=row, new_status=update_status)
+            result_msg = "成功" if result else "失敗"
+            logger.debug(f"更新 {row_platform_number} 的狀態 {update_status} {result_msg}")
+            return result
         elif not tcat_number:
             if row_platform_number in self.update_orders:
-                logger.debug(f"更新單號及狀態 {row_platform_number}")
                 self.df.loc[index, self.delivery_number_field_name] = self.update_orders[row_platform_number]["tcat_number"]
                 status = self.update_orders[row_platform_number]["status"]
-                return self.status_update(index=index, row=row, new_status=status)
+                result = self.status_update(index=index, row=row, new_status=status)
+                result_msg = "成功" if result else "失敗"
+                logger.debug(f"更新單號及狀態 {row_platform_number} {result_msg}")
+                return result
             else:
                 logger.debug(f"逢泰excel中未更新此單號 : {row_platform_number}")
 
