@@ -215,6 +215,7 @@ class GoogleSheetHandle:
             if row[self.status_field_name] != new_status or pd.isna(row[self.ship_date_field_name]) or row[self.ship_date_field_name].strip() == "":
                 if row[self.status_field_name] != new_status:
                     self.df.loc[index, self.status_field_name] = new_status
+                    logger.debug(f"更新 {row[self.delivery_number_field_name]} 的狀態 {new_status}")
                 if pd.isna(row[self.ship_date_field_name]) or row[self.ship_date_field_name].strip() == "":
                     collected_time = Tcat.order_detail_find_collected_time(row[self.delivery_number_field_name], current_state=new_status)
                     if collected_time:
@@ -224,8 +225,12 @@ class GoogleSheetHandle:
                     else:
                         logger.warning(f"未找到 {row[self.delivery_number_field_name]} 的集貨時間")
                         return False
-            return False
+                return True
+            else:
+                logger.debug(f"無須更新 {row[self.delivery_number_field_name]} 資料")
+                return False
         else:
+            logger.debug(f"暫無 {row[self.delivery_number_field_name]} 訂單的狀態")
             if row[self.ship_date_field_name]:
                 self.df.loc[index, self.ship_date_field_name] = ""
         return False
