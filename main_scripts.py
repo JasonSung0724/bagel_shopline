@@ -12,4 +12,4 @@ if __name__ == "__main__":
     shopline_order_scripts = ShopLineOrderScripts(mail_result=result, msg_instance=msg)
     shopline_order_scripts.run_scripts()
 
-    # msg.line_push_message()
+    msg.line_push_message()
