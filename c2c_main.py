@@ -45,10 +45,10 @@ class MessageSender:
 
 def fetch_email_by_date(msg_instance, target_sender_email):
     script = GmailConnect(email=SETTINGS.bot_gmail, password=SETTINGS.bot_app_password)
-    result = script.get_attachments(target_sender_email)
     today = datetime.datetime.now() - datetime.timedelta(days=1)
     date_format = "%d-%b-%Y"
     today_str = today.strftime(date_format)
+    result = script.get_attachments(target_sender_email, today_str)
     has_flowtide_excel = f"今天有收到逢泰Excel ({today_str})\n" if result else f"今天沒有收到逢泰Excel ({today_str})\n"
     msg_instance.add_message(has_flowtide_excel)
     return result

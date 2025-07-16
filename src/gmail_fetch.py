@@ -47,8 +47,8 @@ class GmailConnect:
         self.mail.close()
         self.mail.logout()
 
-    def get_attachments(self, target_sender_email):
-        messages = self._fetch_email()
+    def get_attachments(self, target_sender_email, date):
+        messages = self._fetch_email(date)
         result = []
         if messages:
             for message in messages:
@@ -58,13 +58,8 @@ class GmailConnect:
                     result.append(data)
         return result
 
-    def _fetch_email(self):
-        today = datetime.datetime.now()
-        previous_day = today - datetime.timedelta(days=1)
-        date_format = "%d-%b-%Y"
-        previous_day_str = previous_day.strftime(date_format)
-        today_str = today.strftime(date_format)
-        messages = self.search_emails(today_str)
+    def _fetch_email(self, date):
+        messages = self.search_emails(date)
         return messages
 
     def get_shopline_verification_code(self, target_sender_email):
