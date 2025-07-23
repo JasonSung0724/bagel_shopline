@@ -148,6 +148,7 @@ class ShopLineOrderScripts:
         for order in orders:
             tracking_number = order["delivery_data"]["tracking_number"]
             original_delivery_status = order["order_delivery"]["status"]
+            confirmed_at = order["confirmed_at"]
             order_id = order["id"]
             order_number = order["order_number"]
             if tracking_number:
@@ -156,7 +157,6 @@ class ShopLineOrderScripts:
                     order_id=order_id, order_number=order_number, tcat_status=tcat_status, original_delivery_status=original_delivery_status, shop=shop
                 )
             else:
-                self.msg_instance.add_message(f"未找到 {order['order_number']} 的托運單號")
                 logger.warning(f"未找到 {order['order_number']} 的托運單號")
 
     def update_outstanding_shopline_order(self):

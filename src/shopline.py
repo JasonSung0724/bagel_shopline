@@ -150,6 +150,7 @@ class ShopLine:
         search_params = {
             "per_page": 200,
             "delivery_option_id": self.custome_delivery_method,
+            "status": "confirmed",
             "delivery_statuses[]": ["pending", "shipping", "shipped", "returning"],
         }
         if page:
