@@ -10,6 +10,7 @@ from loguru import logger
 from src.shopline import ShopLine
 from linebot.v3.messaging import Configuration, ApiClient, MessagingApi
 from linebot.v3.messaging import TextMessage, PushMessageRequest
+import io
 
 CONFIG = ConfigManager()
 SETTINGS = SettingsManager()
@@ -64,9 +65,9 @@ def delivery_excel_handle(excel_data, msg_instance, platform="c2c"):
 
     def _get_platform_order_number(row):
         if platform == "c2c":
-            return row[CONFIG.flowtide_order_number]
+            return str(row[CONFIG.flowtide_order_number])
         elif platform == "shopline":
-            return row[CONFIG.flowtide_order_number].split("#")[1]
+            return str(row[CONFIG.flowtide_order_number].split("#")[1])
 
     try:
         processed = []
@@ -74,8 +75,8 @@ def delivery_excel_handle(excel_data, msg_instance, platform="c2c"):
         order_count = 0
         for data in excel_data:
             _file = data["attachments"][0]["file"]
-            order = ExcelReader(_file)
-            data_frame = order.get_data()
+            file = io.BytesIO(_file)
+            data_frame = pd.read_excel(file, dtype={CONFIG.flowtide_order_number: str})
             for index, row in data_frame.iterrows():
                 if _check_platform_order(row):
                     order_count += 1
