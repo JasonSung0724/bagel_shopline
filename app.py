@@ -4,6 +4,7 @@ from flask import Flask, request
 from c2c_main import fetch_email_by_date, GoogleSheetHandle, delivery_excel_handle, MessageSender, ShopLineOrderScripts
 from src.config.config import ConfigManager
 from loguru import logger
+import datetime
 
 app = Flask(__name__)
 
@@ -15,8 +16,8 @@ def flowtide_excel_handle():
     try:
         CONFIG = ConfigManager()
         msg = MessageSender()
-
-        result = fetch_email_by_date(msg, CONFIG.flowtide_sender_email)
+        date = datetime.datetime.now() - datetime.timedelta(days=1)
+        result = fetch_email_by_date(msg, CONFIG.flowtide_sender_email, date)
         c2c_order_status = delivery_excel_handle(result, msg, platform="c2c")
         sheet_handel = GoogleSheetHandle(c2c_order_status)
         sheet_handel.process_data_scripts(msg)

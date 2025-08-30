@@ -44,13 +44,12 @@ class MessageSender:
         self.message = None
 
 
-def fetch_email_by_date(msg_instance, target_sender_email):
+def fetch_email_by_date(msg_instance, target_sender_email, date: datetime.datetime):
     script = GmailConnect(email=SETTINGS.bot_gmail, password=SETTINGS.bot_app_password)
-    today = datetime.datetime.now() - datetime.timedelta(days=1)
     date_format = "%d-%b-%Y"
-    today_str = today.strftime(date_format)
-    result = script.get_attachments(target_sender_email, today_str)
-    has_flowtide_excel = f"今天有收到逢泰Excel ({today_str})\n" if result else f"今天沒有收到逢泰Excel ({today_str})\n"
+    date_str = date.strftime(date_format)
+    result = script.get_attachments(target_sender_email, date_str)
+    has_flowtide_excel = f"今天有收到逢泰Excel ({date_str})\n" if result else f"今天沒有收到逢泰Excel ({date_str})\n"
     msg_instance.add_message(has_flowtide_excel)
     return result
 
@@ -288,7 +287,28 @@ class GoogleSheetHandle:
             self.drive.open_sheet(target_sheet)
             original_worksheet = self.drive.get_worksheet(0)
             all_values = self.drive.get_worksheet_all_values(original_worksheet)
-            backup_worksheet.update_values(crange=f"A1:{chr(64 + len(all_values[0]))}{len(all_values)}", values=all_values)
+            
+            # 檢查並擴展備份工作表大小
+            required_rows = len(all_values)
+            required_cols = len(all_values[0]) if all_values else 0
+            
+            try:
+                # 獲取當前工作表大小
+                current_rows = backup_worksheet.rows
+                current_cols = backup_worksheet.cols
+                
+                # 如果需要更多行或列，則擴展工作表
+                if required_rows > current_rows or required_cols > current_cols:
+                    logger.info(f"擴展備份工作表: 從 {current_rows}x{current_cols} 到 {required_rows}x{required_cols}")
+                    backup_worksheet.resize(rows=required_rows, cols=required_cols)
+                
+                # 更新備份工作表
+                backup_worksheet.update_values(crange=f"A1:{chr(64 + required_cols)}{required_rows}", values=all_values)
+                
+            except Exception as e:
+                logger.error(f"更新備份工作表時發生錯誤: {e}")
+                msg_instance.add_message(f"更新備份工作表時發生錯誤: {e}")
+                raise
 
             header = all_values[0]
             header = [col for col in header if col != ""]

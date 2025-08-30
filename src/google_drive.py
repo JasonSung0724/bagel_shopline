@@ -71,10 +71,22 @@ class C2CGoogleSheet:
                     data_without_headers.append([""] * len(unprotected_headers))
                 else:
                     data_without_headers.append(row.tolist())
+            
             num_rows = len(data_without_headers) + 1
             num_cols = len(df.columns)
             start_col_letter = chr(64 + protected_columns + 1)
             end_col_letter = chr(64 + protected_columns + num_cols)
+            
+            # 檢查並擴展工作表大小
+            current_rows = worksheet.rows
+            current_cols = worksheet.cols
+            required_rows = protected_columns + num_cols  # 總列數
+            required_cols = num_rows  # 總行數
+            
+            if required_cols > current_cols or required_rows > current_rows:
+                logger.info(f"擴展工作表: 從 {current_rows}x{current_cols} 到 {required_rows}x{required_cols}")
+                worksheet.resize(rows=required_cols, cols=required_rows)
+            
             worksheet.update_values(crange=f"{start_col_letter}2:{end_col_letter}{num_rows}", values=data_without_headers)
             logger.success("成功更新 Google Sheet")
             return True
