@@ -106,11 +106,12 @@ def delivery_excel_handle(excel_data, msg_instance, platform="c2c"):
 
 class ShopLineOrderScripts:
 
-    def __init__(self, msg_instance: MessageSender = None, mail_result: list = None):
+    def __init__(self, msg_instance: MessageSender = None, mail_result: list = None, notify=False):
         self.msg_instance = msg_instance
         self.tracking_info_updated_count = 0
         self.updated_delivery_status_count = 0
         self.mail_result = mail_result
+        self.notify = notify
         with open("src/config/status_map.json", "r", encoding="utf-8") as f:
             self.status_map = json.load(f)
 
@@ -124,13 +125,13 @@ class ShopLineOrderScripts:
     def _update_order_status(self, order_id: str, order_number: str, tcat_status: str, original_delivery_status: str, shop: ShopLine):
         cur_delivery_status = self._check_shopline_status(tcat_status)
         if cur_delivery_status and original_delivery_status != cur_delivery_status:
-            if shop.update_delivery_status(status=cur_delivery_status, order_id=order_id):
+            if shop.update_delivery_status(status=cur_delivery_status, order_id=order_id, notify=self.notify):
                 self.updated_delivery_status_count += 1
                 logger.info(f"更新 {order_number} 的訂單狀態 - ShopLine Id : {order_id}")
                 if cur_delivery_status == "arrived":
-                    shop.update_order_status(status="completed", order_id=order_id)
+                    shop.update_order_status(status="completed", order_id=order_id, notify=self.notify)
                 if cur_delivery_status == "returned":
-                    shop.update_order_status(status="cancelled", order_id=order_id)
+                    shop.update_order_status(status="cancelled", order_id=order_id, notify=self.notify)
 
     def shopline_update_order_scripts(self, update_orders: dict):
         for order_number, order_info in update_orders.items():
@@ -292,24 +293,24 @@ class GoogleSheetHandle:
             self.drive.open_sheet(target_sheet)
             original_worksheet = self.drive.get_worksheet(0)
             all_values = self.drive.get_worksheet_all_values(original_worksheet)
-            
+
             # 檢查並擴展備份工作表大小
             required_rows = len(all_values)
             required_cols = len(all_values[0]) if all_values else 0
-            
+
             try:
                 # 獲取當前工作表大小
                 current_rows = backup_worksheet.rows
                 current_cols = backup_worksheet.cols
-                
+
                 # 如果需要更多行或列，則擴展工作表
                 if required_rows > current_rows or required_cols > current_cols:
                     logger.info(f"擴展備份工作表: 從 {current_rows}x{current_cols} 到 {required_rows}x{required_cols}")
                     backup_worksheet.resize(rows=required_rows, cols=required_cols)
-                
+
                 # 更新備份工作表
                 backup_worksheet.update_values(crange=f"A1:{chr(64 + required_cols)}{required_rows}", values=all_values)
-                
+
             except Exception as e:
                 logger.error(f"更新備份工作表時發生錯誤: {e}")
                 msg_instance.add_message(f"更新備份工作表時發生錯誤: {e}")
