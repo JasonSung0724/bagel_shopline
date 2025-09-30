@@ -57,10 +57,15 @@ def fetch_email_by_date(msg_instance, target_sender_email, date: datetime.dateti
 def delivery_excel_handle(excel_data, msg_instance, platform="c2c"):
 
     def _check_platform_order(row):
-        if platform == "c2c":
-            return row[CONFIG.flowtide_mark_field].startswith(CONFIG.flowtide_c2c_mark)
-        elif platform == "shopline":
-            return row[CONFIG.flowtide_order_number].startswith("#") and row[CONFIG.flowtide_delivery_company] == "TCAT"
+        try:
+            if platform == "c2c":
+                return row[CONFIG.flowtide_mark_field].startswith(CONFIG.flowtide_c2c_mark)
+            elif platform == "shopline":
+                return row[CONFIG.flowtide_order_number].startswith("#") and row[CONFIG.flowtide_delivery_company] == "TCAT"
+        except Exception as e:
+            logger.info(f"Check platform order: {row}")
+            logger.error(f"Error _check_platform_order : {e}")
+            return False
 
     def _get_platform_order_number(row):
         if platform == "c2c":
@@ -95,7 +100,7 @@ def delivery_excel_handle(excel_data, msg_instance, platform="c2c"):
         logger.info(f"Get Order Info\n{order_status}")
         return order_status
     except Exception as e:
-        logger.error(e)
+        logger.error(f"Error delivery_excel_handle : {e}")
         return {}
 
 

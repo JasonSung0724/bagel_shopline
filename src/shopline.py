@@ -25,12 +25,14 @@ class ShopLine:
 
     def setup(self):
         try:
+            if "-" in self.order_number:
+                self.order_number = self.order_number.split("-")[0]
             if self.order_number:
                 self.order_detail = self.query_order(self.order_number)["items"][0]
                 self.order_id = self.order_detail["id"]
             else:
                 return None
-        except TypeError as e:
+        except (TypeError, IndexError) as e:
             logger.error(f"Order {self.order_number} 不存在")
             return None
 
@@ -52,6 +54,7 @@ class ShopLine:
                 logger.error("JSON 解碼錯誤")
         elif response.status_code == 401:
             current_ip = self.get_public_ip()
+            logger.error(f"Response: {response.text}")
             logger.error(f"Token 錯誤 - 當前 IP: {current_ip}")
             return None
         else:
