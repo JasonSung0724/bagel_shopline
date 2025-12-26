@@ -105,6 +105,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Debug - List src/config contents
+        run: |
+          echo "=== Checking src/config directory ==="
+          ls -la src/config/ || echo "src/config does not exist"
+          echo "=== Checking .dockerignore ==="
+          cat .dockerignore
+          echo "=== Git status ==="
+          git status
+          git log --oneline -3
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
