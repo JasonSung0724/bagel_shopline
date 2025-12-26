@@ -1,22 +1,16 @@
-# Stage 1: Dependencies
-FROM node:20-alpine AS deps
-WORKDIR /app
-
-# Copy package files
-COPY package.json package-lock.json* ./
-RUN npm ci --only=production
-
-# Stage 2: Builder
+# Stage 1: Builder
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+# Copy package files and install ALL dependencies (including devDependencies for build)
+COPY package.json package-lock.json* ./
+RUN npm ci
 
-# Build the application
+# Copy source and build
+COPY . .
 RUN npm run build
 
-# Stage 3: Runner
+# Stage 2: Runner
 FROM node:20-alpine AS runner
 WORKDIR /app
 
