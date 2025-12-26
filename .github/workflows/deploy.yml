@@ -198,38 +198,66 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Deploy to VM via SSH
+      - name: Create deployment script
         run: |
-          gcloud compute ssh ${{ env.GCE_INSTANCE }} \
-            --zone=${{ env.GCE_ZONE }} \
-            --command="
-              set -e
+          cat > deploy_script.sh << 'SCRIPT_EOF'
+          #!/bin/bash
+          set -e
 
-              echo '=== Authenticating to Artifact Registry ==='
-              gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+          echo '=== Setting up project directory ==='
+          sudo mkdir -p /opt/bagel-shop
+          sudo chown $(whoami):$(whoami) /opt/bagel-shop
+          cd /opt/bagel-shop
 
-              echo '=== Pulling latest images ==='
-              docker pull ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/api:latest || true
-              docker pull ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/worker:latest || true
-              docker pull ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/frontend:latest || true
+          echo '=== Authenticating to Artifact Registry ==='
+          gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
-              echo '=== Navigating to project directory ==='
-              cd /opt/bagel-shop
+          echo '=== Pulling latest images ==='
+          docker pull us-central1-docker.pkg.dev/mybagel-458109/bagel-repo/api:latest || true
+          docker pull us-central1-docker.pkg.dev/mybagel-458109/bagel-repo/worker:latest || true
+          docker pull us-central1-docker.pkg.dev/mybagel-458109/bagel-repo/frontend:latest || true
 
-              echo '=== Updating docker-compose.yml ==='
-              git pull origin revamp || true
+          echo '=== Downloading docker-compose.yml ==='
+          curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/JasonSung0724/bagel_shopline/revamp/docker-compose.yml
 
-              echo '=== Restarting containers ==='
-              docker compose down
-              docker compose up -d
+          echo '=== Creating required directories ==='
+          mkdir -p logs
 
-              echo '=== Cleaning up old images ==='
-              docker image prune -f
-              docker image prune -a -f --filter 'until=24h'
+          echo '=== Stopping old containers ==='
+          docker compose down || true
 
-              echo '=== Deployment complete ==='
-              docker compose ps
-            "
+          echo '=== Starting containers ==='
+          docker compose up -d api worker frontend
+
+          echo '=== Cleaning up old images ==='
+          docker image prune -f
+          docker image prune -a -f --filter 'until=24h' || true
+
+          echo '=== Deployment complete ==='
+          docker compose ps
+          SCRIPT_EOF
+          chmod +x deploy_script.sh
+
+      - name: Create .env file on VM
+        run: |
+          gcloud compute ssh ${{ env.GCE_INSTANCE }} --zone=${{ env.GCE_ZONE }} --command="
+            sudo mkdir -p /opt/bagel-shop
+            sudo chown \$(whoami):\$(whoami) /opt/bagel-shop
+            cat > /opt/bagel-shop/.env << 'ENVEOF'
+          REGISTRY=us-central1-docker.pkg.dev/mybagel-458109/bagel-repo
+          TAG=latest
+          SHOPLINE_TOKEN=${{ secrets.SHOPLINE_TOKEN }}
+          GMAIL_ADDRESS=${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}
+          LINE_ACCESS_TOKEN=${{ secrets.LINE_ACCESS_TOKEN }}
+          LINE_GROUP_ID=${{ secrets.LINE_GROUP_ID }}
+          ENVEOF
+          "
+
+      - name: Copy and run deployment script
+        run: |
+          gcloud compute scp deploy_script.sh ${{ env.GCE_INSTANCE }}:/tmp/deploy_script.sh --zone=${{ env.GCE_ZONE }}
+          gcloud compute ssh ${{ env.GCE_INSTANCE }} --zone=${{ env.GCE_ZONE }} --command="bash /tmp/deploy_script.sh"
 
       - name: Cleanup Old Images in Artifact Registry
         run: |
