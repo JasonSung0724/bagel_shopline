@@ -217,8 +217,7 @@ jobs:
           docker pull us-central1-docker.pkg.dev/mybagel-458109/bagel-repo/worker:latest || true
           docker pull us-central1-docker.pkg.dev/mybagel-458109/bagel-repo/frontend:latest || true
 
-          echo '=== Downloading docker-compose.yml ==='
-          curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/JasonSung0724/bagel_shopline/revamp/docker-compose.yml
+          echo '=== docker-compose.yml will be copied via scp ==='
 
           echo '=== Creating required directories ==='
           mkdir -p logs
@@ -254,9 +253,10 @@ jobs:
           ENVEOF
           "
 
-      - name: Copy and run deployment script
+      - name: Copy files and run deployment script
         run: |
           gcloud compute scp deploy_script.sh ${{ env.GCE_INSTANCE }}:/tmp/deploy_script.sh --zone=${{ env.GCE_ZONE }}
+          gcloud compute scp docker-compose.yml ${{ env.GCE_INSTANCE }}:/opt/bagel-shop/docker-compose.yml --zone=${{ env.GCE_ZONE }}
           gcloud compute ssh ${{ env.GCE_INSTANCE }} --zone=${{ env.GCE_ZONE }} --command="bash /tmp/deploy_script.sh"
 
       - name: Cleanup Old Images in Artifact Registry
