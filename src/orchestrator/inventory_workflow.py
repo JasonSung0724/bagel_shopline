@@ -97,27 +97,39 @@ class InventoryWorkflow:
     def run_backfill(
         self,
         days_back: int = 365,
-        dry_run: bool = False
+        dry_run: bool = False,
+        start_days_ago: int = 0
     ) -> int:
         """
         Backfill historical inventory data from emails.
         Searches all emails and imports to database.
 
         Args:
-            days_back: How many days to look back
+            days_back: How many days to look back (from start_days_ago)
             dry_run: If True, don't save to database
+            start_days_ago: Start from N days ago (default: 0 = today)
+                           e.g. start_days_ago=30, days_back=30 = 回溯第 30~60 天前的資料
 
         Returns:
             Number of snapshots imported
         """
         try:
-            logger.info(f"開始歷史資料回填 - 回溯 {days_back} 天")
+            if start_days_ago > 0:
+                logger.info(f"開始歷史資料回填 - 從 {start_days_ago} 天前開始，回溯 {days_back} 天")
+            else:
+                logger.info(f"開始歷史資料回填 - 回溯 {days_back} 天")
 
             # Step 1: Fetch all historical emails
             emails = self.inventory_service.fetch_all_inventory_emails(
                 target_sender=self.target_sender,
-                days_back=days_back
+                days_back=days_back + start_days_ago  # 總共要抓的天數
             )
+
+            # Filter by start_days_ago if specified
+            if start_days_ago > 0 and emails:
+                cutoff_date = datetime.now() - timedelta(days=start_days_ago)
+                emails = [e for e in emails if e.date < cutoff_date]
+                logger.info(f"篩選後剩餘 {len(emails)} 封郵件 (排除近 {start_days_ago} 天)")
 
             if not emails:
                 logger.warning("沒有找到歷史庫存郵件")

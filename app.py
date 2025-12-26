@@ -33,9 +33,12 @@ def index():
         "status": "running",
         "endpoints": {
             "/health": "Health check",
-            "/api/inventory": "Get latest inventory",
-            "/api/inventory/sync": "Trigger inventory sync",
+            "/api/inventory": "Get latest inventory snapshot with items",
+            "/api/inventory/sync": "Trigger inventory sync from email",
             "/api/inventory/backfill": "Backfill historical data",
+            "/api/inventory/history": "Get historical snapshots (for trends)",
+            "/api/inventory/changes": "Get inventory changes (restock logs)",
+            "/api/inventory/raw-items": "Get raw Excel items (with batch details)",
         }
     }), 200
 
@@ -160,6 +163,197 @@ def parse_local_excel():
         return jsonify({
             "success": True,
             "data": snapshot.to_dict()
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/inventory/history", methods=["GET"])
+def get_inventory_history():
+    """
+    Get historical inventory snapshots for trend analysis.
+
+    Query params:
+        days: Number of days to look back (default: 30)
+
+    Returns:
+        JSON with list of snapshots (summary only, no items)
+    """
+    try:
+        from datetime import datetime, timedelta
+        days = request.args.get("days", 30, type=int)
+
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+
+        snapshots = workflow.inventory_repo.get_snapshots_by_date_range(start_date, end_date)
+
+        return jsonify({
+            "success": True,
+            "data": snapshots,
+            "count": len(snapshots)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/inventory/changes", methods=["GET"])
+def get_inventory_changes():
+    """
+    Get recent inventory changes (restock logs).
+
+    Query params:
+        limit: Number of records (default: 20)
+
+    Returns:
+        JSON with list of changes
+    """
+    try:
+        limit = request.args.get("limit", 20, type=int)
+
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        changes = workflow.inventory_repo.get_recent_changes(limit=limit)
+
+        return jsonify({
+            "success": True,
+            "data": changes,
+            "count": len(changes)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/inventory/raw-items", methods=["GET"])
+def get_raw_items():
+    """
+    Get raw inventory items for a specific snapshot.
+
+    Query params:
+        snapshot_id: UUID of snapshot (optional, defaults to latest)
+        product_name: Filter by product name (optional)
+
+    Returns:
+        JSON with raw item details
+    """
+    try:
+        snapshot_id = request.args.get("snapshot_id")
+        product_name = request.args.get("product_name")
+
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        # Get latest snapshot if no ID provided
+        if not snapshot_id:
+            latest = workflow.inventory_repo.get_latest_snapshot()
+            if latest:
+                snapshot_id = latest.get('id')
+
+        if not snapshot_id:
+            return jsonify({
+                "success": True,
+                "data": [],
+                "message": "No snapshot available"
+            }), 200
+
+        # Query raw items
+        client = workflow.inventory_repo.client
+        query = client.table("inventory_raw_items").select("*").eq("snapshot_id", snapshot_id)
+
+        if product_name:
+            query = query.eq("product_name", product_name)
+
+        result = query.order("product_name").execute()
+
+        return jsonify({
+            "success": True,
+            "data": result.data or [],
+            "count": len(result.data) if result.data else 0
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/inventory/trend", methods=["GET"])
+def get_inventory_trend():
+    """
+    Get daily stock trend for items (for charts).
+
+    Query params:
+        days: Number of days (default: 30)
+        category: Filter by category - 'bread', 'box', 'bag' (optional)
+        item: Filter by specific item name (optional)
+
+    Returns:
+        JSON with items and their daily stock values
+    """
+    try:
+        days = request.args.get("days", 30, type=int)
+        category = request.args.get("category")
+        item_name = request.args.get("item")
+
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        if item_name:
+            # Single item history
+            data = workflow.inventory_repo.get_item_history(item_name, days)
+            # Transform to consistent format
+            trend_data = [{
+                'name': item_name,
+                'category': data[0]['category'] if data else None,
+                'data': [
+                    {
+                        'date': row.get('inventory_snapshots', {}).get('snapshot_date', '')[:10],
+                        'stock': row['current_stock']
+                    }
+                    for row in data if row.get('inventory_snapshots')
+                ]
+            }] if data else []
+        else:
+            # All items trend
+            trend_data = workflow.inventory_repo.get_items_trend(category, days)
+
+        return jsonify({
+            "success": True,
+            "data": trend_data,
+            "count": len(trend_data)
         }), 200
 
     except Exception as e:

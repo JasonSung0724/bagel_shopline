@@ -396,3 +396,76 @@ class InventoryRepository(SupabaseRepository):
         except Exception as e:
             logger.error(f"Failed to get item history: {e}")
             return []
+
+    def get_items_trend(
+        self,
+        category: Optional[str] = None,
+        days: int = 30
+    ) -> List[Dict]:
+        """
+        Get daily stock trend for items (for charts).
+
+        Args:
+            category: Filter by category ('bread', 'box', 'bag') - optional
+            days: Number of days to look back
+
+        Returns:
+            List of items with their daily stock values:
+            [
+                {
+                    "name": "低糖原味貝果",
+                    "category": "bread",
+                    "data": [
+                        {"date": "2025-12-25", "stock": 5000},
+                        {"date": "2025-12-26", "stock": 4800},
+                        ...
+                    ]
+                },
+                ...
+            ]
+        """
+        if not self.is_connected:
+            return []
+
+        try:
+            from datetime import timedelta
+            start_date = datetime.now() - timedelta(days=days)
+
+            # Query all items with their snapshot dates
+            query = self.client.table(self.TABLE_ITEMS) \
+                .select("name, category, current_stock, inventory_snapshots(snapshot_date)") \
+                .gte("created_at", start_date.isoformat())
+
+            if category:
+                query = query.eq("category", category)
+
+            result = query.order("created_at").execute()
+
+            if not result.data:
+                return []
+
+            # Group by item name
+            items_data: Dict[str, Dict] = {}
+            for row in result.data:
+                name = row['name']
+                if name not in items_data:
+                    items_data[name] = {
+                        'name': name,
+                        'category': row['category'],
+                        'data': []
+                    }
+
+                # Extract snapshot date
+                snapshot_info = row.get('inventory_snapshots')
+                if snapshot_info and snapshot_info.get('snapshot_date'):
+                    date_str = snapshot_info['snapshot_date'][:10]  # YYYY-MM-DD
+                    items_data[name]['data'].append({
+                        'date': date_str,
+                        'stock': row['current_stock']
+                    })
+
+            return list(items_data.values())
+
+        except Exception as e:
+            logger.error(f"Failed to get items trend: {e}")
+            return []

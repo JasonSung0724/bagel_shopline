@@ -44,6 +44,13 @@ def main():
         help="Number of days to look back for backfill (default: 365)"
     )
     parser.add_argument(
+        "--start-from",
+        type=int,
+        default=0,
+        help="Start backfill from N days ago (default: 0 = today). "
+             "Example: --start-from 30 --days 30 = backfill days 30~60"
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Dry run mode (don't save to database)"
@@ -68,13 +75,17 @@ def main():
 
     if args.backfill:
         # Backfill mode
-        logger.info(f"模式: 歷史資料回填 (回溯 {args.days} 天)")
+        if args.start_from > 0:
+            logger.info(f"模式: 歷史資料回填 (從 {args.start_from} 天前開始，回溯 {args.days} 天)")
+        else:
+            logger.info(f"模式: 歷史資料回填 (回溯 {args.days} 天)")
         if args.dry_run:
             logger.info("Dry run 模式，不會保存到資料庫")
 
         count = workflow.run_backfill(
             days_back=args.days,
-            dry_run=args.dry_run
+            dry_run=args.dry_run,
+            start_days_ago=args.start_from
         )
 
         if count > 0:

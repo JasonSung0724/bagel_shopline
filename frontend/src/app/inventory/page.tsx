@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -40,117 +40,108 @@ interface InventoryItem {
   name: string;
   category: 'bread' | 'box' | 'bag';
   stock: number;
+  availableStock: number;
+  unit: string;
+  minStock: number;
+  stockStatus: 'high' | 'medium' | 'low';
+  itemsPerRoll?: number;
+  // Calculated fields for display
   dailySales: number;
   sales7d: number;
   sales14d: number;
   sales30d: number;
-  bagStock?: number;
 }
 
 interface RestockLog {
-  id: number;
+  id: string;
   date: string;
-  item: string;
-  quantity: number;
-  supplier: string;
+  item_name: string;
+  category: string;
+  previous_stock: number;
+  new_stock: number;
+  change_amount: number;
+  source: string;
 }
 
-// --- Real Data Mapped from Uploaded CSV ---
-const REAL_DATA_MAP: Record<string, { stock: number; dailySales: number; bagStock: number }> = {
-  "低糖草莓乳酪貝果": { stock: 7109, dailySales: 92, bagStock: 18.1 },
-  "日式香醇芝麻乳酪貝果": { stock: 8599, dailySales: 102, bagStock: 3.0 },
-  "宇治抹茶紅豆貝果": { stock: 7502, dailySales: 62, bagStock: 6.0 },
-  "低糖藍莓乳酪貝果": { stock: 7125, dailySales: 98, bagStock: 18.1 },
-  "經典輕盈原味貝果": { stock: 10450, dailySales: 97, bagStock: 6.0 },
-  "濃郁起司乳酪丁貝果": { stock: 6004, dailySales: 150, bagStock: 7.0 },
-  "法式AOP極致奶油貝果": { stock: 11398, dailySales: 83, bagStock: 3.0 },
-  "原味高蛋白奶酥貝果": { stock: 6972, dailySales: 27, bagStock: 3.0 },
-  "伯爵高蛋白奶酥貝果": { stock: 6901, dailySales: 53, bagStock: 3.0 },
-  "開心果乳酪貝果": { stock: 7300, dailySales: 42, bagStock: 3.0 },
-  "開心果乳酪歐包": { stock: 5729, dailySales: 39, bagStock: 3.0 },
-  "鹽之花鄉村歐包": { stock: 4231, dailySales: 42, bagStock: 3.0 },
-  "伯爵白巧克力歐包": { stock: 5407, dailySales: 36, bagStock: 3.0 },
-  "黑巧克力歐包": { stock: 4435, dailySales: 55, bagStock: 3.0 },
-  "菠菜起司乳酪丁歐包": { stock: 6675, dailySales: 41, bagStock: 3.0 },
-  "莓果綜合穀物歐包": { stock: 4709, dailySales: 35, bagStock: 3.0 },
-};
+interface SnapshotSummary {
+  id: string;
+  snapshot_date: string;
+  source_file: string;
+  total_bread_stock: number;
+  total_box_stock: number;
+  total_bag_rolls: number;
+  low_stock_count: number;
+}
 
-const BREAD_FLAVORS = Object.keys(REAL_DATA_MAP);
+// Trend data types
+interface TrendDataPoint {
+  date: string;
+  stock: number;
+}
 
-const BOX_DATA = [
-  { name: "60cm 紙箱", stock: 4724, dailyUse: 54 },
-  { name: "90cm 紙箱", stock: 5314, dailyUse: 13 },
-];
+interface ItemTrend {
+  name: string;
+  category: string;
+  data: TrendDataPoint[];
+}
 
-const LATEST_RESTOCK_LOGS: RestockLog[] = [
-  { id: 1, date: '2025-12-19', item: '低糖藍莓乳酪貝果', quantity: 2400, supplier: '主要烘焙廠' },
-  { id: 2, date: '2025-12-19', item: '法式AOP極致奶油貝果', quantity: 2400, supplier: '主要烘焙廠' },
-  { id: 3, date: '2025-12-19', item: '經典輕盈原味貝果', quantity: 2400, supplier: '主要烘焙廠' },
-  { id: 4, date: '2025-12-19', item: '伯爵白巧克力歐包', quantity: 1920, supplier: '主要烘焙廠' },
-  { id: 5, date: '2025-12-18', item: '莓果綜合穀物歐包', quantity: 1920, supplier: '主要烘焙廠' },
-  { id: 6, date: '2025-12-16', item: '開心果乳酪歐包', quantity: 2052, supplier: '主要烘焙廠' },
-];
+// API response types
+interface ApiInventoryItem {
+  id: string;
+  name: string;
+  category: string;
+  current_stock: number;
+  available_stock: number;
+  unit: string;
+  min_stock: number;
+  stock_status: string;
+  items_per_roll?: number;
+}
 
-// Generate initial data
-const generateInitialData = (): InventoryItem[] => {
-  const data: InventoryItem[] = [];
+interface ApiInventoryResponse {
+  success: boolean;
+  data: {
+    id: string;
+    snapshot_date: string;
+    source_file: string;
+    source_email_date: string;
+    total_bread_stock: number;
+    total_box_stock: number;
+    total_bag_rolls: number;
+    low_stock_count: number;
+    raw_item_count: number;
+    bread_items: ApiInventoryItem[];
+    box_items: ApiInventoryItem[];
+    bag_items: ApiInventoryItem[];
+  } | null;
+  message?: string;
+}
 
-  // 1. Breads
-  BREAD_FLAVORS.forEach((flavor, index) => {
-    const realData = REAL_DATA_MAP[flavor];
-    const estSales7d = realData.dailySales * 7;
-    const estSales14d = realData.dailySales * 14;
-    const estSales30d = realData.dailySales * 30;
+// Transform API item to frontend format
+const transformApiItem = (
+  item: ApiInventoryItem,
+  category: 'bread' | 'box' | 'bag',
+  historicalData?: Map<string, number[]>
+): InventoryItem => {
+  // Calculate daily sales from historical data if available
+  // For now, estimate based on min_stock as a baseline
+  const estimatedDailySales = Math.round(item.min_stock / 10) || 50;
 
-    data.push({
-      id: `bread-${index}`,
-      name: flavor,
-      category: 'bread',
-      stock: realData.stock,
-      sales7d: estSales7d,
-      sales14d: estSales14d,
-      sales30d: estSales30d,
-      dailySales: realData.dailySales,
-    });
-  });
-
-  // 2. Boxes
-  BOX_DATA.forEach((box, index) => {
-    const estSales7d = box.dailyUse * 7;
-    const estSales14d = box.dailyUse * 14;
-    const estSales30d = box.dailyUse * 30;
-
-    data.push({
-      id: `box-${index}`,
-      name: box.name,
-      category: 'box',
-      stock: box.stock,
-      sales7d: estSales7d,
-      sales14d: estSales14d,
-      sales30d: estSales30d,
-      dailySales: box.dailyUse,
-    });
-  });
-
-  // 3. Bags
-  BREAD_FLAVORS.forEach((flavor, index) => {
-    const realData = REAL_DATA_MAP[flavor];
-    const bagStock = realData.bagStock;
-
-    data.push({
-      id: `bag-${index}`,
-      name: `${flavor}專用袋`,
-      category: 'bag',
-      stock: bagStock,
-      sales7d: realData.dailySales * 7,
-      sales14d: realData.dailySales * 14,
-      sales30d: realData.dailySales * 30,
-      dailySales: realData.dailySales,
-      bagStock: bagStock,
-    });
-  });
-
-  return data;
+  return {
+    id: item.id,
+    name: item.name,
+    category,
+    stock: item.current_stock,
+    availableStock: item.available_stock,
+    unit: item.unit,
+    minStock: item.min_stock,
+    stockStatus: item.stock_status as 'high' | 'medium' | 'low',
+    itemsPerRoll: item.items_per_roll,
+    dailySales: estimatedDailySales,
+    sales7d: estimatedDailySales * 7,
+    sales14d: estimatedDailySales * 14,
+    sales30d: estimatedDailySales * 30,
+  };
 };
 
 // --- Components ---
@@ -209,49 +200,132 @@ type TabType = 'inventory' | 'analysis' | 'restock';
 export default function InventoryDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('inventory');
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [restockLogs, setRestockLogs] = useState<RestockLog[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [lastSyncDate, setLastSyncDate] = useState<string>('2025/12/25');
+  const [snapshotInfo, setSnapshotInfo] = useState<{
+    snapshotDate: string;
+    snapshotTime: string;
+    sourceFile: string;
+    sourceEmailDate: string;
+    lowStockCount: number;
+    totalBreadStock: number;
+    totalBoxStock: number;
+    totalBagRolls: number;
+    rawItemCount: number;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [trendData, setTrendData] = useState<ItemTrend[]>([]);
+  const [selectedTrendItem, setSelectedTrendItem] = useState<string>('');
+  const [trendDays, setTrendDays] = useState<number>(30);
 
-  // Initialize with mock data
-  useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => {
-      setItems(generateInitialData());
-      setLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Fetch from API (for future real data)
+  // Fetch inventory from API
   const fetchInventory = useCallback(async () => {
     try {
+      setError(null);
       const response = await fetch(`${API_BASE_URL}/api/inventory`);
-      const result = await response.json();
+      const result: ApiInventoryResponse = await response.json();
 
       if (result.success && result.data) {
-        // Transform API data to match our format
-        // For now, we use mock data
-        console.log('API data:', result.data);
+        const {
+          bread_items,
+          box_items,
+          bag_items,
+          snapshot_date,
+          source_file,
+          source_email_date,
+          low_stock_count,
+          total_bread_stock,
+          total_box_stock,
+          total_bag_rolls,
+          raw_item_count,
+        } = result.data;
+
+        // Transform API items to frontend format
+        const allItems: InventoryItem[] = [
+          ...bread_items.map((item) => transformApiItem(item, 'bread')),
+          ...box_items.map((item) => transformApiItem(item, 'box')),
+          ...bag_items.map((item) => transformApiItem(item, 'bag')),
+        ];
+
+        setItems(allItems);
+
+        // Parse dates for display
+        const snapshotDateObj = new Date(snapshot_date);
+        setSnapshotInfo({
+          snapshotDate: `${snapshotDateObj.getMonth() + 1}/${snapshotDateObj.getDate()}`,
+          snapshotTime: '',  // Not used anymore
+          sourceFile: source_file,
+          sourceEmailDate: new Date(source_email_date).toLocaleString('zh-TW'),
+          lowStockCount: low_stock_count,
+          totalBreadStock: total_bread_stock,
+          totalBoxStock: total_box_stock,
+          totalBagRolls: total_bag_rolls,
+          rawItemCount: raw_item_count,
+        });
+      } else {
+        setError(result.message || '無庫存資料，請先同步');
       }
     } catch (err) {
       console.error('Failed to fetch inventory:', err);
+      setError('無法連接伺服器，請確認後端已啟動');
     }
   }, []);
 
-  // Trigger sync
-  const handleSync = async () => {
-    setSyncing(true);
+  // Fetch restock logs
+  const fetchRestockLogs = useCallback(async () => {
     try {
-      await fetch(`${API_BASE_URL}/api/inventory/sync`, { method: 'POST' });
-      await fetchInventory();
-      setLastSyncDate(new Date().toLocaleDateString('zh-TW'));
+      const response = await fetch(`${API_BASE_URL}/api/inventory/changes?limit=20`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setRestockLogs(result.data);
+      }
     } catch (err) {
-      console.error('Sync failed:', err);
-    } finally {
-      setSyncing(false);
+      console.error('Failed to fetch restock logs:', err);
     }
+  }, []);
+
+  // Fetch trend data (only when user clicks)
+  const fetchTrendData = useCallback(async (category?: string) => {
+    try {
+      const url = category
+        ? `${API_BASE_URL}/api/inventory/trend?days=${trendDays}&category=${category}`
+        : `${API_BASE_URL}/api/inventory/trend?days=${trendDays}`;
+      const response = await fetch(url);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setTrendData(result.data);
+        // Auto-select first item if none selected
+        if (result.data.length > 0) {
+          setSelectedTrendItem(result.data[0].name);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch trend data:', err);
+    }
+  }, [trendDays]);
+
+  // Initialize: fetch from API (only once on mount)
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      await fetchInventory();
+      await fetchRestockLogs();
+      setLoading(false);
+    };
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Refresh data from database (no sync from email)
+  const handleRefresh = async () => {
+    setSyncing(true);
+    await fetchInventory();
+    await fetchRestockLogs();
+    setSyncing(false);
   };
 
   // Computed Totals
@@ -283,6 +357,35 @@ export default function InventoryDashboard() {
     );
   }
 
+  // Error state with no data
+  if (error && items.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md">
+          <AlertCircle className="w-12 h-12 text-[#EB5C20] mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">無法載入庫存資料</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <div className="space-y-3">
+            <button
+              onClick={handleRefresh}
+              disabled={syncing}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#EB5C20] text-white rounded-lg hover:bg-[#d44c15] transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? '載入中...' : '重新載入'}
+            </button>
+            <Link
+              href="/"
+              className="block w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              返回首頁
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
       {/* Header */}
@@ -302,20 +405,30 @@ export default function InventoryDashboard() {
               <h1 className="text-xl font-bold text-gray-900 tracking-tight">
                 減醣市集{' '}
                 <span className="text-[#9FA0A0] font-normal text-sm ml-2">
-                  庫存管理儀表板 (已同步 {lastSyncDate} 數據)
+                  庫存管理儀表板
                 </span>
+                {snapshotInfo && (
+                  <span className="ml-2 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200">
+                    資料時間: {snapshotInfo.snapshotDate} {snapshotInfo.snapshotTime}
+                  </span>
+                )}
+                {snapshotInfo && snapshotInfo.lowStockCount > 0 && (
+                  <span className="ml-2 text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
+                    {snapshotInfo.lowStockCount} 項低庫存
+                  </span>
+                )}
               </h1>
             </div>
 
             <div className="flex items-center gap-4">
-              {/* Sync Button */}
+              {/* Refresh Button */}
               <button
-                onClick={handleSync}
+                onClick={handleRefresh}
                 disabled={syncing}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-[#EB5C20] text-white rounded-lg hover:bg-[#d44c15] transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
               >
                 <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-                {syncing ? '同步中...' : '同步資料'}
+                {syncing ? '載入中...' : '重新整理'}
               </button>
 
               {/* Tab Navigation */}
@@ -410,24 +523,25 @@ export default function InventoryDashboard() {
                       <h3 className="font-semibold text-gray-800 text-sm">{item.name}</h3>
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full ${
-                          item.stock < 1000
+                          item.stockStatus === 'low'
                             ? 'bg-red-100 text-red-600'
+                            : item.stockStatus === 'medium'
+                            ? 'bg-yellow-100 text-yellow-600'
                             : 'bg-green-100 text-green-600'
                         }`}
                       >
-                        {item.stock < 1000 ? '低庫存' : '充足'}
+                        {item.stockStatus === 'low' ? '低庫存' : item.stockStatus === 'medium' ? '正常' : '充足'}
                       </span>
                     </div>
                     <div className="text-2xl font-bold text-[#EB5C20]">
                       {item.stock.toLocaleString()}{' '}
-                      <span className="text-xs text-gray-400 font-normal">個</span>
+                      <span className="text-xs text-gray-400 font-normal">{item.unit || '個'}</span>
                     </div>
-                    <StockLevelBar current={item.stock} max={12000} lowThreshold={1000} />
+                    <StockLevelBar current={item.stock} max={item.minStock * 3} lowThreshold={item.minStock} />
                     <div className="mt-3 text-xs text-gray-400 flex justify-between">
-                      <span>今日銷量: {item.dailySales}</span>
+                      <span>最低庫存: {item.minStock.toLocaleString()}</span>
                       <span>
-                        預估可售:{' '}
-                        {item.dailySales > 0 ? (item.stock / item.dailySales).toFixed(0) : '>99'} 天
+                        可用量: {item.availableStock.toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -489,15 +603,17 @@ export default function InventoryDashboard() {
                           <tr key={item.id} className="hover:bg-gray-50">
                             <td className="px-6 py-3 font-medium text-gray-700">{item.name}</td>
                             <td className="px-6 py-3 text-right font-bold text-gray-800">
-                              {item.stock.toFixed(1)} 捲
+                              {item.stock.toLocaleString()} {item.unit || '捲'}
                             </td>
                             <td className="px-6 py-3 text-right text-gray-500">
-                              {(item.stock * 6000).toLocaleString()} 個
+                              {item.itemsPerRoll
+                                ? (item.stock * item.itemsPerRoll).toLocaleString()
+                                : '-'} 個
                             </td>
                             <td className="px-6 py-3 text-right">
                               <span
                                 className={`inline-block w-2.5 h-2.5 rounded-full ${
-                                  item.stock <= 2 ? 'bg-red-500' : 'bg-green-500'
+                                  item.stockStatus === 'low' ? 'bg-red-500' : item.stockStatus === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
                                 }`}
                               ></span>
                             </td>
@@ -514,73 +630,189 @@ export default function InventoryDashboard() {
 
         {/* Tab Content: Analysis */}
         {activeTab === 'analysis' && (
-          <div className="space-y-8">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <h3 className="text-lg font-bold text-gray-800 mb-6">麵包銷量趨勢 (Top 5 熱銷)</h3>
-              <div className="h-80 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={breadItems.sort((a, b) => b.sales30d - a.sales30d).slice(0, 5)}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+          <div className="space-y-6">
+            {/* Controls */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <div className="flex flex-wrap items-center gap-4">
+                {/* Days selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">時間範圍:</span>
+                  <div className="flex gap-1">
+                    {[7, 14, 30].map((days) => (
+                      <button
+                        key={days}
+                        onClick={() => setTrendDays(days)}
+                        className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                          trendDays === days
+                            ? 'bg-[#EB5C20] text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {days} 天
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Item selector */}
+                <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                  <span className="text-sm text-gray-600">選擇品項:</span>
+                  <select
+                    value={selectedTrendItem}
+                    onChange={(e) => setSelectedTrendItem(e.target.value)}
+                    className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EB5C20] focus:border-transparent"
                   >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} interval={0} />
-                    <YAxis />
-                    <RechartsTooltip
-                      contentStyle={{
-                        borderRadius: '8px',
-                        border: 'none',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      }}
-                    />
-                    <Legend />
-                    <Bar name="預估近7天" dataKey="sales7d" fill="#EB5C20" radius={[4, 4, 0, 0]} />
-                    <Bar name="預估近14天" dataKey="sales14d" fill="#9FA0A0" radius={[4, 4, 0, 0]} />
-                    <Bar name="預估近30天" dataKey="sales30d" fill="#2d3748" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                    {trendData.map((item) => (
+                      <option key={item.name} value={item.name}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Refresh button */}
+                <button
+                  onClick={() => fetchTrendData('bread')}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  重新整理
+                </button>
               </div>
             </div>
 
+            {/* Trend Chart */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-gray-800">
+                  庫存趨勢圖 - {selectedTrendItem || '請選擇品項'}
+                </h3>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  近 {trendDays} 天資料
+                </span>
+              </div>
+
+              {trendData.length === 0 ? (
+                <div className="h-80 flex items-center justify-center text-gray-400">
+                  <div className="text-center">
+                    <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>載入趨勢資料中...</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-80 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={
+                        trendData
+                          .find((item) => item.name === selectedTrendItem)
+                          ?.data.map((d) => ({
+                            date: d.date.slice(5), // MM-DD format
+                            庫存量: d.stock,
+                          })) || []
+                      }
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 11 }}
+                        tickMargin={10}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(value) => value.toLocaleString()}
+                      />
+                      <RechartsTooltip
+                        contentStyle={{
+                          borderRadius: '8px',
+                          border: 'none',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        }}
+                        formatter={(value: number) => [value.toLocaleString(), '庫存量']}
+                      />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="庫存量"
+                        stroke="#EB5C20"
+                        strokeWidth={2}
+                        dot={{ fill: '#EB5C20', strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, fill: '#EB5C20' }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+
+            {/* Items Table with current stock and trend */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100">
-                <h3 className="font-bold text-gray-800">各品項詳細銷量數據 (依今日銷量推算)</h3>
+                <h3 className="font-bold text-gray-800">各品項庫存走勢</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-gray-50 text-gray-500 font-medium">
                     <tr>
                       <th className="px-6 py-3">商品名稱</th>
-                      <th className="px-6 py-3 text-right">今日實際銷量</th>
-                      <th className="px-6 py-3 text-right text-[#EB5C20]">預估 7 天</th>
-                      <th className="px-6 py-3 text-right text-gray-800">預估 30 天</th>
-                      <th className="px-6 py-3 text-right">建議</th>
+                      <th className="px-6 py-3 text-right">目前庫存</th>
+                      <th className="px-6 py-3 text-right">{trendDays}天前庫存</th>
+                      <th className="px-6 py-3 text-right">變化量</th>
+                      <th className="px-6 py-3 text-right">趨勢</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {breadItems.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-3 font-medium text-gray-700">{item.name}</td>
-                        <td className="px-6 py-3 text-right font-bold text-gray-900 bg-gray-50">
-                          {item.dailySales}
-                        </td>
-                        <td className="px-6 py-3 text-right font-bold text-[#EB5C20]">
-                          {item.sales7d}
-                        </td>
-                        <td className="px-6 py-3 text-right text-gray-600">{item.sales30d}</td>
-                        <td className="px-6 py-3 text-right">
-                          {item.sales7d > 500 && item.stock < 2000 ? (
-                            <span className="text-red-600 bg-red-50 px-2 py-1 rounded text-xs font-medium">
-                              建議補貨
-                            </span>
-                          ) : (
-                            <span className="text-green-600 bg-green-50 px-2 py-1 rounded text-xs font-medium">
-                              庫存健康
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {trendData.slice(0, 15).map((item) => {
+                      const latestStock = item.data[item.data.length - 1]?.stock || 0;
+                      const oldestStock = item.data[0]?.stock || 0;
+                      const change = latestStock - oldestStock;
+                      const changePercent = oldestStock > 0 ? ((change / oldestStock) * 100).toFixed(1) : 0;
+
+                      return (
+                        <tr
+                          key={item.name}
+                          className={`hover:bg-gray-50 cursor-pointer ${
+                            selectedTrendItem === item.name ? 'bg-orange-50' : ''
+                          }`}
+                          onClick={() => setSelectedTrendItem(item.name)}
+                        >
+                          <td className="px-6 py-3 font-medium text-gray-700">
+                            {item.name}
+                            {selectedTrendItem === item.name && (
+                              <span className="ml-2 text-xs text-[#EB5C20]">● 已選取</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-3 text-right font-bold text-gray-900">
+                            {latestStock.toLocaleString()}
+                          </td>
+                          <td className="px-6 py-3 text-right text-gray-500">
+                            {oldestStock.toLocaleString()}
+                          </td>
+                          <td className={`px-6 py-3 text-right font-bold ${
+                            change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-500'
+                          }`}>
+                            {change > 0 ? '+' : ''}{change.toLocaleString()}
+                            <span className="text-xs font-normal ml-1">({changePercent}%)</span>
+                          </td>
+                          <td className="px-6 py-3 text-right">
+                            {change > 0 ? (
+                              <span className="inline-flex items-center text-green-600">
+                                <ArrowUpRight className="w-4 h-4" />
+                                補貨
+                              </span>
+                            ) : change < 0 ? (
+                              <span className="inline-flex items-center text-red-600">
+                                <TrendingUp className="w-4 h-4 rotate-180" />
+                                消耗
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">持平</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -592,55 +824,80 @@ export default function InventoryDashboard() {
         {activeTab === 'restock' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold text-gray-800">近期進貨紀錄 (從庫存表提取)</h2>
-              <button className="bg-[#EB5C20] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#d44c15] transition-colors flex items-center gap-2">
-                <ArrowUpRight className="w-4 h-4" />
-                手動新增
+              <h2 className="text-lg font-bold text-gray-800">
+                近期庫存變動紀錄 {restockLogs.length > 0 && `(${restockLogs.length} 筆)`}
+              </h2>
+              <button
+                onClick={fetchRestockLogs}
+                className="bg-[#EB5C20] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#d44c15] transition-colors flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                重新整理
               </button>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-gray-50 text-gray-500 font-medium">
-                  <tr>
-                    <th className="px-6 py-3">進貨日期 (最後入倉)</th>
-                    <th className="px-6 py-3">品項</th>
-                    <th className="px-6 py-3">供應商</th>
-                    <th className="px-6 py-3 text-right">數量</th>
-                    <th className="px-6 py-3 text-right">狀態</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {LATEST_RESTOCK_LOGS.map((log) => (
-                    <tr key={log.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-gray-600 flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        {log.date}
-                      </td>
-                      <td className="px-6 py-4 font-medium text-gray-800">{log.item}</td>
-                      <td className="px-6 py-4 text-gray-600">
-                        <span className="bg-gray-100 px-2 py-1 rounded text-xs">{log.supplier}</span>
-                      </td>
-                      <td className="px-6 py-4 text-right font-bold text-[#EB5C20]">
-                        +{log.quantity.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <span className="text-green-600 text-xs font-medium border border-green-200 bg-green-50 px-2 py-1 rounded-full">
-                          已入庫
-                        </span>
-                      </td>
+            {restockLogs.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+                <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">尚無庫存變動紀錄</p>
+                <p className="text-sm text-gray-400 mt-1">當庫存發生變化時，紀錄會顯示在這裡</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50 text-gray-500 font-medium">
+                    <tr>
+                      <th className="px-6 py-3">日期</th>
+                      <th className="px-6 py-3">品項</th>
+                      <th className="px-6 py-3">分類</th>
+                      <th className="px-6 py-3 text-right">變動前</th>
+                      <th className="px-6 py-3 text-right">變動後</th>
+                      <th className="px-6 py-3 text-right">變動量</th>
+                      <th className="px-6 py-3 text-right">來源</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {restockLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-gray-600 flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-gray-400" />
+                          {new Date(log.date).toLocaleDateString('zh-TW')}
+                        </td>
+                        <td className="px-6 py-4 font-medium text-gray-800">{log.item_name}</td>
+                        <td className="px-6 py-4 text-gray-600">
+                          <span className="bg-gray-100 px-2 py-1 rounded text-xs">
+                            {log.category === 'bread' ? '麵包' : log.category === 'box' ? '紙箱' : '袋子'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right text-gray-500">
+                          {log.previous_stock.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-right text-gray-800">
+                          {log.new_stock.toLocaleString()}
+                        </td>
+                        <td className={`px-6 py-4 text-right font-bold ${log.change_amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {log.change_amount >= 0 ? '+' : ''}{log.change_amount.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className="text-xs font-medium border px-2 py-1 rounded-full bg-blue-50 text-blue-600 border-blue-200">
+                            {log.source === 'email' ? '郵件同步' : log.source}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             <div className="bg-[#FFF6F2] border border-[#ffdecb] rounded-lg p-4 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-[#EB5C20] mt-0.5" />
               <div>
                 <h4 className="font-bold text-[#EB5C20] text-sm">系統提示</h4>
                 <p className="text-sm text-gray-600 mt-1">
-                  以上數據已與 {lastSyncDate} 的倉庫明細表同步。建議每週上傳新的 Excel 檔案以保持數據準確。
+                  {lastSyncDate
+                    ? `以上數據已與 ${lastSyncDate} 的倉庫明細表同步。系統每日 21:05 自動從郵件同步庫存資料。`
+                    : '尚未同步資料，請點擊「同步資料」按鈕從郵件匯入庫存明細。'}
                 </p>
               </div>
             </div>
