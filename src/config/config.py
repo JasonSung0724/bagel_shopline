@@ -1,5 +1,16 @@
 import json
 import os
+from pathlib import Path
+
+# Load .env file from project root
+from dotenv import load_dotenv
+
+# Find project root (where .env is located)
+_current_file = Path(__file__).resolve()
+_project_root = _current_file.parent.parent.parent  # src/config/config.py -> project root
+_env_path = _project_root / ".env"
+load_dotenv(_env_path)
+
 
 class ConfigManager:
 

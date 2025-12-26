@@ -90,3 +90,44 @@ body {
 .card-hover {
   @apply transition-all duration-200 hover:shadow-md hover:border-gray-200;
 }
+
+/* Inventory page styles */
+.btn-brand {
+  @apply bg-gradient-to-r from-[#EB5C20] to-[#C74A18] text-white font-medium py-3 px-6 rounded-lg;
+  @apply hover:from-[#C74A18] hover:to-[#A53D14] transition-all duration-200;
+  @apply shadow-md hover:shadow-lg;
+}
+
+.btn-brand-outline {
+  @apply bg-white text-[#EB5C20] font-medium py-3 px-6 rounded-lg border-2 border-[#EB5C20];
+  @apply hover:bg-[#EB5C20] hover:text-white transition-all duration-200;
+}
+
+.inventory-card {
+  @apply bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden;
+}
+
+.inventory-tab {
+  @apply px-4 py-2 font-medium text-gray-600 border-b-2 border-transparent;
+  @apply hover:text-[#EB5C20] transition-colors duration-200 cursor-pointer;
+}
+
+.inventory-tab.active {
+  @apply text-[#EB5C20] border-[#EB5C20];
+}
+
+.stock-indicator {
+  @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-medium;
+}
+
+.stock-high {
+  @apply bg-green-100 text-green-800;
+}
+
+.stock-medium {
+  @apply bg-yellow-100 text-yellow-800;
+}
+
+.stock-low {
+  @apply bg-red-100 text-red-800;
+}

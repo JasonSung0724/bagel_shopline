@@ -1,0 +1,210 @@
+"""
+Inventory workflow orchestrator.
+Coordinates inventory data fetching, parsing, and storage.
+"""
+from datetime import datetime, timedelta
+from typing import Optional, List
+from loguru import logger
+
+from src.services.inventory_service import InventoryService
+from src.repositories.supabase_repository import InventoryRepository
+from src.services.notification_service import NotificationService
+from src.models.inventory import InventorySnapshot
+
+
+class InventoryWorkflow:
+    """
+    Orchestrates inventory update workflow.
+
+    Modes:
+    1. Daily sync: Fetch today's inventory email and update DB
+    2. Backfill: Fetch all historical emails and import to DB
+    """
+
+    def __init__(self, target_sender: Optional[str] = None):
+        """
+        Initialize inventory workflow.
+
+        Args:
+            target_sender: Email sender to filter (optional)
+        """
+        self.inventory_service = InventoryService()
+        self.inventory_repo = InventoryRepository()
+        self.notification = NotificationService()
+        self.target_sender = target_sender
+
+    def run_daily_sync(self, target_date: Optional[datetime] = None) -> bool:
+        """
+        Run daily inventory sync.
+        Fetches the latest inventory email and updates the database.
+
+        Args:
+            target_date: Date to sync (default: today)
+
+        Returns:
+            True if successful
+        """
+        try:
+            if target_date is None:
+                target_date = datetime.now()
+
+            date_str = target_date.strftime("%Y-%m-%d")
+            logger.info(f"開始庫存同步 - 目標日期: {date_str}")
+
+            # Step 1: Fetch inventory emails
+            emails = self.inventory_service.fetch_inventory_emails(
+                since_date=target_date - timedelta(days=1),  # 搜尋前一天開始
+                target_sender=self.target_sender
+            )
+
+            if not emails:
+                self.notification.add_message(f"庫存同步: 沒有找到庫存明細郵件 ({date_str})")
+                logger.warning("沒有找到庫存明細郵件")
+                return False
+
+            # Step 2: Get the latest email (most recent)
+            latest_email = max(emails, key=lambda e: e.date)
+            logger.info(f"使用最新郵件: {latest_email.date}")
+
+            # Step 3: Parse and save
+            snapshot = self.inventory_service.process_email_attachment(latest_email)
+
+            if not snapshot:
+                self.notification.add_message("庫存同步: 解析郵件附件失敗")
+                logger.error("解析郵件附件失敗")
+                return False
+
+            # Step 4: Save to database
+            if self.inventory_repo.is_connected:
+                snapshot_id = self.inventory_repo.save_snapshot(snapshot)
+                if snapshot_id:
+                    logger.success(f"庫存快照已保存: {snapshot_id}")
+            else:
+                logger.warning("Supabase 未連接，跳過資料庫保存")
+
+            # Step 5: Send notification
+            self._send_sync_notification(snapshot)
+
+            logger.success("庫存同步完成")
+            return True
+
+        except Exception as e:
+            logger.error(f"庫存同步失敗: {e}")
+            self.notification.add_message(f"庫存同步失敗: {e}")
+            self.notification.send_and_clear()
+            return False
+
+    def run_backfill(
+        self,
+        days_back: int = 365,
+        dry_run: bool = False
+    ) -> int:
+        """
+        Backfill historical inventory data from emails.
+        Searches all emails and imports to database.
+
+        Args:
+            days_back: How many days to look back
+            dry_run: If True, don't save to database
+
+        Returns:
+            Number of snapshots imported
+        """
+        try:
+            logger.info(f"開始歷史資料回填 - 回溯 {days_back} 天")
+
+            # Step 1: Fetch all historical emails
+            emails = self.inventory_service.fetch_all_inventory_emails(
+                target_sender=self.target_sender,
+                days_back=days_back
+            )
+
+            if not emails:
+                logger.warning("沒有找到歷史庫存郵件")
+                return 0
+
+            logger.info(f"找到 {len(emails)} 封歷史郵件")
+
+            # Step 2: Process all emails
+            snapshots = self.inventory_service.process_multiple_emails(emails)
+
+            if not snapshots:
+                logger.warning("沒有有效的庫存快照")
+                return 0
+
+            logger.info(f"成功解析 {len(snapshots)} 個庫存快照")
+
+            if dry_run:
+                logger.info("Dry run 模式，不保存到資料庫")
+                self._print_backfill_summary(snapshots)
+                return len(snapshots)
+
+            # Step 3: Save all snapshots
+            if not self.inventory_repo.is_connected:
+                logger.error("Supabase 未連接，無法保存")
+                return 0
+
+            saved_count = 0
+            for snapshot in snapshots:
+                snapshot_id = self.inventory_repo.save_snapshot(snapshot)
+                if snapshot_id:
+                    saved_count += 1
+                    logger.info(f"已保存: {snapshot.snapshot_date.date()} ({saved_count}/{len(snapshots)})")
+
+            logger.success(f"歷史資料回填完成: 成功 {saved_count}/{len(snapshots)}")
+            return saved_count
+
+        except Exception as e:
+            logger.error(f"歷史資料回填失敗: {e}")
+            return 0
+
+    def get_latest_inventory(self) -> Optional[dict]:
+        """
+        Get the latest inventory data.
+        First tries database, falls back to local parsing.
+
+        Returns:
+            Inventory data dict or None
+        """
+        # Try database first
+        if self.inventory_repo.is_connected:
+            data = self.inventory_repo.get_latest_snapshot()
+            if data:
+                return data
+
+        logger.info("資料庫無資料，返回空值")
+        return None
+
+    def _send_sync_notification(self, snapshot: InventorySnapshot) -> None:
+        """Send LINE notification about sync result."""
+        self.notification.add_message("=== 庫存同步完成 ===")
+        self.notification.add_message(f"資料日期: {snapshot.snapshot_date.strftime('%Y-%m-%d %H:%M')}")
+        self.notification.add_message(f"來源: {snapshot.source_file}")
+        self.notification.add_message(f"麵包總量: {snapshot.total_bread_stock} 個")
+        self.notification.add_message(f"盒子總量: {snapshot.total_box_stock} 個")
+        self.notification.add_message(f"袋子總量: {snapshot.total_bag_rolls} 捲")
+
+        if snapshot.low_stock_count > 0:
+            self.notification.add_message(f"⚠️ 庫存不足項目: {snapshot.low_stock_count} 項")
+
+            # List low stock items
+            all_items = snapshot.bread_items + snapshot.box_items + snapshot.bag_items
+            low_items = [item for item in all_items if item.stock_status == "low"]
+            for item in low_items[:5]:  # 最多顯示 5 項
+                self.notification.add_message(f"  - {item.name}: {item.current_stock} {item.unit}")
+
+        self.notification.send_and_clear()
+
+    def _print_backfill_summary(self, snapshots: List[InventorySnapshot]) -> None:
+        """Print summary of backfill results."""
+        print("\n=== 回填摘要 (Dry Run) ===")
+        print(f"總快照數: {len(snapshots)}")
+
+        if snapshots:
+            print(f"日期範圍: {snapshots[0].snapshot_date.date()} ~ {snapshots[-1].snapshot_date.date()}")
+
+            for snapshot in snapshots[-5:]:  # 顯示最近 5 筆
+                print(f"  {snapshot.snapshot_date.date()}: "
+                      f"麵包 {snapshot.total_bread_stock}, "
+                      f"盒子 {snapshot.total_box_stock}, "
+                      f"袋子 {snapshot.total_bag_rolls} 捲")

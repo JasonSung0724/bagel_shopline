@@ -6,6 +6,9 @@ loguru
 google-api-python-client
 pygsheets
 flask
+flask-cors
 gspread
 line-bot-sdk==3.17.1
 gunicorn
+supabase
+python-dotenv

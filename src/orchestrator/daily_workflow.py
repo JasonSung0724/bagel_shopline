@@ -2,6 +2,7 @@
 Daily workflow orchestrator.
 Coordinates the daily order processing workflow.
 """
+
 from datetime import datetime, timedelta
 from typing import Optional
 from loguru import logger
@@ -52,7 +53,7 @@ class DailyWorkflow:
                 target_date = datetime.now() - timedelta(days=1)
 
             date_str = target_date.strftime("%Y-%m-%d")
-            logger.info(f"開始執行日次流程 - 目標日期: {date_str}")
+            logger.info(f"開始執行每日更新 - 目標日期: {date_str}")
 
             # Step 1: Fetch emails
             success = self._step_fetch_emails(target_date)
@@ -69,12 +70,12 @@ class DailyWorkflow:
             # Step 4: Send notification
             self._send_notification()
 
-            logger.success("日次流程執行完成")
+            logger.success("每日更新訂單資訊完成")
             return True
 
         except Exception as e:
-            logger.error(f"日次流程執行失敗: {e}")
-            self.notification.add_message(f"日次流程執行失敗: {e}")
+            logger.error(f"每日更新訂單資訊失敗: {e}")
+            self.notification.add_message(f"每日更新訂單資訊失敗: {e}")
             self._send_notification()
             return False
 
@@ -97,17 +98,13 @@ class DailyWorkflow:
         logger.info("Step 2: 處理 C2C 訂單")
 
         # Extract C2C orders from email
-        c2c_orders, total_count = self.email_service.extract_orders_from_emails(
-            self._emails, platform="c2c"
-        )
+        c2c_orders, total_count = self.email_service.extract_orders_from_emails(self._emails, platform="c2c")
 
         if not c2c_orders:
             self.notification.add_message("逢泰Excel中沒有 C2C 訂單")
             return
 
-        self.notification.add_message(
-            f"C2C訂單-總計 {total_count} 筆, 黑貓託運單號共 {len(c2c_orders)} 筆"
-        )
+        self.notification.add_message(f"C2C訂單-總計 {total_count} 筆, 黑貓託運單號共 {len(c2c_orders)} 筆")
 
         # Build order status dict
         order_status_dict = self.c2c_service.build_order_status_dict(c2c_orders)
@@ -118,9 +115,7 @@ class DailyWorkflow:
         for sheet_name in target_sheets:
             self.notification.add_message(f"Google Sheet: {sheet_name}")
 
-            update_count, error = self.c2c_service.process_sheet(
-                sheet_name, order_status_dict
-            )
+            update_count, error = self.c2c_service.process_sheet(sheet_name, order_status_dict)
 
             if error:
                 self.notification.add_message(f"處理失敗: {error}")
@@ -134,26 +129,18 @@ class DailyWorkflow:
         logger.info("Step 3: 處理 ShopLine 訂單")
 
         # Extract ShopLine orders from email
-        shopline_orders, total_count = self.email_service.extract_orders_from_emails(
-            self._emails, platform="shopline"
-        )
+        shopline_orders, total_count = self.email_service.extract_orders_from_emails(self._emails, platform="shopline")
 
         if not shopline_orders:
             self.notification.add_message("逢泰Excel中沒有 SHOPLINE 訂單")
             return
 
-        self.notification.add_message(
-            f"SHOPLINE訂單-總計 {total_count} 筆, 黑貓託運單號共 {len(shopline_orders)} 筆"
-        )
+        self.notification.add_message(f"SHOPLINE訂單-總計 {total_count} 筆, 黑貓託運單號共 {len(shopline_orders)} 筆")
 
         # Process orders
-        tracking_count, status_count = self.shopline_service.process_email_orders(
-            shopline_orders, notify=self.notify_customers
-        )
+        tracking_count, status_count = self.shopline_service.process_email_orders(shopline_orders, notify=self.notify_customers)
 
-        self.notification.add_message(
-            f"ShopLine訂單-更新追蹤資訊 {tracking_count} 筆, 更新訂單狀態 {status_count} 筆"
-        )
+        self.notification.add_message(f"ShopLine訂單-更新追蹤資訊 {tracking_count} 筆, 更新訂單狀態 {status_count} 筆")
 
     def _send_notification(self) -> None:
         """Send LINE notification."""

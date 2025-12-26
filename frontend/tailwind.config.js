@@ -20,6 +20,15 @@ module.exports = {
           800: '#166534',
           900: '#14532d',
         },
+        // Brand colors for inventory page
+        brand: {
+          orange: '#EB5C20',
+          'orange-light': '#F5A173',
+          'orange-dark': '#C74A18',
+          gray: '#9FA0A0',
+          'gray-light': '#C5C6C6',
+          'gray-dark': '#6B6C6C',
+        },
       },
     },
   },

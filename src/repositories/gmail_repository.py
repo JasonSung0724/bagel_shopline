@@ -82,9 +82,35 @@ class GmailRepository:
         try:
             # Format date for IMAP search
             date_str = since_date.strftime("%d-%b-%Y")
-            search_criteria = f'(SINCE "{date_str}")'
 
-            status, messages = self.mail.search(None, search_criteria)
+            # Build search criteria
+            # For ASCII-only filters, use X-GM-RAW for server-side filtering
+            # For non-ASCII (Chinese), use basic search + client-side filtering
+            is_ascii_filter = attachment_filter and attachment_filter.isascii() if attachment_filter else True
+
+            if attachment_filter and is_ascii_filter:
+                # Gmail search for ASCII filenames (faster, server-side)
+                gmail_query_parts = [
+                    "has:attachment",
+                    f"filename:{attachment_filter}",
+                    f"after:{since_date.strftime('%Y/%m/%d')}"
+                ]
+                if target_sender:
+                    gmail_query_parts.append(f"from:{target_sender}")
+
+                gmail_query = " ".join(gmail_query_parts)
+                search_criteria = f'X-GM-RAW "{gmail_query}"'
+                logger.info(f"IMAP 搜尋條件: {search_criteria}")
+                status, messages = self.mail.search(None, search_criteria)
+            else:
+                # For Chinese filenames, search by date + sender, filter attachments client-side
+                search_parts = [f'SINCE "{date_str}"']
+                if target_sender:
+                    search_parts.append(f'FROM "{target_sender}"')
+
+                search_criteria = f'({" ".join(search_parts)})'
+                logger.info(f"IMAP 搜尋條件: {search_criteria} (附件過濾: {attachment_filter})")
+                status, messages = self.mail.search(None, search_criteria)
             if status != "OK":
                 logger.warning(f"無法搜索郵件，搜索條件: {search_criteria}")
                 return []
@@ -94,9 +120,13 @@ class GmailRepository:
                 logger.info(f"沒有找到符合條件的郵件 (since {date_str})")
                 return []
 
-            logger.info(f"找到 {len(message_ids)} 封郵件")
+            logger.info(f"找到 {len(message_ids)} 封郵件，開始過濾...")
+
+            # Note: Pre-filtering by BODYSTRUCTURE doesn't work well for Chinese filenames
+            # because they are Base64 encoded. Just download and filter.
 
             results = []
+            processed = 0
             for msg_id in message_ids:
                 email_data = self._parse_email(msg_id, target_sender, attachment_filter)
                 if email_data and email_data.has_attachments():
@@ -107,6 +137,59 @@ class GmailRepository:
         except Exception as e:
             logger.error(f"獲取郵件時發生錯誤: {e}")
             return []
+
+    def _prefilter_by_attachment(
+        self,
+        message_ids: list,
+        attachment_filter: str
+    ) -> list:
+        """
+        Pre-filter emails by checking attachment names without downloading full content.
+        Uses BODYSTRUCTURE which is much faster than RFC822.
+
+        Args:
+            message_ids: List of IMAP message IDs
+            attachment_filter: String that attachment filename must contain
+
+        Returns:
+            Filtered list of message IDs
+        """
+        filtered = []
+
+        for msg_id in message_ids:
+            try:
+                # Fetch only BODYSTRUCTURE (envelope + structure, not content)
+                status, data = self.mail.fetch(msg_id, "(BODYSTRUCTURE)")
+                if status != "OK":
+                    continue
+
+                # Parse BODYSTRUCTURE response to find attachment names
+                bodystructure = str(data[0])
+
+                # Look for attachment filename in the structure
+                # BODYSTRUCTURE contains encoded filenames
+                if attachment_filter in bodystructure:
+                    filtered.append(msg_id)
+                    continue
+
+                # Also check for encoded Chinese characters (RFC 2047)
+                # The filter might appear as =?UTF-8?B?...?= encoded
+                import base64
+                try:
+                    encoded_filter = base64.b64encode(
+                        attachment_filter.encode('utf-8')
+                    ).decode('ascii')
+                    if encoded_filter[:10] in bodystructure:  # Check partial match
+                        filtered.append(msg_id)
+                except Exception:
+                    pass
+
+            except Exception as e:
+                # If we can't check, include it for full parsing
+                logger.debug(f"預過濾檢查失敗: {e}")
+                filtered.append(msg_id)
+
+        return filtered
 
     def _parse_email(
         self,
@@ -137,8 +220,8 @@ class GmailRepository:
             sender_raw = self._decode_header_value(email_message["From"])
             sender_email = self._extract_email(sender_raw)
 
-            # Check if sender matches
-            if sender_email != target_sender:
+            # Check if sender matches (skip check if target_sender is empty)
+            if target_sender and sender_email != target_sender:
                 return None
 
             # Parse subject and date

@@ -2,6 +2,7 @@
 Outstanding order workflow orchestrator.
 Coordinates the outstanding order status update workflow.
 """
+
 from loguru import logger
 
 from src.services.shopline_service import ShopLineService
@@ -43,9 +44,7 @@ class OutstandingOrderWorkflow:
             logger.info("開始執行待處理訂單更新流程")
 
             # Process outstanding orders
-            update_count = self.shopline_service.process_outstanding_orders(
-                notify=self.notify_customers
-            )
+            update_count = self.shopline_service.process_outstanding_orders(notify=self.notify_customers)
 
             # Build notification message
             self.notification.add_message(f"待處理訂單更新完成")
@@ -53,7 +52,8 @@ class OutstandingOrderWorkflow:
 
             # Send notification
             if self.send_line_notification:
-                self.notification.send_and_clear()
+                # self.notification.send_and_clear()
+                pass
 
             logger.success(f"待處理訂單更新完成，共更新 {update_count} 筆")
             return True
