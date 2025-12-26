@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ===========================================
   # Backend API (Flask)
@@ -24,7 +22,7 @@ services:
       - LINE_GROUP_ID=${LINE_GROUP_ID}
     volumes:
       - ./logs:/app/logs
-      - ./src/config:/app/src/config:ro
+      # Note: src/config is baked into the image, no need to mount in production
     networks:
       - bagel-network
     healthcheck:
@@ -53,7 +51,7 @@ services:
       - LINE_GROUP_ID=${LINE_GROUP_ID}
     volumes:
       - ./logs:/app/logs
-      - ./src/config:/app/src/config:ro
+      # Note: src/config is baked into the image, no need to mount in production
     networks:
       - bagel-network
 
