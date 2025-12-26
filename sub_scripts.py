@@ -1,25 +1,39 @@
-from c2c_main import ShopLineOrderScripts, MessageSender
-from loguru import logger
-import sys
+"""
+Sub script for updating outstanding ShopLine orders.
 
-# 配置日誌系統 - 按大小輪轉，只保留兩個禮拜的日誌
-logger.remove()  # 移除預設的日誌處理器
-logger.add(
-    sys.stderr,  # 輸出到標準錯誤
-    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-    level="INFO",
-)
-logger.add(
-    "logs/sub.log",  # 單一檔案名稱
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-    level="DEBUG",
-    rotation="100 MB",  # 當檔案超過100MB時輪轉
-    retention="14 days",  # 保留14天（兩個禮拜）
-    compression="zip",  # 壓縮舊日誌檔案
-    encoding="utf-8",
-)
+This script:
+1. Fetches all outstanding orders from ShopLine
+2. Queries Tcat status for each order
+3. Updates ShopLine order status
+
+Usage:
+    python sub_scripts.py
+"""
+from src.utils.logger import setup_logger
+from src.orchestrator.outstanding_workflow import OutstandingOrderWorkflow
+from loguru import logger
+
+
+def main():
+    """Run the outstanding order update workflow."""
+    # Setup logging
+    setup_logger(log_file="logs/sub.log")
+
+    logger.info("=" * 50)
+    logger.info("開始執行 sub_scripts.py")
+    logger.info("=" * 50)
+
+    # Run workflow with customer notifications enabled
+    workflow = OutstandingOrderWorkflow(notify_customers=True)
+    success = workflow.run()
+
+    if success:
+        logger.success("sub_scripts.py 執行完成")
+    else:
+        logger.warning("sub_scripts.py 執行完成（有警告）")
+
+    return success
+
 
 if __name__ == "__main__":
-    msg = MessageSender()
-    shopline_order_scripts = ShopLineOrderScripts(msg_instance=msg, notify=True)
-    shopline_order_scripts.run_update_outstanding_shopline_order()
+    main()
