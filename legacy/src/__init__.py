@@ -1,3 +1,0 @@
-"""
-Bagel Shopline main package
-""" 

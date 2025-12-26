@@ -6,12 +6,12 @@ class ConfigManager:
     def __init__(self):
         # Get the directory where config.py is located
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        
+
         # Load field config
         field_config_path = os.path.join(current_dir, "field_config.json")
         with open(field_config_path, "r", encoding="utf-8") as f:
             self.config = json.load(f)
-            
+
         # Initialize configuration fields
         self.flowdite_backup_sheet = self.config["flowtide"]["backup_sheet_name_format"]
         self.flowtide_mark_field = self.config["flowtide"]["mark_field"]
@@ -19,7 +19,7 @@ class ConfigManager:
         self.flowtide_tcat_number = self.config["flowtide"]["tcat_number"]
         self.flowtide_order_number = self.config["flowtide"]["customer_order_number"]
         self.flowtide_delivery_company = self.config["flowtide"]["delivery_company"]
-        
+
         self.c2c_shipping_date = self.config["c2c"]["shipping_date"]
         self.c2c_current_status = self.config["c2c"]["current_status"]
         self.c2c_order_number = self.config["c2c"]["customer_order_number"]
@@ -33,24 +33,24 @@ class ConfigManager:
         self.shopline_sender_email = self.config["shopline"]["sender_email"]
         self.shopline_mail_subject = self.config["shopline"]["mail_subject"]
 
+
 class SettingsManager:
+    """
+    Manages sensitive settings from environment variables only.
+    """
 
     def __init__(self):
-        # Get the directory where config.py is located
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # Load main config
-        config_path = os.path.join(current_dir, "config.json")
-        with open(config_path, "r", encoding="utf-8") as f:
-            self.settings = json.load(f)
-            
-        # Initialize settings fields
-        self.line_access_token = self.settings["line_access_token"]
-        self.group_id = self.settings["group_id"]
-        self.bot_gmail = self.settings["GmailAddress"]
-        self.bot_app_password = self.settings["APPPassword"]
-        self.shopline_token = self.settings["ShopLineToken"]
+
+        # Read from environment variables only
+        self.shopline_token = os.environ["SHOPLINE_TOKEN"]
+        self.bot_gmail = os.environ["GMAIL_ADDRESS"]
+        self.bot_app_password = os.environ["GMAIL_APP_PASSWORD"]
+        self.line_access_token = os.environ["LINE_ACCESS_TOKEN"]
+        self.group_id = os.environ["LINE_GROUP_ID"]
 
         # Service account file path
-        self.service_account_file = os.path.join(current_dir, "mybagel-458109-30f35338f350.json")
-
+        self.service_account_file = os.getenv(
+            "GOOGLE_SERVICE_ACCOUNT_FILE",
+            os.path.join(current_dir, "mybagel-458109-30f35338f350.json")
+        )

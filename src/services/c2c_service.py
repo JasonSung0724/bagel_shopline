@@ -132,6 +132,11 @@ class C2CService:
         """
         Process a single row for updates.
 
+        Logic matches legacy c2c_main.py update_data() method:
+        1. If has tcat_number and already delivered -> still try to update (may fill shipping date)
+        2. If has tcat_number but not delivered -> query Tcat and update status
+        3. If no tcat_number -> try to get from email orders
+
         Args:
             df: DataFrame to update
             index: Row index
@@ -145,25 +150,28 @@ class C2CService:
         tcat_number = row.get(self.delivery_number_field)
         current_status = row.get(self.status_field)
 
-        # Skip if already delivered
-        if tcat_number and current_status == self.success_status:
-            return False
+        # Case 1: Has tcat_number and already delivered
+        # Legacy behavior: still call status_update to potentially fill shipping date
+        if pd.notna(tcat_number) and str(tcat_number).strip() and current_status == self.success_status:
+            return self._update_status_value(df, index, row, self.success_status)
 
-        # Has tracking number - just update status
+        # Case 2: Has tcat_number but not delivered - query Tcat and update
         if pd.notna(tcat_number) and str(tcat_number).strip():
             tcat_number = str(tcat_number).strip()
             return self._update_status(df, index, row, tcat_number)
 
-        # No tracking number - try to get from email
+        # Case 3: No tcat_number - try to get from email
         if order_number in email_orders:
             order_info = email_orders[order_number]
-            tcat_number = order_info.get("tcat_number")
+            new_tcat_number = order_info.get("tcat_number")
             status = order_info.get("status")
 
-            if tcat_number:
-                df.loc[index, self.delivery_number_field] = tcat_number
-                logger.debug(f"更新 {order_number} 的黑貓單號: {tcat_number}")
+            if new_tcat_number:
+                df.loc[index, self.delivery_number_field] = new_tcat_number
+                logger.debug(f"更新 {order_number} 的黑貓單號: {new_tcat_number}")
                 return self._update_status_value(df, index, row, status)
+        else:
+            logger.debug(f"逢泰excel中未更新此單號: {order_number}")
 
         return False
 
@@ -199,6 +207,10 @@ class C2CService:
         """
         Apply status update to DataFrame.
 
+        Logic matches legacy c2c_main.py status_update() method:
+        - If new_status is "尚無資料", clear shipping date if it exists
+        - Otherwise, update status and try to fill shipping date
+
         Args:
             df: DataFrame to update
             index: Row index
@@ -208,31 +220,45 @@ class C2CService:
         Returns:
             True if updated
         """
+        tcat_number = row.get(self.delivery_number_field)
+        shipping_date = row.get(self.shipping_date_field)
+
+        # Legacy behavior: when status is "尚無資料", clear shipping date
         if new_status == self.no_data_status:
+            logger.debug(f"暫無 {tcat_number} 訂單的狀態")
+            # Clear shipping date if it has value (legacy behavior)
+            if pd.notna(shipping_date) and str(shipping_date).strip():
+                df.loc[index, self.shipping_date_field] = ""
             return False
 
         current_status = row.get(self.status_field)
-        shipping_date = row.get(self.shipping_date_field)
-        tcat_number = row.get(self.delivery_number_field)
         updated = False
 
-        # Update status if different
-        if current_status != new_status:
-            df.loc[index, self.status_field] = new_status
-            logger.debug(f"更新狀態: {current_status} -> {new_status}")
-            updated = True
+        # Update status if different, or update shipping date if empty
+        if current_status != new_status or pd.isna(shipping_date) or not str(shipping_date).strip():
+            # Update status if different
+            if current_status != new_status:
+                df.loc[index, self.status_field] = new_status
+                logger.debug(f"更新 {tcat_number} 的狀態 {new_status}")
+                updated = True
 
-        # Update shipping date if empty
-        if pd.isna(shipping_date) or not str(shipping_date).strip():
-            if pd.notna(tcat_number):
-                collected_time = self.tcat_repo.get_collected_time(
-                    str(tcat_number).strip(),
-                    current_status=new_status
-                )
-                if collected_time:
-                    df.loc[index, self.shipping_date_field] = collected_time
-                    logger.debug(f"更新集貨時間: {collected_time}")
-                    updated = True
+            # Update shipping date if empty
+            if pd.isna(shipping_date) or not str(shipping_date).strip():
+                if pd.notna(tcat_number):
+                    collected_time = self.tcat_repo.get_collected_time(
+                        str(tcat_number).strip(),
+                        current_status=new_status
+                    )
+                    if collected_time:
+                        df.loc[index, self.shipping_date_field] = collected_time
+                        logger.debug(f"更新 {tcat_number} 的集貨時間 {collected_time}")
+                        return True
+                    else:
+                        logger.warning(f"未找到 {tcat_number} 的集貨時間")
+                        return updated
+                return True
+        else:
+            logger.debug(f"無須更新 {tcat_number} 資料")
 
         return updated
 

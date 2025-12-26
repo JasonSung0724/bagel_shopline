@@ -1,0 +1,129 @@
+name: Build and Deploy to GCP VM
+
+on:
+  push:
+    branches:
+      - revamp
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  PROJECT_ID: mybagel-458109
+  GCE_INSTANCE: instance-20250531-132235
+  GCE_ZONE: us-central1-c
+  REGISTRY: us-central1-docker.pkg.dev
+  REPOSITORY: bagel-repo
+
+jobs:
+  # ===========================================
+  # Build and Push Docker Images
+  # ===========================================
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.REGISTRY }}
+
+      - name: Build and Push API Image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/api:${{ github.sha }} \
+                       -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/api:latest \
+                       -f Dockerfile .
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/api:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/api:latest
+
+      - name: Build and Push Worker Image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/worker:${{ github.sha }} \
+                       -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/worker:latest \
+                       -f Dockerfile.worker .
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/worker:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/worker:latest
+
+      - name: Build and Push Frontend Image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/frontend:${{ github.sha }} \
+                       -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/frontend:latest \
+                       -f frontend/Dockerfile frontend/
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/frontend:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/frontend:latest
+
+  # ===========================================
+  # Deploy to GCP VM
+  # ===========================================
+  deploy:
+    name: Deploy to GCP VM
+    runs-on: ubuntu-latest
+    needs: build
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to VM via SSH
+        run: |
+          gcloud compute ssh ${{ env.GCE_INSTANCE }} \
+            --zone=${{ env.GCE_ZONE }} \
+            --command="
+              set -e
+
+              echo '=== Authenticating to Artifact Registry ==='
+              gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+              echo '=== Pulling latest images ==='
+              docker pull ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/api:latest
+              docker pull ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/worker:latest
+              docker pull ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/frontend:latest
+
+              echo '=== Navigating to project directory ==='
+              cd /opt/bagel-shop
+
+              echo '=== Updating docker-compose.yml ==='
+              git pull origin main || true
+
+              echo '=== Restarting containers ==='
+              docker compose down
+              docker compose up -d
+
+              echo '=== Cleaning up old images ==='
+              docker image prune -f
+
+              echo '=== Deployment complete ==='
+              docker compose ps
+            "
+
+      - name: Health Check
+        run: |
+          sleep 30
+          gcloud compute ssh ${{ env.GCE_INSTANCE }} \
+            --zone=${{ env.GCE_ZONE }} \
+            --command="curl -f http://localhost:8080/health || exit 1"

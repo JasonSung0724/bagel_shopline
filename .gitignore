@@ -1,9 +1,45 @@
-venv/*
+venv/
+**/venv/
 .DS_Store
 *.xls
-__pycache__/*
+__pycache__/
+**/__pycache__/
 result.json
-google-cloud-sdk/*
+google-cloud-sdk/
 *.pyc
 test.py
 bagel_shopline.code-workspace
+
+# Environment variables (sensitive)
+.env
+.env.local
+.env.production
+**/.env
+**/.env.local
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Docker
+*.tar
+
+# Jupyter
+*.ipynb
+
+# Node.js
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+
+# Frontend build
+frontend/out/
+frontend/.vercel/
+
+# Google service account (keep tracked but be careful)
+# src/config/*.json

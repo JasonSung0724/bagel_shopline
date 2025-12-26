@@ -1,0 +1,60 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+ENV/
+env/
+.eggs/
+*.egg-info/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Test
+test.ipynb
+tests/
+*.test.py
+
+# Frontend (handled separately)
+frontend/
+
+# GCP SDK
+google-cloud-sdk/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.docker/
+
+# CI/CD
+.github/
+
+# Scripts
+scripts/
+
+# Nginx
+nginx/
+
+# Docs
+*.md
+LICENSE

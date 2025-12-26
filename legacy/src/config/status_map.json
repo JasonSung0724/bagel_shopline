@@ -1,6 +1,0 @@
-{
-    "arrived" : ["順利送達"],
-    "shipped" : ["已集貨"],
-    "returning" : ["取消取件"],
-    "returned" : ["退貨完成"]
-}

@@ -1,0 +1,26 @@
+# Bagel Shop Worker Cron Jobs
+# Timezone: Asia/Taipei (UTC+8)
+#
+# Format: minute hour day month weekday command
+#
+# sub_scripts.py - Update outstanding ShopLine orders
+# Runs at: 13:30, 14:00, 20:30, 20:50 (UTC+8)
+#
+# main_scripts.py - Daily order processing
+# Runs at: 21:00 (UTC+8)
+
+# Environment variables for cron
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+PYTHONPATH=/app
+
+# sub_scripts.py schedules (UTC+8)
+30 13 * * * cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
+0 14 * * * cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
+30 20 * * * cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
+50 20 * * * cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
+
+# main_scripts.py schedule (UTC+8)
+0 21 * * * cd /app && /usr/local/bin/python main_scripts.py >> /app/logs/cron.log 2>&1
+
+# Empty line required at end of crontab
