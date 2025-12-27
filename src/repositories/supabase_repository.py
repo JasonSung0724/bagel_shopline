@@ -765,62 +765,80 @@ class InventoryRepository(SupabaseRepository):
                 return {}
 
             # 2. Get sales data (stock_out) for past 30 days
-            start_date_30d = datetime.now() - timedelta(days=30)
-            start_date_20d = datetime.now() - timedelta(days=20)
+            start_date_30d = (datetime.now() - timedelta(days=30)).date().isoformat()
+            start_date_20d = (datetime.now() - timedelta(days=20)).date().isoformat()
 
-            # Query raw items with pagination to get all records (Supabase default limit is 1000)
-            all_raw_items = []
-            page_size = 1000
-            offset = 0
+            # First, get snapshot IDs and dates within the date range
+            snapshots_result = (
+                self.client.table(self.TABLE_SNAPSHOTS)
+                .select("id, snapshot_date")
+                .gte("snapshot_date", start_date_30d)
+                .execute()
+            )
 
-            while True:
-                raw_items_result = (
-                    self.client.table(self.TABLE_RAW_ITEMS)
-                    .select("product_name, stock_out, created_at")
-                    .gte("created_at", start_date_30d.isoformat())
-                    .range(offset, offset + page_size - 1)
-                    .execute()
-                )
+            if not snapshots_result.data:
+                # No snapshots in range, skip sales calculation
+                sales_30d: Dict[str, int] = {}
+                sales_20d: Dict[str, int] = {}
+                latest_sales: Dict[str, Dict] = {}
+            else:
+                # Create a map of snapshot_id -> date
+                snapshot_date_map = {s["id"]: s["snapshot_date"][:10] for s in snapshots_result.data}
+                snapshot_ids = list(snapshot_date_map.keys())
 
-                if not raw_items_result.data:
-                    break
+                # Query raw items with pagination to get all records (Supabase default limit is 1000)
+                all_raw_items = []
+                page_size = 1000
+                offset = 0
 
-                all_raw_items.extend(raw_items_result.data)
+                while True:
+                    raw_items_result = (
+                        self.client.table(self.TABLE_RAW_ITEMS)
+                        .select("product_name, stock_out, snapshot_id")
+                        .in_("snapshot_id", snapshot_ids)
+                        .range(offset, offset + page_size - 1)
+                        .execute()
+                    )
 
-                if len(raw_items_result.data) < page_size:
-                    break
+                    if not raw_items_result.data:
+                        break
 
-                offset += page_size
+                    all_raw_items.extend(raw_items_result.data)
 
-            # Calculate sales totals per product
-            sales_30d: Dict[str, int] = {}
-            sales_20d: Dict[str, int] = {}
-            # Track latest day's stock_out per product (for 日銷 display)
-            latest_sales: Dict[str, Dict] = {}  # {product_name: {"date": date_str, "stock_out": int}}
+                    if len(raw_items_result.data) < page_size:
+                        break
 
-            for row in all_raw_items:
-                name = row["product_name"]
-                stock_out = int(row.get("stock_out", 0) or 0)
-                created_at = row.get("created_at", "")
-                date_str = created_at[:10] if created_at else ""
+                    offset += page_size
 
-                # Add to 30-day total
-                sales_30d[name] = sales_30d.get(name, 0) + stock_out
+                # Calculate sales totals per product
+                sales_30d: Dict[str, int] = {}
+                sales_20d: Dict[str, int] = {}
+                # Track latest day's stock_out per product (for 日銷 display)
+                latest_sales: Dict[str, Dict] = {}  # {product_name: {"date": date_str, "stock_out": int}}
 
-                # Add to 20-day total if within range
-                if created_at and created_at >= start_date_20d.isoformat():
-                    sales_20d[name] = sales_20d.get(name, 0) + stock_out
+                for row in all_raw_items:
+                    name = row["product_name"]
+                    stock_out = int(row.get("stock_out", 0) or 0)
+                    snapshot_id = row.get("snapshot_id")
+                    date_str = snapshot_date_map.get(snapshot_id, "")
 
-                # Track latest day's stock_out (accumulate if same day)
-                if date_str:
-                    if name not in latest_sales:
-                        latest_sales[name] = {"date": date_str, "stock_out": stock_out}
-                    elif date_str > latest_sales[name]["date"]:
-                        # New latest date, reset
-                        latest_sales[name] = {"date": date_str, "stock_out": stock_out}
-                    elif date_str == latest_sales[name]["date"]:
-                        # Same day, accumulate stock_out
-                        latest_sales[name]["stock_out"] += stock_out
+                    # Add to 30-day total
+                    sales_30d[name] = sales_30d.get(name, 0) + stock_out
+
+                    # Add to 20-day total if within range
+                    if date_str and date_str >= start_date_20d:
+                        sales_20d[name] = sales_20d.get(name, 0) + stock_out
+
+                    # Track latest day's stock_out (accumulate if same day)
+                    if date_str:
+                        if name not in latest_sales:
+                            latest_sales[name] = {"date": date_str, "stock_out": stock_out}
+                        elif date_str > latest_sales[name]["date"]:
+                            # New latest date, reset
+                            latest_sales[name] = {"date": date_str, "stock_out": stock_out}
+                        elif date_str == latest_sales[name]["date"]:
+                            # Same day, accumulate stock_out
+                            latest_sales[name]["stock_out"] += stock_out
 
             # 3. Get product mappings (bread to bag)
             mappings = self.get_product_mappings()
