@@ -1,6 +1,7 @@
 """
 Supabase repository for database operations.
 """
+
 import os
 from pathlib import Path
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
@@ -12,11 +13,13 @@ if TYPE_CHECKING:
 
 # Load .env file
 from dotenv import load_dotenv
+
 _project_root = Path(__file__).resolve().parent.parent.parent
 load_dotenv(_project_root / ".env")
 
 try:
     from supabase import create_client, Client
+
     SUPABASE_AVAILABLE = True
 except ImportError:
     SUPABASE_AVAILABLE = False
@@ -79,7 +82,7 @@ class InventoryRepository(SupabaseRepository):
     TABLE_MASTER_BAGS = "master_bags"
     TABLE_MASTER_BOXES = "master_boxes"
 
-    def save_snapshot(self, snapshot: 'InventorySnapshot') -> Optional[str]:
+    def save_snapshot(self, snapshot: "InventorySnapshot") -> Optional[str]:
         """
         Save an inventory snapshot to database.
 
@@ -98,7 +101,7 @@ class InventoryRepository(SupabaseRepository):
             existing = self._get_snapshot_by_date(snapshot.snapshot_date)
             if existing:
                 logger.info(f"Snapshot for {snapshot.snapshot_date.date()} already exists, updating...")
-                return self._update_snapshot(existing['id'], snapshot)
+                return self._update_snapshot(existing["id"], snapshot)
 
             # Insert snapshot record
             snapshot_data = {
@@ -118,7 +121,7 @@ class InventoryRepository(SupabaseRepository):
                 logger.error("Failed to insert snapshot")
                 return None
 
-            snapshot_id = result.data[0]['id']
+            snapshot_id = result.data[0]["id"]
 
             # Insert raw items (原始資料)
             self._save_raw_items(snapshot_id, snapshot)
@@ -140,18 +143,20 @@ class InventoryRepository(SupabaseRepository):
         """Get snapshot by date (same day)."""
         try:
             date_str = date.date().isoformat()
-            result = self.client.table(self.TABLE_SNAPSHOTS) \
-                .select("*") \
-                .gte("snapshot_date", f"{date_str}T00:00:00") \
-                .lt("snapshot_date", f"{date_str}T23:59:59") \
+            result = (
+                self.client.table(self.TABLE_SNAPSHOTS)
+                .select("*")
+                .gte("snapshot_date", f"{date_str}T00:00:00")
+                .lt("snapshot_date", f"{date_str}T23:59:59")
                 .execute()
+            )
 
             return result.data[0] if result.data else None
         except Exception as e:
             logger.error(f"Failed to check existing snapshot: {e}")
             return None
 
-    def _update_snapshot(self, snapshot_id: str, snapshot: 'InventorySnapshot') -> str:
+    def _update_snapshot(self, snapshot_id: str, snapshot: "InventorySnapshot") -> str:
         """Update existing snapshot."""
         try:
             # Update snapshot record
@@ -165,16 +170,10 @@ class InventoryRepository(SupabaseRepository):
                 "updated_at": datetime.now().isoformat(),
             }
 
-            self.client.table(self.TABLE_SNAPSHOTS) \
-                .update(snapshot_data) \
-                .eq("id", snapshot_id) \
-                .execute()
+            self.client.table(self.TABLE_SNAPSHOTS).update(snapshot_data).eq("id", snapshot_id).execute()
 
             # Delete old items and re-insert
-            self.client.table(self.TABLE_ITEMS) \
-                .delete() \
-                .eq("snapshot_id", snapshot_id) \
-                .execute()
+            self.client.table(self.TABLE_ITEMS).delete().eq("snapshot_id", snapshot_id).execute()
 
             self._save_items(snapshot_id, snapshot)
 
@@ -184,7 +183,7 @@ class InventoryRepository(SupabaseRepository):
             logger.error(f"Failed to update snapshot: {e}")
             return snapshot_id
 
-    def _save_raw_items(self, snapshot_id: str, snapshot: 'InventorySnapshot') -> None:
+    def _save_raw_items(self, snapshot_id: str, snapshot: "InventorySnapshot") -> None:
         """Save raw inventory items (original Excel rows) for a snapshot."""
         if not snapshot.raw_items:
             return
@@ -199,15 +198,15 @@ class InventoryRepository(SupabaseRepository):
             # 將 raw_data 轉為 JSON 字串（如果是 dict）
             if item_data.get("raw_data") and isinstance(item_data["raw_data"], dict):
                 import json
+
                 # 清理 NaN 值
-                cleaned = {k: (None if (isinstance(v, float) and str(v) == 'nan') else v)
-                          for k, v in item_data["raw_data"].items()}
+                cleaned = {k: (None if (isinstance(v, float) and str(v) == "nan") else v) for k, v in item_data["raw_data"].items()}
                 item_data["raw_data"] = json.dumps(cleaned, ensure_ascii=False, default=str)
             raw_items_data.append(item_data)
 
         # 分批插入
         for i in range(0, len(raw_items_data), batch_size):
-            batch = raw_items_data[i:i + batch_size]
+            batch = raw_items_data[i : i + batch_size]
             try:
                 self.client.table(self.TABLE_RAW_ITEMS).insert(batch).execute()
             except Exception as e:
@@ -215,22 +214,24 @@ class InventoryRepository(SupabaseRepository):
 
         logger.info(f"Saved {len(raw_items_data)} raw items for snapshot")
 
-    def _save_items(self, snapshot_id: str, snapshot: 'InventorySnapshot') -> None:
+    def _save_items(self, snapshot_id: str, snapshot: "InventorySnapshot") -> None:
         """Save aggregated inventory items for a snapshot."""
         all_items = []
 
         for item in snapshot.bread_items + snapshot.box_items + snapshot.bag_items:
-            all_items.append({
-                "snapshot_id": snapshot_id,
-                "name": item.name,
-                "category": item.category.value,
-                "current_stock": item.current_stock,
-                "available_stock": item.available_stock,
-                "unit": item.unit,
-                "min_stock": item.min_stock,
-                "items_per_roll": item.items_per_roll,
-                "stock_status": item.stock_status,
-            })
+            all_items.append(
+                {
+                    "snapshot_id": snapshot_id,
+                    "name": item.name,
+                    "category": item.category.value,
+                    "current_stock": item.current_stock,
+                    "available_stock": item.available_stock,
+                    "unit": item.unit,
+                    "min_stock": item.min_stock,
+                    "items_per_roll": item.items_per_roll,
+                    "stock_status": item.stock_status,
+                }
+            )
 
         if all_items:
             self.client.table(self.TABLE_ITEMS).insert(all_items).execute()
@@ -248,11 +249,7 @@ class InventoryRepository(SupabaseRepository):
 
         try:
             # Get latest snapshot
-            result = self.client.table(self.TABLE_SNAPSHOTS) \
-                .select("*") \
-                .order("snapshot_date", desc=True) \
-                .limit(1) \
-                .execute()
+            result = self.client.table(self.TABLE_SNAPSHOTS).select("*").order("snapshot_date", desc=True).limit(1).execute()
 
             if not result.data:
                 return None
@@ -260,15 +257,12 @@ class InventoryRepository(SupabaseRepository):
             snapshot = result.data[0]
 
             # Get items for this snapshot
-            items_result = self.client.table(self.TABLE_ITEMS) \
-                .select("*") \
-                .eq("snapshot_id", snapshot['id']) \
-                .execute()
+            items_result = self.client.table(self.TABLE_ITEMS).select("*").eq("snapshot_id", snapshot["id"]).execute()
 
             # Organize items by category
-            snapshot['bread_items'] = [i for i in items_result.data if i['category'] == 'bread']
-            snapshot['box_items'] = [i for i in items_result.data if i['category'] == 'box']
-            snapshot['bag_items'] = [i for i in items_result.data if i['category'] == 'bag']
+            snapshot["bread_items"] = [i for i in items_result.data if i["category"] == "bread"]
+            snapshot["box_items"] = [i for i in items_result.data if i["category"] == "box"]
+            snapshot["bag_items"] = [i for i in items_result.data if i["category"] == "bag"]
 
             return snapshot
 
@@ -276,11 +270,7 @@ class InventoryRepository(SupabaseRepository):
             logger.error(f"Failed to get latest snapshot: {e}")
             return None
 
-    def get_snapshots_by_date_range(
-        self,
-        start_date: datetime,
-        end_date: datetime
-    ) -> List[Dict]:
+    def get_snapshots_by_date_range(self, start_date: datetime, end_date: datetime) -> List[Dict]:
         """
         Get snapshots within a date range.
 
@@ -295,12 +285,14 @@ class InventoryRepository(SupabaseRepository):
             return []
 
         try:
-            result = self.client.table(self.TABLE_SNAPSHOTS) \
-                .select("*") \
-                .gte("snapshot_date", start_date.isoformat()) \
-                .lte("snapshot_date", end_date.isoformat()) \
-                .order("snapshot_date", desc=True) \
+            result = (
+                self.client.table(self.TABLE_SNAPSHOTS)
+                .select("*")
+                .gte("snapshot_date", start_date.isoformat())
+                .lte("snapshot_date", end_date.isoformat())
+                .order("snapshot_date", desc=True)
                 .execute()
+            )
 
             return result.data or []
 
@@ -308,14 +300,7 @@ class InventoryRepository(SupabaseRepository):
             logger.error(f"Failed to get snapshots by date range: {e}")
             return []
 
-    def save_inventory_change(
-        self,
-        item_name: str,
-        category: str,
-        previous_stock: int,
-        new_stock: int,
-        source: str = "email"
-    ) -> Optional[str]:
+    def save_inventory_change(self, item_name: str, category: str, previous_stock: int, new_stock: int, source: str = "email") -> Optional[str]:
         """
         Record an inventory change.
 
@@ -337,7 +322,7 @@ class InventoryRepository(SupabaseRepository):
             }
 
             result = self.client.table(self.TABLE_CHANGES).insert(change_data).execute()
-            return result.data[0]['id'] if result.data else None
+            return result.data[0]["id"] if result.data else None
 
         except Exception as e:
             logger.error(f"Failed to save inventory change: {e}")
@@ -357,11 +342,7 @@ class InventoryRepository(SupabaseRepository):
             return []
 
         try:
-            result = self.client.table(self.TABLE_CHANGES) \
-                .select("*") \
-                .order("date", desc=True) \
-                .limit(limit) \
-                .execute()
+            result = self.client.table(self.TABLE_CHANGES).select("*").order("date", desc=True).limit(limit).execute()
 
             return result.data or []
 
@@ -369,11 +350,7 @@ class InventoryRepository(SupabaseRepository):
             logger.error(f"Failed to get recent changes: {e}")
             return []
 
-    def get_item_history(
-        self,
-        item_name: str,
-        days: int = 30
-    ) -> List[Dict]:
+    def get_item_history(self, item_name: str, days: int = 30) -> List[Dict]:
         """
         Get stock history for a specific item.
 
@@ -389,14 +366,17 @@ class InventoryRepository(SupabaseRepository):
 
         try:
             from datetime import timedelta
+
             start_date = datetime.now() - timedelta(days=days)
 
-            result = self.client.table(self.TABLE_ITEMS) \
-                .select("*, inventory_snapshots(snapshot_date)") \
-                .eq("name", item_name) \
-                .gte("created_at", start_date.isoformat()) \
-                .order("created_at") \
+            result = (
+                self.client.table(self.TABLE_ITEMS)
+                .select("*, inventory_snapshots(snapshot_date)")
+                .eq("name", item_name)
+                .gte("created_at", start_date.isoformat())
+                .order("created_at")
                 .execute()
+            )
 
             return result.data or []
 
@@ -404,11 +384,7 @@ class InventoryRepository(SupabaseRepository):
             logger.error(f"Failed to get item history: {e}")
             return []
 
-    def get_items_trend(
-        self,
-        category: Optional[str] = None,
-        days: int = 30
-    ) -> List[Dict]:
+    def get_items_trend(self, category: Optional[str] = None, days: int = 30) -> List[Dict]:
         """
         Get daily stock trend for items (for charts).
 
@@ -436,13 +412,16 @@ class InventoryRepository(SupabaseRepository):
 
         try:
             from datetime import timedelta
+
             start_date = datetime.now() - timedelta(days=days)
 
             # Query all items with their snapshot dates
             # Use available_stock (預計可用量) instead of current_stock (期末)
-            query = self.client.table(self.TABLE_ITEMS) \
-                .select("name, category, available_stock, inventory_snapshots(snapshot_date)") \
+            query = (
+                self.client.table(self.TABLE_ITEMS)
+                .select("name, category, available_stock, inventory_snapshots(snapshot_date)")
                 .gte("created_at", start_date.isoformat())
+            )
 
             if category:
                 query = query.eq("category", category)
@@ -455,22 +434,15 @@ class InventoryRepository(SupabaseRepository):
             # Group by item name
             items_data: Dict[str, Dict] = {}
             for row in result.data:
-                name = row['name']
+                name = row["name"]
                 if name not in items_data:
-                    items_data[name] = {
-                        'name': name,
-                        'category': row['category'],
-                        'data': []
-                    }
+                    items_data[name] = {"name": name, "category": row["category"], "data": []}
 
                 # Extract snapshot date
-                snapshot_info = row.get('inventory_snapshots')
-                if snapshot_info and snapshot_info.get('snapshot_date'):
-                    date_str = snapshot_info['snapshot_date'][:10]  # YYYY-MM-DD
-                    items_data[name]['data'].append({
-                        'date': date_str,
-                        'stock': row['available_stock']  # Use available_stock (預計可用量)
-                    })
+                snapshot_info = row.get("inventory_snapshots")
+                if snapshot_info and snapshot_info.get("snapshot_date"):
+                    date_str = snapshot_info["snapshot_date"][:10]  # YYYY-MM-DD
+                    items_data[name]["data"].append({"date": date_str, "stock": row["available_stock"]})  # Use available_stock (預計可用量)
 
             return list(items_data.values())
 
@@ -478,11 +450,7 @@ class InventoryRepository(SupabaseRepository):
             logger.error(f"Failed to get items trend: {e}")
             return []
 
-    def get_sales_trend(
-        self,
-        category: Optional[str] = None,
-        days: int = 30
-    ) -> List[Dict]:
+    def get_sales_trend(self, category: Optional[str] = None, days: int = 30) -> List[Dict]:
         """
         Get daily sales trend for items (based on stock_out from raw items).
 
@@ -510,22 +478,17 @@ class InventoryRepository(SupabaseRepository):
 
         try:
             from datetime import timedelta
+
             start_date = (datetime.now() - timedelta(days=days)).date().isoformat()
 
             # First, get snapshot IDs within the date range
-            snapshots_result = self.client.table(self.TABLE_SNAPSHOTS) \
-                .select("id, snapshot_date") \
-                .gte("snapshot_date", start_date) \
-                .execute()
+            snapshots_result = self.client.table(self.TABLE_SNAPSHOTS).select("id, snapshot_date").gte("snapshot_date", start_date).execute()
 
             if not snapshots_result.data:
                 return []
 
             # Create a map of snapshot_id -> date
-            snapshot_date_map = {
-                s['id']: s['snapshot_date'][:10]
-                for s in snapshots_result.data
-            }
+            snapshot_date_map = {s["id"]: s["snapshot_date"][:10] for s in snapshots_result.data}
             snapshot_ids = list(snapshot_date_map.keys())
 
             # Query raw items for these snapshots (with pagination to get all records)
@@ -534,11 +497,13 @@ class InventoryRepository(SupabaseRepository):
             offset = 0
 
             while True:
-                result = self.client.table(self.TABLE_RAW_ITEMS) \
-                    .select("product_name, stock_out, snapshot_id") \
-                    .in_("snapshot_id", snapshot_ids) \
-                    .range(offset, offset + page_size - 1) \
+                result = (
+                    self.client.table(self.TABLE_RAW_ITEMS)
+                    .select("product_name, stock_out, snapshot_id")
+                    .in_("snapshot_id", snapshot_ids)
+                    .range(offset, offset + page_size - 1)
                     .execute()
+                )
 
                 if not result.data:
                     break
@@ -559,60 +524,44 @@ class InventoryRepository(SupabaseRepository):
             category_map = {}
             if category:
                 # Filter by category - need to get items in that category first
-                items_result = self.client.table(self.TABLE_ITEMS) \
-                    .select("name, category") \
-                    .eq("category", category) \
-                    .execute()
+                items_result = self.client.table(self.TABLE_ITEMS).select("name, category").eq("category", category).execute()
                 if items_result.data:
-                    category_map = {item['name']: item['category'] for item in items_result.data}
+                    category_map = {item["name"]: item["category"] for item in items_result.data}
             else:
                 # Get all category mappings
-                items_result = self.client.table(self.TABLE_ITEMS) \
-                    .select("name, category") \
-                    .execute()
+                items_result = self.client.table(self.TABLE_ITEMS).select("name, category").execute()
                 if items_result.data:
-                    category_map = {item['name']: item['category'] for item in items_result.data}
+                    category_map = {item["name"]: item["category"] for item in items_result.data}
 
             # Group by product name and date, sum stock_out
             items_data: Dict[str, Dict] = {}
             for row in result_data:
-                name = row['product_name']
+                name = row["product_name"]
 
                 # Filter by category if specified
                 if category and name not in category_map:
                     continue
 
                 if name not in items_data:
-                    items_data[name] = {
-                        'name': name,
-                        'category': category_map.get(name, 'bread'),
-                        'data': {}  # Use dict to aggregate by date
-                    }
+                    items_data[name] = {"name": name, "category": category_map.get(name, "bread"), "data": {}}  # Use dict to aggregate by date
 
                 # Get date from snapshot_id
-                snapshot_id = row.get('snapshot_id')
+                snapshot_id = row.get("snapshot_id")
                 date_str = snapshot_date_map.get(snapshot_id)
                 if date_str:
-                    stock_out = row.get('stock_out', 0) or 0
+                    stock_out = row.get("stock_out", 0) or 0
 
                     # Aggregate stock_out by date (same product may have multiple batches)
-                    if date_str not in items_data[name]['data']:
-                        items_data[name]['data'][date_str] = 0
-                    items_data[name]['data'][date_str] += stock_out
+                    if date_str not in items_data[name]["data"]:
+                        items_data[name]["data"][date_str] = 0
+                    items_data[name]["data"][date_str] += stock_out
 
             # Convert dict to list format
             result_list = []
             for name, item in items_data.items():
-                data_list = [
-                    {'date': date, 'sales': int(sales)}
-                    for date, sales in sorted(item['data'].items())
-                ]
+                data_list = [{"date": date, "sales": int(sales)} for date, sales in sorted(item["data"].items())]
                 if data_list:  # Only include items with data
-                    result_list.append({
-                        'name': name,
-                        'category': item['category'],
-                        'data': data_list
-                    })
+                    result_list.append({"name": name, "category": item["category"], "data": data_list})
 
             return result_list
 
@@ -620,11 +569,7 @@ class InventoryRepository(SupabaseRepository):
             logger.error(f"Failed to get sales trend: {e}")
             return []
 
-    def get_restock_records(
-        self,
-        days: int = 30,
-        category: Optional[str] = None
-    ) -> List[Dict]:
+    def get_restock_records(self, days: int = 30, category: Optional[str] = None) -> List[Dict]:
         """
         Get restock records (入庫) from raw items.
 
@@ -651,13 +596,16 @@ class InventoryRepository(SupabaseRepository):
 
         try:
             from datetime import timedelta
+
             start_date = datetime.now() - timedelta(days=days)
 
             # Query raw items with stock_in > 0
-            query = self.client.table(self.TABLE_RAW_ITEMS) \
-                .select("product_name, stock_in, expiry_date, warehouse_date, snapshot_id, inventory_snapshots(snapshot_date)") \
-                .gt("stock_in", 0) \
+            query = (
+                self.client.table(self.TABLE_RAW_ITEMS)
+                .select("product_name, stock_in, expiry_date, warehouse_date, snapshot_id, inventory_snapshots(snapshot_date)")
+                .gt("stock_in", 0)
                 .gte("created_at", start_date.isoformat())
+            )
 
             result = query.order("created_at", desc=True).execute()
 
@@ -666,36 +614,36 @@ class InventoryRepository(SupabaseRepository):
 
             # Get category mapping from inventory_items
             category_map = {}
-            items_result = self.client.table(self.TABLE_ITEMS) \
-                .select("name, category") \
-                .execute()
+            items_result = self.client.table(self.TABLE_ITEMS).select("name, category").execute()
             if items_result.data:
-                category_map = {item['name']: item['category'] for item in items_result.data}
+                category_map = {item["name"]: item["category"] for item in items_result.data}
 
             # Transform data
             records = []
             for row in result.data:
-                name = row['product_name']
-                item_category = category_map.get(name, 'bread')
+                name = row["product_name"]
+                item_category = category_map.get(name, "bread")
 
                 # Filter by category if specified
                 if category and item_category != category:
                     continue
 
                 # Extract snapshot date
-                snapshot_info = row.get('inventory_snapshots')
+                snapshot_info = row.get("inventory_snapshots")
                 date_str = None
-                if snapshot_info and snapshot_info.get('snapshot_date'):
-                    date_str = snapshot_info['snapshot_date'][:10]  # YYYY-MM-DD
+                if snapshot_info and snapshot_info.get("snapshot_date"):
+                    date_str = snapshot_info["snapshot_date"][:10]  # YYYY-MM-DD
 
-                records.append({
-                    'date': date_str or row.get('warehouse_date', ''),
-                    'product_name': name,
-                    'category': item_category,
-                    'stock_in': int(row.get('stock_in', 0)),
-                    'expiry_date': row.get('expiry_date'),
-                    'warehouse_date': row.get('warehouse_date'),
-                })
+                records.append(
+                    {
+                        "date": date_str or row.get("warehouse_date", ""),
+                        "product_name": name,
+                        "category": item_category,
+                        "stock_in": int(row.get("stock_in", 0)),
+                        "expiry_date": row.get("expiry_date"),
+                        "warehouse_date": row.get("warehouse_date"),
+                    }
+                )
 
             return records
 
@@ -720,9 +668,7 @@ class InventoryRepository(SupabaseRepository):
             return []
 
         try:
-            result = self.client.table(self.TABLE_MAPPINGS) \
-                .select("bread_name, bag_name") \
-                .execute()
+            result = self.client.table(self.TABLE_MAPPINGS).select("bread_name, bag_name").execute()
 
             if not result.data:
                 return []
@@ -748,13 +694,7 @@ class InventoryRepository(SupabaseRepository):
             return False
 
         try:
-            self.client.table(self.TABLE_MAPPINGS) \
-                .upsert({
-                    "bread_name": bread_name,
-                    "bag_name": bag_name,
-                    "updated_at": datetime.now().isoformat()
-                }) \
-                .execute()
+            self.client.table(self.TABLE_MAPPINGS).upsert({"bread_name": bread_name, "bag_name": bag_name, "updated_at": datetime.now().isoformat()}).execute()
             return True
 
         except Exception as e:
@@ -776,11 +716,7 @@ class InventoryRepository(SupabaseRepository):
             return False
 
         try:
-            self.client.table(self.TABLE_MAPPINGS) \
-                .delete() \
-                .eq("bread_name", bread_name) \
-                .eq("bag_name", bag_name) \
-                .execute()
+            self.client.table(self.TABLE_MAPPINGS).delete().eq("bread_name", bread_name).eq("bag_name", bag_name).execute()
             return True
 
         except Exception as e:
@@ -811,7 +747,7 @@ class InventoryRepository(SupabaseRepository):
             from datetime import timedelta
 
             # Constants
-            LEAD_TIME = {'bread': 20, 'box': 20, 'bag': 30}
+            LEAD_TIME = {"bread": 20, "box": 20, "bag": 30}
             TARGET_DAYS = 30
 
             # 1. Get latest inventory items
@@ -819,14 +755,11 @@ class InventoryRepository(SupabaseRepository):
             if not latest_snapshot:
                 return {}
 
-            snapshot_id = latest_snapshot.get('id')
-            snapshot_date = latest_snapshot.get('snapshot_date', '')[:10]
+            snapshot_id = latest_snapshot.get("id")
+            snapshot_date = latest_snapshot.get("snapshot_date", "")[:10]
 
             # Get all inventory items
-            items_result = self.client.table(self.TABLE_ITEMS) \
-                .select("*") \
-                .eq("snapshot_id", snapshot_id) \
-                .execute()
+            items_result = self.client.table(self.TABLE_ITEMS).select("*").eq("snapshot_id", snapshot_id).execute()
 
             if not items_result.data:
                 return {}
@@ -835,10 +768,12 @@ class InventoryRepository(SupabaseRepository):
             start_date_30d = datetime.now() - timedelta(days=30)
             start_date_20d = datetime.now() - timedelta(days=20)
 
-            raw_items_result = self.client.table(self.TABLE_RAW_ITEMS) \
-                .select("product_name, stock_out, created_at, inventory_snapshots(snapshot_date)") \
-                .gte("created_at", start_date_30d.isoformat()) \
+            raw_items_result = (
+                self.client.table(self.TABLE_RAW_ITEMS)
+                .select("product_name, stock_out, created_at, inventory_snapshots(snapshot_date)")
+                .gte("created_at", start_date_30d.isoformat())
                 .execute()
+            )
 
             # Calculate sales totals per product
             sales_30d: Dict[str, int] = {}
@@ -846,9 +781,9 @@ class InventoryRepository(SupabaseRepository):
 
             if raw_items_result.data:
                 for row in raw_items_result.data:
-                    name = row['product_name']
-                    stock_out = int(row.get('stock_out', 0) or 0)
-                    created_at = row.get('created_at', '')
+                    name = row["product_name"]
+                    stock_out = int(row.get("stock_out", 0) or 0)
+                    created_at = row.get("created_at", "")
 
                     # Add to 30-day total
                     sales_30d[name] = sales_30d.get(name, 0) + stock_out
@@ -859,17 +794,17 @@ class InventoryRepository(SupabaseRepository):
 
             # 3. Get product mappings (bread to bag)
             mappings = self.get_product_mappings()
-            bread_to_bag = {m['bread_name']: m['bag_name'] for m in mappings}
-            bag_to_bread = {m['bag_name']: m['bread_name'] for m in mappings}
+            bread_to_bag = {m["bread_name"]: m["bag_name"] for m in mappings}
+            bag_to_bread = {m["bag_name"]: m["bread_name"] for m in mappings}
 
             # Constants for bag calculation
             BAG_CAPACITY = 6000  # 一卷塑膠袋可包 6000 個麵包
 
             # 4. Build diagnosis for each item
             def calculate_diagnosis(item: Dict, category: str) -> Dict:
-                name = item['name']
-                current_stock = int(item.get('available_stock', 0) or item.get('current_stock', 0))
-                unit = item.get('unit', '個')
+                name = item["name"]
+                current_stock = int(item.get("available_stock", 0) or item.get("current_stock", 0))
+                unit = item.get("unit", "個")
                 lead_time = LEAD_TIME.get(category, 20)
 
                 # Sales calculations
@@ -885,40 +820,40 @@ class InventoryRepository(SupabaseRepository):
                 if daily_sales > 0:
                     days_of_stock = round(current_stock / daily_sales, 1)
                     reorder_point = daily_sales * lead_time
-                    target_stock = total_30d  # 30日出庫總量作為正常水位
+                    target_stock = total_30d  # 30日銷量總量作為正常水位
 
                     # Health status
                     if days_of_stock < lead_time:
-                        health_status = 'critical'
+                        health_status = "critical"
                     elif current_stock > total_30d:
-                        health_status = 'overstock'
+                        health_status = "overstock"
                     else:
-                        health_status = 'healthy'
+                        health_status = "healthy"
 
                     # Suggested order (補到正常水位)
-                    suggested_order = max(0, target_stock - current_stock) if health_status == 'critical' else 0
+                    suggested_order = max(0, target_stock - current_stock) if health_status == "critical" else 0
                 else:
                     days_of_stock = 999
                     reorder_point = 0
                     target_stock = 0
-                    health_status = 'healthy'  # No sales data, default healthy
+                    health_status = "healthy"  # No sales data, default healthy
                     suggested_order = 0
 
                 return {
-                    'name': name,
-                    'category': category,
-                    'current_stock': current_stock,
-                    'unit': unit,
-                    'lead_time': lead_time,
-                    'daily_sales_30d': daily_30d,
-                    'daily_sales_20d': daily_20d,
-                    'total_sales_30d': total_30d,
-                    'total_sales_20d': total_20d,
-                    'days_of_stock': days_of_stock,
-                    'reorder_point': round(reorder_point),
-                    'target_stock': round(target_stock),
-                    'health_status': health_status,
-                    'suggested_order': round(suggested_order),
+                    "name": name,
+                    "category": category,
+                    "current_stock": current_stock,
+                    "unit": unit,
+                    "lead_time": lead_time,
+                    "daily_sales_30d": daily_30d,
+                    "daily_sales_20d": daily_20d,
+                    "total_sales_30d": total_30d,
+                    "total_sales_20d": total_20d,
+                    "days_of_stock": days_of_stock,
+                    "reorder_point": round(reorder_point),
+                    "target_stock": round(target_stock),
+                    "health_status": health_status,
+                    "suggested_order": round(suggested_order),
                 }
 
             # Process items by category
@@ -936,20 +871,20 @@ class InventoryRepository(SupabaseRepository):
             raw_bag_items = []
 
             for item in items_result.data:
-                category = item.get('category', 'other')
-                if category == 'bread':
-                    diagnosis = calculate_diagnosis(item, 'bread')
+                category = item.get("category", "other")
+                if category == "bread":
+                    diagnosis = calculate_diagnosis(item, "bread")
                     bread_items.append(diagnosis)
-                elif category == 'box':
-                    diagnosis = calculate_diagnosis(item, 'box')
+                elif category == "box":
+                    diagnosis = calculate_diagnosis(item, "box")
                     box_items.append(diagnosis)
-                elif category == 'bag':
+                elif category == "bag":
                     # Store for later processing
                     raw_bag_items.append(item)
-                    bags_in_inventory.add(item['name'])
+                    bags_in_inventory.add(item["name"])
 
             # Create bread lookup for bag calculations
-            bread_lookup = {b['name']: b for b in bread_items}
+            bread_lookup = {b["name"]: b for b in bread_items}
 
             # 5. Calculate bag diagnosis based on corresponding bread
             import math
@@ -959,13 +894,13 @@ class InventoryRepository(SupabaseRepository):
                 Calculate bag reorder_point and target_stock based on corresponding bread.
                 一卷塑膠袋可包 6000 個麵包，根據麵包的補貨點計算塑膠袋需求量，無條件進位
                 """
-                lead_time = LEAD_TIME.get('bag', 30)
+                lead_time = LEAD_TIME.get("bag", 30)
 
                 # Find corresponding bread
                 bread_name = bag_to_bread.get(bag_name)
                 if bread_name and bread_name in bread_lookup:
                     bread = bread_lookup[bread_name]
-                    bread_reorder_point = bread.get('reorder_point', 0)
+                    bread_reorder_point = bread.get("reorder_point", 0)
 
                     # 塑膠袋補貨點 = 麵包補貨點 / 6000，無條件進位
                     if bread_reorder_point > 0:
@@ -979,39 +914,39 @@ class InventoryRepository(SupabaseRepository):
                     # Health status based on bag stock vs reorder point
                     if bag_reorder_point > 0:
                         if current_stock < bag_reorder_point:
-                            health_status = 'critical'
+                            health_status = "critical"
                         elif current_stock > bag_target_stock * 2:
-                            health_status = 'overstock'
+                            health_status = "overstock"
                         else:
-                            health_status = 'healthy'
+                            health_status = "healthy"
                     else:
-                        health_status = 'healthy'
+                        health_status = "healthy"
 
                     # Suggested order
-                    suggested_order = max(0, bag_target_stock - current_stock) if health_status == 'critical' else 0
+                    suggested_order = max(0, bag_target_stock - current_stock) if health_status == "critical" else 0
                 else:
                     # No corresponding bread found
                     bag_reorder_point = 0
                     bag_target_stock = 0
-                    health_status = 'healthy' if current_stock > 0 else 'critical'
+                    health_status = "healthy" if current_stock > 0 else "critical"
                     suggested_order = 0
 
                 return {
-                    'name': bag_name,
-                    'category': 'bag',
-                    'current_stock': current_stock,
-                    'unit': '捲',
-                    'lead_time': lead_time,
-                    'reorder_point': bag_reorder_point,
-                    'target_stock': bag_target_stock,
-                    'health_status': health_status,
-                    'suggested_order': suggested_order,
+                    "name": bag_name,
+                    "category": "bag",
+                    "current_stock": current_stock,
+                    "unit": "捲",
+                    "lead_time": lead_time,
+                    "reorder_point": bag_reorder_point,
+                    "target_stock": bag_target_stock,
+                    "health_status": health_status,
+                    "suggested_order": suggested_order,
                 }
 
             # Process raw bag items
             for item in raw_bag_items:
-                bag_name = item['name']
-                current_stock = int(item.get('available_stock', 0) or item.get('current_stock', 0))
+                bag_name = item["name"]
+                current_stock = int(item.get("available_stock", 0) or item.get("current_stock", 0))
                 diagnosis = calculate_bag_diagnosis(bag_name, current_stock)
                 bag_items.append(diagnosis)
                 bag_lookup[bag_name] = diagnosis
@@ -1019,7 +954,7 @@ class InventoryRepository(SupabaseRepository):
             # Add missing bags from master_bags (庫存為0的塑膠袋)
             master_bags = self.get_master_bags()
             for master_bag in master_bags:
-                bag_name = master_bag.get('name')
+                bag_name = master_bag.get("name")
                 if bag_name and bag_name not in bags_in_inventory:
                     # Create diagnosis for zero-stock bags
                     diagnosis = calculate_bag_diagnosis(bag_name, 0)
@@ -1028,38 +963,38 @@ class InventoryRepository(SupabaseRepository):
 
             # 6. Match bags to breads
             for bread in bread_items:
-                bag_name = bread_to_bag.get(bread['name'])
+                bag_name = bread_to_bag.get(bread["name"])
                 if bag_name and bag_name in bag_lookup:
-                    bread['matched_bag'] = bag_lookup[bag_name]
+                    bread["matched_bag"] = bag_lookup[bag_name]
                 else:
                     # Try fallback matching
                     for bag in bag_items:
-                        bag_base = bag['name'].replace('塑膠袋-', '').replace('塑膠袋', '')
-                        if bag_base == bread['name'] or bread['name'].endswith(bag_base):
-                            bread['matched_bag'] = bag
+                        bag_base = bag["name"].replace("塑膠袋-", "").replace("塑膠袋", "")
+                        if bag_base == bread["name"] or bread["name"].endswith(bag_base):
+                            bread["matched_bag"] = bag
                             break
                     else:
-                        bread['matched_bag'] = None
+                        bread["matched_bag"] = None
 
             # 7. Calculate summary
             all_items = bread_items + box_items + bag_items
-            total_bag_rolls = sum(i['current_stock'] for i in bag_items)
+            total_bag_rolls = sum(i["current_stock"] for i in bag_items)
             summary = {
-                'critical_count': len([i for i in all_items if i['health_status'] == 'critical']),
-                'healthy_count': len([i for i in all_items if i['health_status'] == 'healthy']),
-                'overstock_count': len([i for i in all_items if i['health_status'] == 'overstock']),
-                'total_bread_stock': sum(i['current_stock'] for i in bread_items),
-                'total_box_stock': sum(i['current_stock'] for i in box_items),
-                'total_bag_stock': total_bag_rolls,
-                'total_bag_capacity': total_bag_rolls * BAG_CAPACITY,  # 可包裝量 = 塑膠袋卷數 * 6000
+                "critical_count": len([i for i in all_items if i["health_status"] == "critical"]),
+                "healthy_count": len([i for i in all_items if i["health_status"] == "healthy"]),
+                "overstock_count": len([i for i in all_items if i["health_status"] == "overstock"]),
+                "total_bread_stock": sum(i["current_stock"] for i in bread_items),
+                "total_box_stock": sum(i["current_stock"] for i in box_items),
+                "total_bag_stock": total_bag_rolls,
+                "total_bag_capacity": total_bag_rolls * BAG_CAPACITY,  # 可包裝量 = 塑膠袋卷數 * 6000
             }
 
             return {
-                'snapshot_date': snapshot_date,
-                'bread_items': bread_items,
-                'box_items': box_items,
-                'bag_items': bag_items,
-                'summary': summary,
+                "snapshot_date": snapshot_date,
+                "bread_items": bread_items,
+                "box_items": box_items,
+                "bag_items": bag_items,
+                "summary": summary,
             }
 
         except Exception as e:
@@ -1075,10 +1010,7 @@ class InventoryRepository(SupabaseRepository):
         if not self.is_connected:
             return []
         try:
-            result = self.client.table(self.TABLE_MASTER_BREADS) \
-                .select("*") \
-                .order("name") \
-                .execute()
+            result = self.client.table(self.TABLE_MASTER_BREADS).select("*").order("name").execute()
             return result.data or []
         except Exception as e:
             logger.error(f"Failed to get master breads: {e}")
@@ -1089,10 +1021,7 @@ class InventoryRepository(SupabaseRepository):
         if not self.is_connected:
             return []
         try:
-            result = self.client.table(self.TABLE_MASTER_BAGS) \
-                .select("*") \
-                .order("name") \
-                .execute()
+            result = self.client.table(self.TABLE_MASTER_BAGS).select("*").order("name").execute()
             return result.data or []
         except Exception as e:
             logger.error(f"Failed to get master bags: {e}")
@@ -1103,10 +1032,7 @@ class InventoryRepository(SupabaseRepository):
         if not self.is_connected:
             return []
         try:
-            result = self.client.table(self.TABLE_MASTER_BOXES) \
-                .select("*") \
-                .order("name") \
-                .execute()
+            result = self.client.table(self.TABLE_MASTER_BOXES).select("*").order("name").execute()
             return result.data or []
         except Exception as e:
             logger.error(f"Failed to get master boxes: {e}")
@@ -1166,9 +1092,7 @@ class InventoryRepository(SupabaseRepository):
 
         try:
             # Get unique product names from inventory items
-            items_result = self.client.table(self.TABLE_ITEMS) \
-                .select("name, category") \
-                .execute()
+            items_result = self.client.table(self.TABLE_ITEMS).select("name, category").execute()
 
             if not items_result.data:
                 return {"breads": 0, "bags": 0, "boxes": 0}
@@ -1196,17 +1120,13 @@ class InventoryRepository(SupabaseRepository):
             for name in boxes:
                 self.add_master_box(name)
 
-            return {
-                "breads": len(breads),
-                "bags": len(bags),
-                "boxes": len(boxes)
-            }
+            return {"breads": len(breads), "bags": len(bags), "boxes": len(boxes)}
 
         except Exception as e:
             logger.error(f"Failed to sync master data: {e}")
             return {"breads": 0, "bags": 0, "boxes": 0}
 
-    def _auto_sync_master_data(self, snapshot: 'InventorySnapshot') -> Dict[str, int]:
+    def _auto_sync_master_data(self, snapshot: "InventorySnapshot") -> Dict[str, int]:
         """
         Auto-sync new items from snapshot to master tables.
         Called automatically when saving a new snapshot.
@@ -1225,9 +1145,9 @@ class InventoryRepository(SupabaseRepository):
 
         try:
             # Get existing master data for comparison
-            existing_breads = {b['name'] for b in self.get_master_breads()}
-            existing_bags = {b['name'] for b in self.get_master_bags()}
-            existing_boxes = {b['name'] for b in self.get_master_boxes()}
+            existing_breads = {b["name"] for b in self.get_master_breads()}
+            existing_bags = {b["name"] for b in self.get_master_bags()}
+            existing_boxes = {b["name"] for b in self.get_master_boxes()}
 
             new_breads = 0
             new_bags = 0
@@ -1257,11 +1177,7 @@ class InventoryRepository(SupabaseRepository):
             if new_breads or new_bags or new_boxes:
                 logger.success(f"Auto-synced master data: {new_breads} breads, {new_bags} bags, {new_boxes} boxes")
 
-            return {
-                "breads": new_breads,
-                "bags": new_bags,
-                "boxes": new_boxes
-            }
+            return {"breads": new_breads, "bags": new_bags, "boxes": new_boxes}
 
         except Exception as e:
             logger.error(f"Failed to auto-sync master data: {e}")

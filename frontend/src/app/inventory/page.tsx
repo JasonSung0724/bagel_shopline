@@ -981,7 +981,7 @@ export default function InventoryDashboard() {
                           </span>
                         </div>
                         <p className="text-xs text-gray-500 mb-2">
-                          日銷: {(bread.daily_sales_30d ?? 0).toLocaleString()} | 30日出庫: {(bread.total_sales_30d ?? 0).toLocaleString()}
+                          日銷: {(bread.daily_sales_30d ?? 0).toLocaleString()} | 30日銷量: {(bread.total_sales_30d ?? 0).toLocaleString()}
                         </p>
                         <div className="flex items-baseline gap-2 mb-2">
                           <span className="text-2xl font-bold text-gray-800">{bread.current_stock.toLocaleString()}</span>
@@ -1132,7 +1132,7 @@ export default function InventoryDashboard() {
                         </div>
 
                         <p className="text-sm text-gray-500 mb-4">
-                          日銷: {(item.daily_sales_30d ?? 0).toLocaleString()} 個 | 30日出庫: {(item.total_sales_30d ?? 0).toLocaleString()} | 可售天數: <span className={`font-medium ${
+                          日銷: {(item.daily_sales_30d ?? 0).toLocaleString()} 個 | 30日銷量: {(item.total_sales_30d ?? 0).toLocaleString()} | 可售天數: <span className={`font-medium ${
                             (item.days_of_stock ?? 0) < LEAD_TIME.box ? 'text-red-600' :
                             (item.days_of_stock ?? 0) > TARGET_DAYS ? 'text-orange-500' : 'text-green-600'
                           }`}>{item.days_of_stock ?? 0} 天</span>
@@ -1172,7 +1172,7 @@ export default function InventoryDashboard() {
                         {item.health_status === 'overstock' && (
                           <div className="flex items-center gap-2 text-sm text-orange-500">
                             <Box className="w-4 h-4" />
-                            <span>庫存積壓，超出30日出庫 {((item.current_stock ?? 0) - (item.total_sales_30d ?? 0)).toLocaleString()} 個</span>
+                            <span>庫存積壓，超出30日銷量 {((item.current_stock ?? 0) - (item.total_sales_30d ?? 0)).toLocaleString()} 個</span>
                           </div>
                         )}
                         {item.health_status === 'healthy' && (
