@@ -186,11 +186,30 @@ jobs:
           "
 
       - name: Deploy to VM
+        env:
+          PULL_API: ${{ needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch' }}
+          PULL_WORKER: ${{ needs.changes.outputs.worker == 'true' || github.event_name == 'workflow_dispatch' }}
+          PULL_FRONTEND: ${{ needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
         run: |
           # Copy docker-compose.yml and nginx config to VM
           gcloud compute scp docker-compose.yml ${{ env.GCE_INSTANCE }}:/opt/bagel-shop/docker-compose.yml --zone=${{ env.GCE_ZONE }}
           gcloud compute ssh ${{ env.GCE_INSTANCE }} --zone=${{ env.GCE_ZONE }} --command="mkdir -p /opt/bagel-shop/nginx"
           gcloud compute scp nginx/nginx.conf ${{ env.GCE_INSTANCE }}:/opt/bagel-shop/nginx/nginx.conf --zone=${{ env.GCE_ZONE }}
+
+          # Build list of images to pull based on changes
+          IMAGES_TO_PULL=""
+          if [ "$PULL_API" = "true" ]; then
+            IMAGES_TO_PULL="$IMAGES_TO_PULL api"
+            echo "📦 Will pull: api"
+          fi
+          if [ "$PULL_WORKER" = "true" ]; then
+            IMAGES_TO_PULL="$IMAGES_TO_PULL worker"
+            echo "📦 Will pull: worker"
+          fi
+          if [ "$PULL_FRONTEND" = "true" ]; then
+            IMAGES_TO_PULL="$IMAGES_TO_PULL frontend"
+            echo "📦 Will pull: frontend"
+          fi
 
           # Run deployment commands on VM
           gcloud compute ssh ${{ env.GCE_INSTANCE }} --zone=${{ env.GCE_ZONE }} --command="
@@ -202,8 +221,14 @@ jobs:
             # Create logs directory
             mkdir -p logs
 
-            # Pull latest images
-            docker compose pull
+            # Pull only changed images (selective pull)
+            IMAGES='$IMAGES_TO_PULL'
+            if [ -n \"\$IMAGES\" ]; then
+              echo '🚀 Pulling changed images:' \$IMAGES
+              docker compose pull \$IMAGES
+            else
+              echo '⏭️ No image changes, skipping pull'
+            fi
 
             # Restart containers with new images (including nginx)
             docker compose up -d --force-recreate api worker frontend nginx
