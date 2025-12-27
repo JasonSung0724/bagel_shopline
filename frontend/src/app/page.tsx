@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import Link from 'next/link';
-import { FileSpreadsheet, Loader2, Package } from 'lucide-react';
+import { FileSpreadsheet, Loader2 } from 'lucide-react';
 import FileUploader from '@/components/FileUploader';
 import PlatformSelector from '@/components/PlatformSelector';
 import DataPreview from '@/components/DataPreview';
@@ -186,13 +185,6 @@ export default function Home() {
           <p className="text-gray-500">
             快速整合多平台訂單，一鍵生成出貨報告
           </p>
-          <Link
-            href="/inventory"
-            className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-gradient-to-r from-[#EB5C20] to-[#C74A18] text-white rounded-lg hover:from-[#C74A18] hover:to-[#A53D14] transition-all shadow-md hover:shadow-lg"
-          >
-            <Package className="w-4 h-4" />
-            庫存管理系統
-          </Link>
         </header>
 
         <div className="space-y-6">
