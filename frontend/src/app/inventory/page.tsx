@@ -34,6 +34,20 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 const BRAND_ORANGE = '#EB5C20';
 const BRAND_GRAY = '#9FA0A0';
 
+// Chart colors for multi-line display
+const CHART_COLORS = [
+  '#EB5C20', // Brand orange
+  '#10B981', // Green
+  '#3B82F6', // Blue
+  '#8B5CF6', // Purple
+  '#F59E0B', // Amber
+  '#EF4444', // Red
+  '#06B6D4', // Cyan
+  '#EC4899', // Pink
+  '#84CC16', // Lime
+  '#6366F1', // Indigo
+];
+
 // Types
 interface InventoryItem {
   id: string;
@@ -79,10 +93,21 @@ interface TrendDataPoint {
   stock: number;
 }
 
+interface SalesDataPoint {
+  date: string;
+  sales: number;
+}
+
 interface ItemTrend {
   name: string;
   category: string;
   data: TrendDataPoint[];
+}
+
+interface ItemSalesTrend {
+  name: string;
+  category: string;
+  data: SalesDataPoint[];
 }
 
 // API response types
@@ -217,8 +242,11 @@ export default function InventoryDashboard() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [trendData, setTrendData] = useState<ItemTrend[]>([]);
-  const [selectedTrendItem, setSelectedTrendItem] = useState<string>('');
+  const [salesTrendData, setSalesTrendData] = useState<ItemSalesTrend[]>([]);
+  const [selectedTrendItems, setSelectedTrendItems] = useState<Set<string>>(new Set());
+  const [selectedSalesItems, setSelectedSalesItems] = useState<Set<string>>(new Set());
   const [trendDays, setTrendDays] = useState<number>(30);
+  const [analysisMode, setAnalysisMode] = useState<'stock' | 'sales'>('sales');  // Default to sales
 
   // Fetch inventory from API
   const fetchInventory = useCallback(async () => {
@@ -287,7 +315,7 @@ export default function InventoryDashboard() {
     }
   }, []);
 
-  // Fetch trend data (only when user clicks)
+  // Fetch stock trend data
   const fetchTrendData = useCallback(async (category?: string) => {
     try {
       const url = category
@@ -298,15 +326,78 @@ export default function InventoryDashboard() {
 
       if (result.success && result.data) {
         setTrendData(result.data);
-        // Auto-select first item if none selected
+        // Auto-select all items by default
         if (result.data.length > 0) {
-          setSelectedTrendItem(result.data[0].name);
+          setSelectedTrendItems(new Set(result.data.map((item: ItemTrend) => item.name)));
         }
       }
     } catch (err) {
       console.error('Failed to fetch trend data:', err);
     }
   }, [trendDays]);
+
+  // Fetch sales trend data (based on stock_out)
+  const fetchSalesTrend = useCallback(async (category?: string) => {
+    try {
+      const url = category
+        ? `${API_BASE_URL}/api/inventory/sales-trend?days=${trendDays}&category=${category}`
+        : `${API_BASE_URL}/api/inventory/sales-trend?days=${trendDays}`;
+      const response = await fetch(url);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setSalesTrendData(result.data);
+        // Auto-select all items by default
+        if (result.data.length > 0) {
+          setSelectedSalesItems(new Set(result.data.map((item: ItemSalesTrend) => item.name)));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch sales trend:', err);
+    }
+  }, [trendDays]);
+
+  // Toggle item selection
+  const toggleTrendItem = (name: string) => {
+    setSelectedTrendItems(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  };
+
+  const toggleSalesItem = (name: string) => {
+    setSelectedSalesItems(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  };
+
+  // Select/deselect all
+  const selectAllTrendItems = () => {
+    setSelectedTrendItems(new Set(trendData.map(item => item.name)));
+  };
+
+  const deselectAllTrendItems = () => {
+    setSelectedTrendItems(new Set());
+  };
+
+  const selectAllSalesItems = () => {
+    setSelectedSalesItems(new Set(salesTrendData.map(item => item.name)));
+  };
+
+  const deselectAllSalesItems = () => {
+    setSelectedSalesItems(new Set());
+  };
 
   // Initialize: fetch from API (only once on mount)
   useEffect(() => {
@@ -320,12 +411,16 @@ export default function InventoryDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-fetch trend data when switching to analysis tab
+  // Auto-fetch data when switching to analysis tab
   useEffect(() => {
-    if (activeTab === 'analysis' && trendData.length === 0) {
-      fetchTrendData('bread');
+    if (activeTab === 'analysis') {
+      if (analysisMode === 'sales' && salesTrendData.length === 0) {
+        fetchSalesTrend('bread');
+      } else if (analysisMode === 'stock' && trendData.length === 0) {
+        fetchTrendData('bread');
+      }
     }
-  }, [activeTab, trendData.length, fetchTrendData]);
+  }, [activeTab, analysisMode, salesTrendData.length, trendData.length, fetchSalesTrend, fetchTrendData]);
 
   // Refresh data from database (no sync from email)
   const handleRefresh = async () => {
@@ -336,7 +431,11 @@ export default function InventoryDashboard() {
         await fetchInventory();
         break;
       case 'analysis':
-        await fetchTrendData('bread');
+        if (analysisMode === 'sales') {
+          await fetchSalesTrend('bread');
+        } else {
+          await fetchTrendData('bread');
+        }
         break;
       case 'restock':
         await fetchRestockLogs();
@@ -652,6 +751,39 @@ export default function InventoryDashboard() {
             {/* Controls */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
               <div className="flex flex-wrap items-center gap-4">
+                {/* Mode selector: Sales vs Stock */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">分析類型:</span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => {
+                        setAnalysisMode('sales');
+                        if (salesTrendData.length === 0) fetchSalesTrend('bread');
+                      }}
+                      className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                        analysisMode === 'sales'
+                          ? 'bg-[#EB5C20] text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      銷量趨勢
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAnalysisMode('stock');
+                        if (trendData.length === 0) fetchTrendData('bread');
+                      }}
+                      className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                        analysisMode === 'stock'
+                          ? 'bg-[#EB5C20] text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      庫存趨勢
+                    </button>
+                  </div>
+                </div>
+
                 {/* Days selector */}
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-600">時間範圍:</span>
@@ -672,169 +804,365 @@ export default function InventoryDashboard() {
                   </div>
                 </div>
 
-                {/* Item selector */}
-                <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                  <span className="text-sm text-gray-600">選擇品項:</span>
-                  <select
-                    value={selectedTrendItem}
-                    onChange={(e) => setSelectedTrendItem(e.target.value)}
-                    className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EB5C20] focus:border-transparent"
+                {/* Select/Deselect All buttons */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={analysisMode === 'sales' ? selectAllSalesItems : selectAllTrendItems}
+                    className="px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
                   >
-                    {trendData.map((item) => (
-                      <option key={item.name} value={item.name}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
+                    全選
+                  </button>
+                  <button
+                    onClick={analysisMode === 'sales' ? deselectAllSalesItems : deselectAllTrendItems}
+                    className="px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    取消全選
+                  </button>
                 </div>
 
                 {/* Refresh button */}
                 <button
-                  onClick={() => fetchTrendData('bread')}
+                  onClick={() => analysisMode === 'sales' ? fetchSalesTrend('bread') : fetchTrendData('bread')}
                   className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   <RefreshCw className="w-4 h-4" />
                   重新整理
                 </button>
               </div>
+
+              {/* Selected count */}
+              <div className="mt-3 text-sm text-gray-500">
+                已選擇: {analysisMode === 'sales' ? selectedSalesItems.size : selectedTrendItems.size} / {analysisMode === 'sales' ? salesTrendData.length : trendData.length} 項
+              </div>
             </div>
 
-            {/* Trend Chart */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-gray-800">
-                  庫存趨勢圖 - {selectedTrendItem || '請選擇品項'}
-                </h3>
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                  近 {trendDays} 天資料
-                </span>
-              </div>
+            {/* Sales Trend Chart - Multi-line */}
+            {analysisMode === 'sales' && (
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-bold text-gray-800">
+                    銷量趨勢圖 (出庫量)
+                  </h3>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    近 {trendDays} 天資料
+                  </span>
+                </div>
 
-              {trendData.length === 0 ? (
-                <div className="h-80 flex items-center justify-center text-gray-400">
-                  <div className="text-center">
-                    <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>載入趨勢資料中...</p>
+                {salesTrendData.length === 0 ? (
+                  <div className="h-80 flex items-center justify-center text-gray-400">
+                    <div className="text-center">
+                      <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>載入銷量資料中...</p>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="h-80 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={
-                        trendData
-                          .find((item) => item.name === selectedTrendItem)
-                          ?.data.map((d) => ({
-                            date: d.date.slice(5), // MM-DD format
-                            庫存量: d.stock,
-                          })) || []
-                      }
-                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis
-                        dataKey="date"
-                        tick={{ fontSize: 11 }}
-                        tickMargin={10}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 11 }}
-                        tickFormatter={(value) => value.toLocaleString()}
-                      />
-                      <RechartsTooltip
-                        contentStyle={{
-                          borderRadius: '8px',
-                          border: 'none',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                        }}
-                        formatter={(value) => [Number(value).toLocaleString(), '庫存量']}
-                      />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="庫存量"
-                        stroke="#EB5C20"
-                        strokeWidth={2}
-                        dot={{ fill: '#EB5C20', strokeWidth: 2, r: 4 }}
-                        activeDot={{ r: 6, fill: '#EB5C20' }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </div>
-
-            {/* Items Table with current stock and trend */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100">
-                <h3 className="font-bold text-gray-800">各品項庫存走勢</h3>
+                ) : selectedSalesItems.size === 0 ? (
+                  <div className="h-80 flex items-center justify-center text-gray-400">
+                    <div className="text-center">
+                      <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>請在下方表格選擇要顯示的品項</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-80 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={(() => {
+                          // Merge all selected items data by date
+                          const dateMap = new Map<string, Record<string, number>>();
+                          salesTrendData
+                            .filter(item => selectedSalesItems.has(item.name))
+                            .forEach(item => {
+                              item.data.forEach(d => {
+                                const dateKey = d.date.slice(5); // MM-DD
+                                if (!dateMap.has(dateKey)) {
+                                  dateMap.set(dateKey, { date: dateKey });
+                                }
+                                dateMap.get(dateKey)![item.name] = d.sales;
+                              });
+                            });
+                          return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+                        })()}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} tickMargin={10} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v.toLocaleString()} />
+                        <RechartsTooltip
+                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                          formatter={(value: number) => [value.toLocaleString(), '']}
+                        />
+                        <Legend />
+                        {salesTrendData
+                          .filter(item => selectedSalesItems.has(item.name))
+                          .map((item, idx) => (
+                            <Line
+                              key={item.name}
+                              type="monotone"
+                              dataKey={item.name}
+                              stroke={CHART_COLORS[idx % CHART_COLORS.length]}
+                              strokeWidth={2}
+                              dot={{ fill: CHART_COLORS[idx % CHART_COLORS.length], strokeWidth: 2, r: 3 }}
+                              activeDot={{ r: 5 }}
+                            />
+                          ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-gray-50 text-gray-500 font-medium">
-                    <tr>
-                      <th className="px-6 py-3">商品名稱</th>
-                      <th className="px-6 py-3 text-right">目前庫存</th>
-                      <th className="px-6 py-3 text-right">{trendDays}天前庫存</th>
-                      <th className="px-6 py-3 text-right">變化量</th>
-                      <th className="px-6 py-3 text-right">趨勢</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {trendData.slice(0, 15).map((item) => {
-                      const latestStock = item.data[item.data.length - 1]?.stock || 0;
-                      const oldestStock = item.data[0]?.stock || 0;
-                      const change = latestStock - oldestStock;
-                      const changePercent = oldestStock > 0 ? ((change / oldestStock) * 100).toFixed(1) : 0;
+            )}
 
-                      return (
-                        <tr
-                          key={item.name}
-                          className={`hover:bg-gray-50 cursor-pointer ${
-                            selectedTrendItem === item.name ? 'bg-orange-50' : ''
-                          }`}
-                          onClick={() => setSelectedTrendItem(item.name)}
-                        >
-                          <td className="px-6 py-3 font-medium text-gray-700">
-                            {item.name}
-                            {selectedTrendItem === item.name && (
-                              <span className="ml-2 text-xs text-[#EB5C20]">● 已選取</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-3 text-right font-bold text-gray-900">
-                            {latestStock.toLocaleString()}
-                          </td>
-                          <td className="px-6 py-3 text-right text-gray-500">
-                            {oldestStock.toLocaleString()}
-                          </td>
-                          <td className={`px-6 py-3 text-right font-bold ${
-                            change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-500'
-                          }`}>
-                            {change > 0 ? '+' : ''}{change.toLocaleString()}
-                            <span className="text-xs font-normal ml-1">({changePercent}%)</span>
-                          </td>
-                          <td className="px-6 py-3 text-right">
-                            {change > 0 ? (
-                              <span className="inline-flex items-center text-green-600">
-                                <ArrowUpRight className="w-4 h-4" />
-                                補貨
-                              </span>
-                            ) : change < 0 ? (
-                              <span className="inline-flex items-center text-red-600">
-                                <TrendingUp className="w-4 h-4 rotate-180" />
-                                消耗
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">持平</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+            {/* Stock Trend Chart - Multi-line */}
+            {analysisMode === 'stock' && (
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-bold text-gray-800">
+                    庫存趨勢圖 (預計可用量)
+                  </h3>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    近 {trendDays} 天資料
+                  </span>
+                </div>
+
+                {trendData.length === 0 ? (
+                  <div className="h-80 flex items-center justify-center text-gray-400">
+                    <div className="text-center">
+                      <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>載入趨勢資料中...</p>
+                    </div>
+                  </div>
+                ) : selectedTrendItems.size === 0 ? (
+                  <div className="h-80 flex items-center justify-center text-gray-400">
+                    <div className="text-center">
+                      <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>請在下方表格選擇要顯示的品項</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-80 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={(() => {
+                          // Merge all selected items data by date
+                          const dateMap = new Map<string, Record<string, number>>();
+                          trendData
+                            .filter(item => selectedTrendItems.has(item.name))
+                            .forEach(item => {
+                              item.data.forEach(d => {
+                                const dateKey = d.date.slice(5); // MM-DD
+                                if (!dateMap.has(dateKey)) {
+                                  dateMap.set(dateKey, { date: dateKey });
+                                }
+                                dateMap.get(dateKey)![item.name] = d.stock;
+                              });
+                            });
+                          return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+                        })()}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} tickMargin={10} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v.toLocaleString()} />
+                        <RechartsTooltip
+                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                          formatter={(value: number) => [value.toLocaleString(), '']}
+                        />
+                        <Legend />
+                        {trendData
+                          .filter(item => selectedTrendItems.has(item.name))
+                          .map((item, idx) => (
+                            <Line
+                              key={item.name}
+                              type="monotone"
+                              dataKey={item.name}
+                              stroke={CHART_COLORS[idx % CHART_COLORS.length]}
+                              strokeWidth={2}
+                              dot={{ fill: CHART_COLORS[idx % CHART_COLORS.length], strokeWidth: 2, r: 3 }}
+                              activeDot={{ r: 5 }}
+                            />
+                          ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
+
+            {/* Sales Table with checkboxes */}
+            {analysisMode === 'sales' && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <h3 className="font-bold text-gray-800">各品項銷量統計 (出庫量) - 點擊列可切換顯示</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-50 text-gray-500 font-medium">
+                      <tr>
+                        <th className="px-4 py-3 w-10">
+                          <input
+                            type="checkbox"
+                            checked={selectedSalesItems.size === salesTrendData.length}
+                            onChange={(e) => e.target.checked ? selectAllSalesItems() : deselectAllSalesItems()}
+                            className="w-4 h-4 rounded border-gray-300 text-[#EB5C20] focus:ring-[#EB5C20]"
+                          />
+                        </th>
+                        <th className="px-4 py-3">商品名稱</th>
+                        <th className="px-4 py-3 text-right">{trendDays}天總銷量</th>
+                        <th className="px-4 py-3 text-right">日均銷量</th>
+                        <th className="px-4 py-3 text-right">最高日銷量</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {salesTrendData
+                        .map((item, originalIdx) => {
+                          const totalSales = item.data.reduce((sum, d) => sum + d.sales, 0);
+                          const avgSales = item.data.length > 0 ? Math.round(totalSales / item.data.length) : 0;
+                          const maxSales = Math.max(...item.data.map(d => d.sales), 0);
+                          return { ...item, totalSales, avgSales, maxSales, originalIdx };
+                        })
+                        .sort((a, b) => b.totalSales - a.totalSales)
+                        .map((item) => {
+                          const isSelected = selectedSalesItems.has(item.name);
+                          const colorIdx = salesTrendData.findIndex(i => i.name === item.name);
+                          return (
+                            <tr
+                              key={item.name}
+                              className={`hover:bg-gray-50 cursor-pointer ${isSelected ? 'bg-green-50' : ''}`}
+                              onClick={() => toggleSalesItem(item.name)}
+                            >
+                              <td className="px-4 py-3">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleSalesItem(item.name)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-4 h-4 rounded border-gray-300 text-[#EB5C20] focus:ring-[#EB5C20]"
+                                />
+                              </td>
+                              <td className="px-4 py-3 font-medium text-gray-700">
+                                <div className="flex items-center gap-2">
+                                  {isSelected && (
+                                    <span
+                                      className="w-3 h-3 rounded-full"
+                                      style={{ backgroundColor: CHART_COLORS[colorIdx % CHART_COLORS.length] }}
+                                    />
+                                  )}
+                                  {item.name}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-right font-bold text-gray-900">
+                                {item.totalSales.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-3 text-right text-gray-600">
+                                {item.avgSales.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-3 text-right text-green-600 font-medium">
+                                {item.maxSales.toLocaleString()}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Stock Table with checkboxes */}
+            {analysisMode === 'stock' && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <h3 className="font-bold text-gray-800">各品項庫存走勢 (預計可用量) - 點擊列可切換顯示</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-50 text-gray-500 font-medium">
+                      <tr>
+                        <th className="px-4 py-3 w-10">
+                          <input
+                            type="checkbox"
+                            checked={selectedTrendItems.size === trendData.length}
+                            onChange={(e) => e.target.checked ? selectAllTrendItems() : deselectAllTrendItems()}
+                            className="w-4 h-4 rounded border-gray-300 text-[#EB5C20] focus:ring-[#EB5C20]"
+                          />
+                        </th>
+                        <th className="px-4 py-3">商品名稱</th>
+                        <th className="px-4 py-3 text-right">目前庫存</th>
+                        <th className="px-4 py-3 text-right">{trendDays}天前庫存</th>
+                        <th className="px-4 py-3 text-right">變化量</th>
+                        <th className="px-4 py-3 text-right">趨勢</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {trendData.map((item) => {
+                        const latestStock = item.data[item.data.length - 1]?.stock || 0;
+                        const oldestStock = item.data[0]?.stock || 0;
+                        const change = latestStock - oldestStock;
+                        const changePercent = oldestStock > 0 ? ((change / oldestStock) * 100).toFixed(1) : 0;
+                        const isSelected = selectedTrendItems.has(item.name);
+                        const colorIdx = trendData.findIndex(i => i.name === item.name);
+
+                        return (
+                          <tr
+                            key={item.name}
+                            className={`hover:bg-gray-50 cursor-pointer ${isSelected ? 'bg-orange-50' : ''}`}
+                            onClick={() => toggleTrendItem(item.name)}
+                          >
+                            <td className="px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleTrendItem(item.name)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-4 h-4 rounded border-gray-300 text-[#EB5C20] focus:ring-[#EB5C20]"
+                              />
+                            </td>
+                            <td className="px-4 py-3 font-medium text-gray-700">
+                              <div className="flex items-center gap-2">
+                                {isSelected && (
+                                  <span
+                                    className="w-3 h-3 rounded-full"
+                                    style={{ backgroundColor: CHART_COLORS[colorIdx % CHART_COLORS.length] }}
+                                  />
+                                )}
+                                {item.name}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right font-bold text-gray-900">
+                              {latestStock.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-500">
+                              {oldestStock.toLocaleString()}
+                            </td>
+                            <td className={`px-4 py-3 text-right font-bold ${
+                              change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-500'
+                            }`}>
+                              {change > 0 ? '+' : ''}{change.toLocaleString()}
+                              <span className="text-xs font-normal ml-1">({changePercent}%)</span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {change > 0 ? (
+                                <span className="inline-flex items-center text-green-600">
+                                  <ArrowUpRight className="w-4 h-4" />
+                                  補貨
+                                </span>
+                              ) : change < 0 ? (
+                                <span className="inline-flex items-center text-red-600">
+                                  <TrendingUp className="w-4 h-4 rotate-180" />
+                                  消耗
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">持平</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -432,8 +432,9 @@ class InventoryRepository(SupabaseRepository):
             start_date = datetime.now() - timedelta(days=days)
 
             # Query all items with their snapshot dates
+            # Use available_stock (預計可用量) instead of current_stock (期末)
             query = self.client.table(self.TABLE_ITEMS) \
-                .select("name, category, current_stock, inventory_snapshots(snapshot_date)") \
+                .select("name, category, available_stock, inventory_snapshots(snapshot_date)") \
                 .gte("created_at", start_date.isoformat())
 
             if category:
@@ -461,11 +462,120 @@ class InventoryRepository(SupabaseRepository):
                     date_str = snapshot_info['snapshot_date'][:10]  # YYYY-MM-DD
                     items_data[name]['data'].append({
                         'date': date_str,
-                        'stock': row['current_stock']
+                        'stock': row['available_stock']  # Use available_stock (預計可用量)
                     })
 
             return list(items_data.values())
 
         except Exception as e:
             logger.error(f"Failed to get items trend: {e}")
+            return []
+
+    def get_sales_trend(
+        self,
+        category: Optional[str] = None,
+        days: int = 30
+    ) -> List[Dict]:
+        """
+        Get daily sales trend for items (based on stock_out from raw items).
+
+        Args:
+            category: Filter by category ('bread', 'box', 'bag') - optional
+            days: Number of days to look back
+
+        Returns:
+            List of items with their daily sales (stock_out) values:
+            [
+                {
+                    "name": "低糖原味貝果",
+                    "category": "bread",
+                    "data": [
+                        {"date": "2025-12-25", "sales": 200},
+                        {"date": "2025-12-26", "sales": 150},
+                        ...
+                    ]
+                },
+                ...
+            ]
+        """
+        if not self.is_connected:
+            return []
+
+        try:
+            from datetime import timedelta
+            start_date = datetime.now() - timedelta(days=days)
+
+            # Query raw items with stock_out data
+            query = self.client.table(self.TABLE_RAW_ITEMS) \
+                .select("product_name, stock_out, snapshot_id, inventory_snapshots(snapshot_date)") \
+                .gte("created_at", start_date.isoformat())
+
+            result = query.order("created_at").execute()
+
+            if not result.data:
+                return []
+
+            # Get category mapping from inventory_items
+            category_map = {}
+            if category:
+                # Filter by category - need to get items in that category first
+                items_result = self.client.table(self.TABLE_ITEMS) \
+                    .select("name, category") \
+                    .eq("category", category) \
+                    .execute()
+                if items_result.data:
+                    category_map = {item['name']: item['category'] for item in items_result.data}
+            else:
+                # Get all category mappings
+                items_result = self.client.table(self.TABLE_ITEMS) \
+                    .select("name, category") \
+                    .execute()
+                if items_result.data:
+                    category_map = {item['name']: item['category'] for item in items_result.data}
+
+            # Group by product name and date, sum stock_out
+            items_data: Dict[str, Dict] = {}
+            for row in result.data:
+                name = row['product_name']
+
+                # Filter by category if specified
+                if category and name not in category_map:
+                    continue
+
+                if name not in items_data:
+                    items_data[name] = {
+                        'name': name,
+                        'category': category_map.get(name, 'bread'),
+                        'data': {}  # Use dict to aggregate by date
+                    }
+
+                # Extract snapshot date
+                snapshot_info = row.get('inventory_snapshots')
+                if snapshot_info and snapshot_info.get('snapshot_date'):
+                    date_str = snapshot_info['snapshot_date'][:10]  # YYYY-MM-DD
+                    stock_out = row.get('stock_out', 0) or 0
+
+                    # Aggregate stock_out by date (same product may have multiple batches)
+                    if date_str not in items_data[name]['data']:
+                        items_data[name]['data'][date_str] = 0
+                    items_data[name]['data'][date_str] += stock_out
+
+            # Convert dict to list format
+            result_list = []
+            for name, item in items_data.items():
+                data_list = [
+                    {'date': date, 'sales': int(sales)}
+                    for date, sales in sorted(item['data'].items())
+                ]
+                if data_list:  # Only include items with data
+                    result_list.append({
+                        'name': name,
+                        'category': item['category'],
+                        'data': data_list
+                    })
+
+            return result_list
+
+        except Exception as e:
+            logger.error(f"Failed to get sales trend: {e}")
             return []

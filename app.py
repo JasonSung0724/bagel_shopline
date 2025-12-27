@@ -39,6 +39,8 @@ def index():
             "/api/inventory/history": "Get historical snapshots (for trends)",
             "/api/inventory/changes": "Get inventory changes (restock logs)",
             "/api/inventory/raw-items": "Get raw Excel items (with batch details)",
+            "/api/inventory/trend": "Get stock trend (庫存趨勢)",
+            "/api/inventory/sales-trend": "Get sales trend based on stock_out (銷量趨勢)",
         }
     }), 200
 
@@ -354,6 +356,44 @@ def get_inventory_trend():
             "success": True,
             "data": trend_data,
             "count": len(trend_data)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/inventory/sales-trend", methods=["GET"])
+def get_sales_trend():
+    """
+    Get daily sales trend for items (based on stock_out).
+
+    Query params:
+        days: Number of days (default: 30)
+        category: Filter by category - 'bread', 'box', 'bag' (optional)
+
+    Returns:
+        JSON with items and their daily sales (stock_out) values
+    """
+    try:
+        days = request.args.get("days", 30, type=int)
+        category = request.args.get("category")
+
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        sales_data = workflow.inventory_repo.get_sales_trend(category, days)
+
+        return jsonify({
+            "success": True,
+            "data": sales_data,
+            "count": len(sales_data)
         }), 200
 
     except Exception as e:
