@@ -729,7 +729,7 @@ export default function InventoryDashboard() {
                           border: 'none',
                           boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                         }}
-                        formatter={(value: number) => [value.toLocaleString(), '庫存量']}
+                        formatter={(value) => [Number(value).toLocaleString(), '庫存量']}
                       />
                       <Legend />
                       <Line
