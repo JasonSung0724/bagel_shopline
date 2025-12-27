@@ -34,6 +34,7 @@ def index():
         "endpoints": {
             "/health": "Health check",
             "/api/inventory": "Get latest inventory snapshot with items",
+            "/api/inventory/diagnosis": "Get inventory diagnosis with all calculations (庫存診斷)",
             "/api/inventory/sync": "Trigger inventory sync from email",
             "/api/inventory/backfill": "Backfill historical data",
             "/api/inventory/history": "Get historical snapshots (for trends)",
@@ -42,6 +43,7 @@ def index():
             "/api/inventory/raw-items": "Get raw Excel items (with batch details)",
             "/api/inventory/trend": "Get stock trend (庫存趨勢)",
             "/api/inventory/sales-trend": "Get sales trend based on stock_out (銷量趨勢)",
+            "/api/inventory/product-mappings": "Get/Add/Delete product mappings (麵包與塑膠袋對照)",
         }
     }), 200
 
@@ -433,6 +435,396 @@ def get_sales_trend():
             "success": True,
             "data": sales_data,
             "count": len(sales_data)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/inventory/analysis", methods=["GET"])
+def get_inventory_analysis():
+    """
+    Get comprehensive trend analysis data for all time periods (7, 14, 30 days).
+    This endpoint returns both sales trend and stock trend data in a single call,
+    with pre-calculated statistics for each period.
+
+    Query params:
+        category: Filter by category - 'bread', 'box', 'bag' (optional, default: 'bread')
+
+    Returns:
+        JSON with sales and stock trend data for 7, 14, 30 day periods:
+        {
+            "success": true,
+            "data": {
+                "sales": {
+                    "items": [...],  // All items with 30-day data
+                    "stats": {
+                        "7": { "itemName": { total, avg, max, min }, ... },
+                        "14": { ... },
+                        "30": { ... }
+                    }
+                },
+                "stock": {
+                    "items": [...],  // All items with 30-day data
+                    "stats": {
+                        "7": { "itemName": { latest, oldest, change }, ... },
+                        "14": { ... },
+                        "30": { ... }
+                    }
+                }
+            }
+        }
+    """
+    try:
+        category = request.args.get("category", "bread")
+
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        from datetime import datetime, timedelta
+
+        # Get 30-day data (covers all periods)
+        sales_data = workflow.inventory_repo.get_sales_trend(category, 30)
+        stock_data = workflow.inventory_repo.get_items_trend(category, 30)
+
+        # Calculate date boundaries
+        today = datetime.now().date()
+        date_7 = (today - timedelta(days=7)).isoformat()
+        date_14 = (today - timedelta(days=14)).isoformat()
+        date_30 = (today - timedelta(days=30)).isoformat()
+
+        # Calculate sales stats for each period
+        sales_stats = {"7": {}, "14": {}, "30": {}}
+        for item in sales_data:
+            name = item['name']
+            data = item.get('data', [])
+
+            for period, cutoff in [("7", date_7), ("14", date_14), ("30", date_30)]:
+                filtered = [d for d in data if d['date'] >= cutoff]
+                if filtered:
+                    sales_values = [d['sales'] for d in filtered]
+                    total = sum(sales_values)
+                    sales_stats[period][name] = {
+                        "total": total,
+                        "avg": round(total / len(filtered)) if filtered else 0,
+                        "max": max(sales_values) if sales_values else 0,
+                        "min": min(sales_values) if sales_values else 0,
+                        "days": len(filtered)
+                    }
+
+        # Calculate stock stats for each period
+        stock_stats = {"7": {}, "14": {}, "30": {}}
+        for item in stock_data:
+            name = item['name']
+            data = item.get('data', [])
+
+            for period, cutoff in [("7", date_7), ("14", date_14), ("30", date_30)]:
+                filtered = [d for d in data if d['date'] >= cutoff]
+                if filtered:
+                    # Sort by date to get oldest and latest
+                    sorted_data = sorted(filtered, key=lambda x: x['date'])
+                    oldest = sorted_data[0]['stock'] if sorted_data else 0
+                    latest = sorted_data[-1]['stock'] if sorted_data else 0
+                    stock_stats[period][name] = {
+                        "latest": latest,
+                        "oldest": oldest,
+                        "change": latest - oldest,
+                        "days": len(filtered)
+                    }
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "sales": {
+                    "items": sales_data,
+                    "stats": sales_stats
+                },
+                "stock": {
+                    "items": stock_data,
+                    "stats": stock_stats
+                }
+            }
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/inventory/diagnosis", methods=["GET"])
+def get_inventory_diagnosis():
+    """
+    Get comprehensive inventory diagnosis with all calculations done server-side.
+
+    Returns:
+        JSON with diagnosis data for all items including:
+        - Current stock
+        - 30-day and 20-day sales (total and daily average)
+        - Days of stock remaining
+        - Reorder point
+        - Health status (critical/healthy/overstock)
+        - Matched bag for bread items
+    """
+    try:
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        diagnosis = workflow.inventory_repo.get_inventory_diagnosis()
+
+        if not diagnosis:
+            return jsonify({
+                "success": False,
+                "error": "No inventory data available"
+            }), 404
+
+        return jsonify({
+            "success": True,
+            "data": diagnosis
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/inventory/product-mappings", methods=["GET"])
+def get_product_mappings():
+    """
+    Get product mappings (bread to bag relationships).
+
+    Returns:
+        JSON with list of mappings
+    """
+    try:
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        mappings = workflow.inventory_repo.get_product_mappings()
+
+        return jsonify({
+            "success": True,
+            "data": mappings,
+            "count": len(mappings)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/inventory/product-mappings", methods=["POST"])
+def add_product_mapping():
+    """
+    Add a new product mapping.
+
+    Body:
+        bread_name: Name of the bread product
+        bag_name: Name of the corresponding bag
+
+    Returns:
+        JSON with success status
+    """
+    try:
+        data = request.get_json()
+        bread_name = data.get("bread_name")
+        bag_name = data.get("bag_name")
+
+        if not bread_name or not bag_name:
+            return jsonify({
+                "success": False,
+                "error": "bread_name and bag_name are required"
+            }), 400
+
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        success = workflow.inventory_repo.add_product_mapping(bread_name, bag_name)
+
+        return jsonify({
+            "success": success,
+            "message": "Mapping added" if success else "Failed to add mapping"
+        }), 200 if success else 500
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/inventory/product-mappings", methods=["DELETE"])
+def delete_product_mapping():
+    """
+    Delete a product mapping.
+
+    Body:
+        bread_name: Name of the bread product
+        bag_name: Name of the corresponding bag
+
+    Returns:
+        JSON with success status
+    """
+    try:
+        data = request.get_json()
+        bread_name = data.get("bread_name")
+        bag_name = data.get("bag_name")
+
+        if not bread_name or not bag_name:
+            return jsonify({
+                "success": False,
+                "error": "bread_name and bag_name are required"
+            }), 400
+
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        success = workflow.inventory_repo.delete_product_mapping(bread_name, bag_name)
+
+        return jsonify({
+            "success": success,
+            "message": "Mapping deleted" if success else "Failed to delete mapping"
+        }), 200 if success else 500
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# ===========================================
+# Master Data API Endpoints
+# ===========================================
+
+@app.route("/api/master/sync", methods=["POST"])
+def sync_master_data():
+    """
+    Sync master data from historical inventory records.
+
+    Returns:
+        JSON with sync result counts
+    """
+    try:
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        result = workflow.inventory_repo.sync_master_data_from_inventory()
+
+        return jsonify({
+            "success": True,
+            "data": result,
+            "message": f"Synced {result['breads']} breads, {result['bags']} bags, {result['boxes']} boxes"
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/master/breads", methods=["GET"])
+def get_master_breads():
+    """Get all bread master records."""
+    try:
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        data = workflow.inventory_repo.get_master_breads()
+
+        return jsonify({
+            "success": True,
+            "data": data,
+            "count": len(data)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/master/bags", methods=["GET"])
+def get_master_bags():
+    """Get all bag master records."""
+    try:
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        data = workflow.inventory_repo.get_master_bags()
+
+        return jsonify({
+            "success": True,
+            "data": data,
+            "count": len(data)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/master/boxes", methods=["GET"])
+def get_master_boxes():
+    """Get all box master records."""
+    try:
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        data = workflow.inventory_repo.get_master_boxes()
+
+        return jsonify({
+            "success": True,
+            "data": data,
+            "count": len(data)
         }), 200
 
     except Exception as e:

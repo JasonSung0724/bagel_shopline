@@ -3,7 +3,7 @@
 .gitignore
 
 # Python
-__pyㄑ__
+__pycache__
 *.py[cod]
 *$py.class
 *.so

@@ -74,6 +74,10 @@ class InventoryRepository(SupabaseRepository):
     TABLE_RAW_ITEMS = "inventory_raw_items"
     TABLE_ITEMS = "inventory_items"
     TABLE_CHANGES = "inventory_changes"
+    TABLE_MAPPINGS = "product_mappings"
+    TABLE_MASTER_BREADS = "master_breads"
+    TABLE_MASTER_BAGS = "master_bags"
+    TABLE_MASTER_BOXES = "master_boxes"
 
     def save_snapshot(self, snapshot: 'InventorySnapshot') -> Optional[str]:
         """
@@ -121,6 +125,9 @@ class InventoryRepository(SupabaseRepository):
 
             # Insert inventory items (彙總資料)
             self._save_items(snapshot_id, snapshot)
+
+            # Auto-sync new items to master tables (自動同步新品項)
+            self._auto_sync_master_data(snapshot)
 
             logger.success(f"Saved snapshot {snapshot_id} for {snapshot.snapshot_date.date()}")
             return snapshot_id
@@ -662,3 +669,567 @@ class InventoryRepository(SupabaseRepository):
         except Exception as e:
             logger.error(f"Failed to get restock records: {e}")
             return []
+
+    def get_product_mappings(self) -> List[Dict]:
+        """
+        Get product mappings (bread to bag relationships).
+
+        Returns:
+            List of mappings: [
+                {
+                    "bread_name": "西西里開心果乳酪貝果",
+                    "bag_name": "塑膠袋-開心果乳酪貝果"
+                },
+                ...
+            ]
+        """
+        if not self.is_connected:
+            return []
+
+        try:
+            result = self.client.table(self.TABLE_MAPPINGS) \
+                .select("bread_name, bag_name") \
+                .execute()
+
+            if not result.data:
+                return []
+
+            return result.data
+
+        except Exception as e:
+            logger.error(f"Failed to get product mappings: {e}")
+            return []
+
+    def add_product_mapping(self, bread_name: str, bag_name: str) -> bool:
+        """
+        Add a new product mapping.
+
+        Args:
+            bread_name: Name of the bread product
+            bag_name: Name of the corresponding bag
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.is_connected:
+            return False
+
+        try:
+            self.client.table(self.TABLE_MAPPINGS) \
+                .upsert({
+                    "bread_name": bread_name,
+                    "bag_name": bag_name,
+                    "updated_at": datetime.now().isoformat()
+                }) \
+                .execute()
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to add product mapping: {e}")
+            return False
+
+    def delete_product_mapping(self, bread_name: str, bag_name: str) -> bool:
+        """
+        Delete a product mapping.
+
+        Args:
+            bread_name: Name of the bread product
+            bag_name: Name of the corresponding bag
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.is_connected:
+            return False
+
+        try:
+            self.client.table(self.TABLE_MAPPINGS) \
+                .delete() \
+                .eq("bread_name", bread_name) \
+                .eq("bag_name", bag_name) \
+                .execute()
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to delete product mapping: {e}")
+            return False
+
+    def get_inventory_diagnosis(self) -> Dict:
+        """
+        Get comprehensive inventory diagnosis with all calculations done server-side.
+
+        Returns:
+            {
+                "snapshot_date": "2025-12-27",
+                "bread_items": [...],
+                "box_items": [...],
+                "bag_items": [...],
+                "summary": {
+                    "critical_count": 2,
+                    "healthy_count": 10,
+                    "overstock_count": 3
+                }
+            }
+        """
+        if not self.is_connected:
+            return {}
+
+        try:
+            from datetime import timedelta
+
+            # Constants
+            LEAD_TIME = {'bread': 20, 'box': 20, 'bag': 30}
+            TARGET_DAYS = 30
+
+            # 1. Get latest inventory items
+            latest_snapshot = self.get_latest_snapshot()
+            if not latest_snapshot:
+                return {}
+
+            snapshot_id = latest_snapshot.get('id')
+            snapshot_date = latest_snapshot.get('snapshot_date', '')[:10]
+
+            # Get all inventory items
+            items_result = self.client.table(self.TABLE_ITEMS) \
+                .select("*") \
+                .eq("snapshot_id", snapshot_id) \
+                .execute()
+
+            if not items_result.data:
+                return {}
+
+            # 2. Get sales data (stock_out) for past 30 days
+            start_date_30d = datetime.now() - timedelta(days=30)
+            start_date_20d = datetime.now() - timedelta(days=20)
+
+            raw_items_result = self.client.table(self.TABLE_RAW_ITEMS) \
+                .select("product_name, stock_out, created_at, inventory_snapshots(snapshot_date)") \
+                .gte("created_at", start_date_30d.isoformat()) \
+                .execute()
+
+            # Calculate sales totals per product
+            sales_30d: Dict[str, int] = {}
+            sales_20d: Dict[str, int] = {}
+
+            if raw_items_result.data:
+                for row in raw_items_result.data:
+                    name = row['product_name']
+                    stock_out = int(row.get('stock_out', 0) or 0)
+                    created_at = row.get('created_at', '')
+
+                    # Add to 30-day total
+                    sales_30d[name] = sales_30d.get(name, 0) + stock_out
+
+                    # Add to 20-day total if within range
+                    if created_at and created_at >= start_date_20d.isoformat():
+                        sales_20d[name] = sales_20d.get(name, 0) + stock_out
+
+            # 3. Get product mappings (bread to bag)
+            mappings = self.get_product_mappings()
+            bread_to_bag = {m['bread_name']: m['bag_name'] for m in mappings}
+            bag_to_bread = {m['bag_name']: m['bread_name'] for m in mappings}
+
+            # Constants for bag calculation
+            BAG_CAPACITY = 6000  # 一卷塑膠袋可包 6000 個麵包
+
+            # 4. Build diagnosis for each item
+            def calculate_diagnosis(item: Dict, category: str) -> Dict:
+                name = item['name']
+                current_stock = int(item.get('available_stock', 0) or item.get('current_stock', 0))
+                unit = item.get('unit', '個')
+                lead_time = LEAD_TIME.get(category, 20)
+
+                # Sales calculations
+                total_30d = sales_30d.get(name, 0)
+                total_20d = sales_20d.get(name, 0)
+                daily_30d = round(total_30d / 30) if total_30d > 0 else 0
+                daily_20d = round(total_20d / 20) if total_20d > 0 else 0
+
+                # Use 30-day average for main calculations
+                daily_sales = daily_30d
+
+                # Stock metrics
+                if daily_sales > 0:
+                    days_of_stock = round(current_stock / daily_sales, 1)
+                    reorder_point = daily_sales * lead_time
+                    target_stock = total_30d  # 30日出庫總量作為正常水位
+
+                    # Health status
+                    if days_of_stock < lead_time:
+                        health_status = 'critical'
+                    elif current_stock > total_30d:
+                        health_status = 'overstock'
+                    else:
+                        health_status = 'healthy'
+
+                    # Suggested order (補到正常水位)
+                    suggested_order = max(0, target_stock - current_stock) if health_status == 'critical' else 0
+                else:
+                    days_of_stock = 999
+                    reorder_point = 0
+                    target_stock = 0
+                    health_status = 'healthy'  # No sales data, default healthy
+                    suggested_order = 0
+
+                return {
+                    'name': name,
+                    'category': category,
+                    'current_stock': current_stock,
+                    'unit': unit,
+                    'lead_time': lead_time,
+                    'daily_sales_30d': daily_30d,
+                    'daily_sales_20d': daily_20d,
+                    'total_sales_30d': total_30d,
+                    'total_sales_20d': total_20d,
+                    'days_of_stock': days_of_stock,
+                    'reorder_point': round(reorder_point),
+                    'target_stock': round(target_stock),
+                    'health_status': health_status,
+                    'suggested_order': round(suggested_order),
+                }
+
+            # Process items by category
+            bread_items = []
+            box_items = []
+            bag_items = []
+
+            # Create a lookup for bag diagnoses
+            bag_lookup: Dict[str, Dict] = {}
+
+            # Track which bags we've seen in current inventory
+            bags_in_inventory: set = set()
+
+            # Store raw bag items for later processing (after bread items are ready)
+            raw_bag_items = []
+
+            for item in items_result.data:
+                category = item.get('category', 'other')
+                if category == 'bread':
+                    diagnosis = calculate_diagnosis(item, 'bread')
+                    bread_items.append(diagnosis)
+                elif category == 'box':
+                    diagnosis = calculate_diagnosis(item, 'box')
+                    box_items.append(diagnosis)
+                elif category == 'bag':
+                    # Store for later processing
+                    raw_bag_items.append(item)
+                    bags_in_inventory.add(item['name'])
+
+            # Create bread lookup for bag calculations
+            bread_lookup = {b['name']: b for b in bread_items}
+
+            # 5. Calculate bag diagnosis based on corresponding bread
+            import math
+
+            def calculate_bag_diagnosis(bag_name: str, current_stock: int) -> Dict:
+                """
+                Calculate bag reorder_point and target_stock based on corresponding bread.
+                一卷塑膠袋可包 6000 個麵包，根據麵包的補貨點計算塑膠袋需求量，無條件進位
+                """
+                lead_time = LEAD_TIME.get('bag', 30)
+
+                # Find corresponding bread
+                bread_name = bag_to_bread.get(bag_name)
+                if bread_name and bread_name in bread_lookup:
+                    bread = bread_lookup[bread_name]
+                    bread_reorder_point = bread.get('reorder_point', 0)
+
+                    # 塑膠袋補貨點 = 麵包補貨點 / 6000，無條件進位
+                    if bread_reorder_point > 0:
+                        bag_reorder_point = math.ceil(bread_reorder_point / BAG_CAPACITY)
+                    else:
+                        bag_reorder_point = 0
+
+                    # 正常水位 = 補貨點
+                    bag_target_stock = bag_reorder_point
+
+                    # Health status based on bag stock vs reorder point
+                    if bag_reorder_point > 0:
+                        if current_stock < bag_reorder_point:
+                            health_status = 'critical'
+                        elif current_stock > bag_target_stock * 2:
+                            health_status = 'overstock'
+                        else:
+                            health_status = 'healthy'
+                    else:
+                        health_status = 'healthy'
+
+                    # Suggested order
+                    suggested_order = max(0, bag_target_stock - current_stock) if health_status == 'critical' else 0
+                else:
+                    # No corresponding bread found
+                    bag_reorder_point = 0
+                    bag_target_stock = 0
+                    health_status = 'healthy' if current_stock > 0 else 'critical'
+                    suggested_order = 0
+
+                return {
+                    'name': bag_name,
+                    'category': 'bag',
+                    'current_stock': current_stock,
+                    'unit': '捲',
+                    'lead_time': lead_time,
+                    'reorder_point': bag_reorder_point,
+                    'target_stock': bag_target_stock,
+                    'health_status': health_status,
+                    'suggested_order': suggested_order,
+                }
+
+            # Process raw bag items
+            for item in raw_bag_items:
+                bag_name = item['name']
+                current_stock = int(item.get('available_stock', 0) or item.get('current_stock', 0))
+                diagnosis = calculate_bag_diagnosis(bag_name, current_stock)
+                bag_items.append(diagnosis)
+                bag_lookup[bag_name] = diagnosis
+
+            # Add missing bags from master_bags (庫存為0的塑膠袋)
+            master_bags = self.get_master_bags()
+            for master_bag in master_bags:
+                bag_name = master_bag.get('name')
+                if bag_name and bag_name not in bags_in_inventory:
+                    # Create diagnosis for zero-stock bags
+                    diagnosis = calculate_bag_diagnosis(bag_name, 0)
+                    bag_items.append(diagnosis)
+                    bag_lookup[bag_name] = diagnosis
+
+            # 6. Match bags to breads
+            for bread in bread_items:
+                bag_name = bread_to_bag.get(bread['name'])
+                if bag_name and bag_name in bag_lookup:
+                    bread['matched_bag'] = bag_lookup[bag_name]
+                else:
+                    # Try fallback matching
+                    for bag in bag_items:
+                        bag_base = bag['name'].replace('塑膠袋-', '').replace('塑膠袋', '')
+                        if bag_base == bread['name'] or bread['name'].endswith(bag_base):
+                            bread['matched_bag'] = bag
+                            break
+                    else:
+                        bread['matched_bag'] = None
+
+            # 7. Calculate summary
+            all_items = bread_items + box_items + bag_items
+            total_bag_rolls = sum(i['current_stock'] for i in bag_items)
+            summary = {
+                'critical_count': len([i for i in all_items if i['health_status'] == 'critical']),
+                'healthy_count': len([i for i in all_items if i['health_status'] == 'healthy']),
+                'overstock_count': len([i for i in all_items if i['health_status'] == 'overstock']),
+                'total_bread_stock': sum(i['current_stock'] for i in bread_items),
+                'total_box_stock': sum(i['current_stock'] for i in box_items),
+                'total_bag_stock': total_bag_rolls,
+                'total_bag_capacity': total_bag_rolls * BAG_CAPACITY,  # 可包裝量 = 塑膠袋卷數 * 6000
+            }
+
+            return {
+                'snapshot_date': snapshot_date,
+                'bread_items': bread_items,
+                'box_items': box_items,
+                'bag_items': bag_items,
+                'summary': summary,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get inventory diagnosis: {e}")
+            return {}
+
+    # =============================================
+    # Master Data Management
+    # =============================================
+
+    def get_master_breads(self) -> List[Dict]:
+        """Get all bread master records."""
+        if not self.is_connected:
+            return []
+        try:
+            result = self.client.table(self.TABLE_MASTER_BREADS) \
+                .select("*") \
+                .order("name") \
+                .execute()
+            return result.data or []
+        except Exception as e:
+            logger.error(f"Failed to get master breads: {e}")
+            return []
+
+    def get_master_bags(self) -> List[Dict]:
+        """Get all bag master records."""
+        if not self.is_connected:
+            return []
+        try:
+            result = self.client.table(self.TABLE_MASTER_BAGS) \
+                .select("*") \
+                .order("name") \
+                .execute()
+            return result.data or []
+        except Exception as e:
+            logger.error(f"Failed to get master bags: {e}")
+            return []
+
+    def get_master_boxes(self) -> List[Dict]:
+        """Get all box master records."""
+        if not self.is_connected:
+            return []
+        try:
+            result = self.client.table(self.TABLE_MASTER_BOXES) \
+                .select("*") \
+                .order("name") \
+                .execute()
+            return result.data or []
+        except Exception as e:
+            logger.error(f"Failed to get master boxes: {e}")
+            return []
+
+    def add_master_bread(self, name: str, code: str = None) -> bool:
+        """Add a bread to master records."""
+        if not self.is_connected:
+            return False
+        try:
+            data = {"name": name, "updated_at": datetime.now().isoformat()}
+            if code:
+                data["code"] = code
+            self.client.table(self.TABLE_MASTER_BREADS).upsert(data).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to add master bread: {e}")
+            return False
+
+    def add_master_bag(self, name: str, code: str = None) -> bool:
+        """Add a bag to master records."""
+        if not self.is_connected:
+            return False
+        try:
+            data = {"name": name, "updated_at": datetime.now().isoformat()}
+            if code:
+                data["code"] = code
+            self.client.table(self.TABLE_MASTER_BAGS).upsert(data).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to add master bag: {e}")
+            return False
+
+    def add_master_box(self, name: str, code: str = None) -> bool:
+        """Add a box to master records."""
+        if not self.is_connected:
+            return False
+        try:
+            data = {"name": name, "updated_at": datetime.now().isoformat()}
+            if code:
+                data["code"] = code
+            self.client.table(self.TABLE_MASTER_BOXES).upsert(data).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to add master box: {e}")
+            return False
+
+    def sync_master_data_from_inventory(self) -> Dict[str, int]:
+        """
+        Sync master data from historical inventory records.
+
+        Returns:
+            Dict with counts of synced items per category
+        """
+        if not self.is_connected:
+            return {"breads": 0, "bags": 0, "boxes": 0}
+
+        try:
+            # Get unique product names from inventory items
+            items_result = self.client.table(self.TABLE_ITEMS) \
+                .select("name, category") \
+                .execute()
+
+            if not items_result.data:
+                return {"breads": 0, "bags": 0, "boxes": 0}
+
+            # Group by category
+            breads = set()
+            bags = set()
+            boxes = set()
+
+            for item in items_result.data:
+                name = item.get("name")
+                category = item.get("category")
+                if category == "bread":
+                    breads.add(name)
+                elif category == "bag":
+                    bags.add(name)
+                elif category == "box":
+                    boxes.add(name)
+
+            # Insert into master tables
+            for name in breads:
+                self.add_master_bread(name)
+            for name in bags:
+                self.add_master_bag(name)
+            for name in boxes:
+                self.add_master_box(name)
+
+            return {
+                "breads": len(breads),
+                "bags": len(bags),
+                "boxes": len(boxes)
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to sync master data: {e}")
+            return {"breads": 0, "bags": 0, "boxes": 0}
+
+    def _auto_sync_master_data(self, snapshot: 'InventorySnapshot') -> Dict[str, int]:
+        """
+        Auto-sync new items from snapshot to master tables.
+        Called automatically when saving a new snapshot.
+
+        This ensures that when new products appear in vendor Excel files,
+        they are automatically added to master_breads, master_bags, and master_boxes.
+
+        Args:
+            snapshot: The inventory snapshot being saved
+
+        Returns:
+            Dict with counts of newly added items per category
+        """
+        if not self.is_connected:
+            return {"breads": 0, "bags": 0, "boxes": 0}
+
+        try:
+            # Get existing master data for comparison
+            existing_breads = {b['name'] for b in self.get_master_breads()}
+            existing_bags = {b['name'] for b in self.get_master_bags()}
+            existing_boxes = {b['name'] for b in self.get_master_boxes()}
+
+            new_breads = 0
+            new_bags = 0
+            new_boxes = 0
+
+            # Check bread items
+            for item in snapshot.bread_items:
+                if item.name and item.name not in existing_breads:
+                    if self.add_master_bread(item.name):
+                        new_breads += 1
+                        logger.info(f"Auto-added new bread to master: {item.name}")
+
+            # Check bag items
+            for item in snapshot.bag_items:
+                if item.name and item.name not in existing_bags:
+                    if self.add_master_bag(item.name):
+                        new_bags += 1
+                        logger.info(f"Auto-added new bag to master: {item.name}")
+
+            # Check box items
+            for item in snapshot.box_items:
+                if item.name and item.name not in existing_boxes:
+                    if self.add_master_box(item.name):
+                        new_boxes += 1
+                        logger.info(f"Auto-added new box to master: {item.name}")
+
+            if new_breads or new_bags or new_boxes:
+                logger.success(f"Auto-synced master data: {new_breads} breads, {new_bags} bags, {new_boxes} boxes")
+
+            return {
+                "breads": new_breads,
+                "bags": new_bags,
+                "boxes": new_boxes
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to auto-sync master data: {e}")
+            return {"breads": 0, "bags": 0, "boxes": 0}

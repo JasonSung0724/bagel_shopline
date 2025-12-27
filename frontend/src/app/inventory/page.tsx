@@ -25,6 +25,10 @@ import {
   RefreshCw,
   Loader2,
   ArrowLeft,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  FileText,
 } from 'lucide-react';
 
 // API Base URL - empty string means same origin (use Nginx proxy)
@@ -33,6 +37,58 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 // Brand colors
 const BRAND_ORANGE = '#EB5C20';
 const BRAND_GRAY = '#9FA0A0';
+
+// Lead time constants (前置期天數)
+const LEAD_TIME = {
+  bread: 20,  // 麵包代工期 20 天
+  box: 20,    // 紙箱製作期 20 天
+  bag: 30,    // 塑膠袋製作期 30 天
+};
+
+// Target stock days (正常水位天數)
+const TARGET_DAYS = 30;
+
+// Items per roll for bags (每捲塑膠袋可包裝麵包數)
+const ITEMS_PER_ROLL = 6000;
+
+// Stock health status types
+type StockHealthStatus = 'critical' | 'healthy' | 'overstock';
+
+// Inventory diagnosis for each item (from backend API)
+interface ItemDiagnosis {
+  name: string;
+  category: 'bread' | 'box' | 'bag';
+  current_stock: number;
+  unit: string;
+  lead_time: number;
+  daily_sales_30d?: number;  // 塑膠袋不需要
+  daily_sales_20d?: number;  // 塑膠袋不需要
+  total_sales_30d?: number;  // 塑膠袋不需要
+  total_sales_20d?: number;  // 塑膠袋不需要
+  days_of_stock?: number;    // 塑膠袋不需要
+  reorder_point: number;
+  target_stock: number;
+  health_status: StockHealthStatus;
+  suggested_order: number;
+  matched_bag?: ItemDiagnosis | null;
+}
+
+// Diagnosis API response
+interface DiagnosisResponse {
+  snapshot_date: string;
+  bread_items: ItemDiagnosis[];
+  box_items: ItemDiagnosis[];
+  bag_items: ItemDiagnosis[];
+  summary: {
+    critical_count: number;
+    healthy_count: number;
+    overstock_count: number;
+    total_bread_stock: number;
+    total_box_stock: number;
+    total_bag_stock: number;
+    total_bag_capacity: number;  // 可包裝量 = 塑膠袋卷數 * 6000
+  };
+}
 
 // Chart colors for multi-line display
 const CHART_COLORS = [
@@ -106,6 +162,45 @@ interface ItemSalesTrend {
   name: string;
   category: string;
   data: SalesDataPoint[];
+}
+
+// Stats for each period (from backend)
+interface SalesStats {
+  total: number;
+  avg: number;
+  max: number;
+  min: number;
+  days: number;
+}
+
+interface StockStats {
+  latest: number;
+  oldest: number;
+  change: number;
+  days: number;
+}
+
+// Analysis API response (combined endpoint)
+interface AnalysisResponse {
+  success: boolean;
+  data: {
+    sales: {
+      items: ItemSalesTrend[];
+      stats: {
+        "7": Record<string, SalesStats>;
+        "14": Record<string, SalesStats>;
+        "30": Record<string, SalesStats>;
+      };
+    };
+    stock: {
+      items: ItemTrend[];
+      stats: {
+        "7": Record<string, StockStats>;
+        "14": Record<string, StockStats>;
+        "30": Record<string, StockStats>;
+      };
+    };
+  };
 }
 
 // API response types
@@ -218,10 +313,10 @@ const StockLevelBar = ({ current, max = 12000, lowThreshold = 1000 }: StockLevel
 };
 
 // Tab types
-type TabType = 'inventory' | 'analysis' | 'restock';
+type TabType = 'diagnosis' | 'inventory' | 'analysis' | 'restock' | 'order';
 
 export default function InventoryDashboard() {
-  const [activeTab, setActiveTab] = useState<TabType>('inventory');
+  const [activeTab, setActiveTab] = useState<TabType>('diagnosis');
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [restockLogs, setRestockLogs] = useState<RestockLog[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -241,10 +336,20 @@ export default function InventoryDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [trendData, setTrendData] = useState<ItemTrend[]>([]);
   const [salesTrendData, setSalesTrendData] = useState<ItemSalesTrend[]>([]);
+  const [salesStats, setSalesStats] = useState<Record<string, Record<string, SalesStats>>>({});
+  const [stockStats, setStockStats] = useState<Record<string, Record<string, StockStats>>>({});
   const [selectedTrendItems, setSelectedTrendItems] = useState<Set<string>>(new Set());
   const [selectedSalesItems, setSelectedSalesItems] = useState<Set<string>>(new Set());
   const [trendDays, setTrendDays] = useState<number>(30);
   const [analysisMode, setAnalysisMode] = useState<'stock' | 'sales'>('sales');  // Default to sales
+  const [focusedItem, setFocusedItem] = useState<string | null>(null);  // Track focused item (clicked from table)
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [productMappings, setProductMappings] = useState<{ bread_name: string; bag_name: string }[]>([]);
+  const [diagnosisData, setDiagnosisData] = useState<DiagnosisResponse | null>(null);
+  // Restock filters
+  const [restockProductFilter, setRestockProductFilter] = useState<string>('');
+  const [restockDateFrom, setRestockDateFrom] = useState<string>('');
+  const [restockDateTo, setRestockDateTo] = useState<string>('');
 
   // Fetch inventory from API
   const fetchInventory = useCallback(async () => {
@@ -313,47 +418,73 @@ export default function InventoryDashboard() {
     }
   }, []);
 
-  // Fetch stock trend data
+  // Fetch combined analysis data (sales + stock trends with stats for all periods)
+  const fetchAnalysisData = useCallback(async (category: string = 'bread') => {
+    try {
+      setAnalysisLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/inventory/analysis?category=${category}`);
+      const result: AnalysisResponse = await response.json();
+
+      if (result.success && result.data) {
+        // Set sales data
+        setSalesTrendData(result.data.sales.items);
+        setSalesStats(result.data.sales.stats);
+
+        // Set stock data
+        setTrendData(result.data.stock.items);
+        setStockStats(result.data.stock.stats);
+
+        // Auto-select all items by default
+        if (result.data.sales.items.length > 0) {
+          setSelectedSalesItems(new Set(result.data.sales.items.map((item: ItemSalesTrend) => item.name)));
+        }
+        if (result.data.stock.items.length > 0) {
+          setSelectedTrendItems(new Set(result.data.stock.items.map((item: ItemTrend) => item.name)));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch analysis data:', err);
+    } finally {
+      setAnalysisLoading(false);
+    }
+  }, []);
+
+  // Legacy fetch functions (kept for compatibility, but now just call the combined API)
   const fetchTrendData = useCallback(async (category?: string) => {
-    try {
-      const url = category
-        ? `${API_BASE_URL}/api/inventory/trend?days=${trendDays}&category=${category}`
-        : `${API_BASE_URL}/api/inventory/trend?days=${trendDays}`;
-      const response = await fetch(url);
-      const result = await response.json();
+    await fetchAnalysisData(category || 'bread');
+  }, [fetchAnalysisData]);
 
-      if (result.success && result.data) {
-        setTrendData(result.data);
-        // Auto-select all items by default
-        if (result.data.length > 0) {
-          setSelectedTrendItems(new Set(result.data.map((item: ItemTrend) => item.name)));
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch trend data:', err);
-    }
-  }, [trendDays]);
-
-  // Fetch sales trend data (based on stock_out)
   const fetchSalesTrend = useCallback(async (category?: string) => {
+    await fetchAnalysisData(category || 'bread');
+  }, [fetchAnalysisData]);
+
+  // Fetch product mappings (bread to bag relationships)
+  const fetchProductMappings = useCallback(async () => {
     try {
-      const url = category
-        ? `${API_BASE_URL}/api/inventory/sales-trend?days=${trendDays}&category=${category}`
-        : `${API_BASE_URL}/api/inventory/sales-trend?days=${trendDays}`;
-      const response = await fetch(url);
+      const response = await fetch(`${API_BASE_URL}/api/inventory/product-mappings`);
       const result = await response.json();
 
       if (result.success && result.data) {
-        setSalesTrendData(result.data);
-        // Auto-select all items by default
-        if (result.data.length > 0) {
-          setSelectedSalesItems(new Set(result.data.map((item: ItemSalesTrend) => item.name)));
-        }
+        setProductMappings(result.data);
       }
     } catch (err) {
-      console.error('Failed to fetch sales trend:', err);
+      console.error('Failed to fetch product mappings:', err);
     }
-  }, [trendDays]);
+  }, []);
+
+  // Fetch comprehensive diagnosis data from backend (all calculations done server-side)
+  const fetchDiagnosis = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/inventory/diagnosis`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setDiagnosisData(result.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch diagnosis:', err);
+    }
+  }, []);
 
   // Toggle item selection
   const toggleTrendItem = (name: string) => {
@@ -397,19 +528,21 @@ export default function InventoryDashboard() {
     setSelectedSalesItems(new Set());
   };
 
-  // Initialize: fetch from API (only once on mount)
+  // Initialize: fetch inventory and diagnosis data (on mount)
   useEffect(() => {
     const init = async () => {
       setLoading(true);
-      await fetchInventory();
-      await fetchRestockLogs();
+      await Promise.all([
+        fetchInventory(),
+        fetchDiagnosis(),  // Fetch comprehensive diagnosis data from backend
+      ]);
       setLoading(false);
     };
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-fetch data when switching to analysis tab
+  // Auto-fetch data when switching tabs
   useEffect(() => {
     if (activeTab === 'analysis') {
       if (analysisMode === 'sales' && salesTrendData.length === 0) {
@@ -417,14 +550,21 @@ export default function InventoryDashboard() {
       } else if (analysisMode === 'stock' && trendData.length === 0) {
         fetchTrendData('bread');
       }
+    } else if (activeTab === 'restock' && restockLogs.length === 0) {
+      fetchRestockLogs();
     }
-  }, [activeTab, analysisMode, salesTrendData.length, trendData.length, fetchSalesTrend, fetchTrendData]);
+  }, [activeTab, analysisMode, salesTrendData.length, trendData.length, restockLogs.length, fetchSalesTrend, fetchTrendData, fetchRestockLogs]);
 
   // Refresh data from database (no sync from email)
   const handleRefresh = async () => {
     setSyncing(true);
 
     switch (activeTab) {
+      case 'diagnosis':
+      case 'order':
+        // Both diagnosis and order tabs need diagnosis data from backend
+        await Promise.all([fetchInventory(), fetchDiagnosis()]);
+        break;
       case 'inventory':
         await fetchInventory();
         break;
@@ -452,6 +592,41 @@ export default function InventoryDashboard() {
     };
   }, [items]);
 
+  // Summary statistics from backend diagnosis data
+  const diagnosisSummary = useMemo(() => {
+    if (!diagnosisData) {
+      return {
+        criticalCount: 0,
+        overstockCount: 0,
+        healthyCount: 0,
+        totalBagCapacity: 0,
+      };
+    }
+    return {
+      criticalCount: diagnosisData.summary.critical_count,
+      overstockCount: diagnosisData.summary.overstock_count,
+      healthyCount: diagnosisData.summary.healthy_count,
+      totalBagCapacity: diagnosisData.summary.total_bag_capacity,
+    };
+  }, [diagnosisData]);
+
+  // All diagnosis items from backend (bread, box, bag combined)
+  const allDiagnosisItems = useMemo((): ItemDiagnosis[] => {
+    if (!diagnosisData) return [];
+    return [
+      ...diagnosisData.bread_items,
+      ...diagnosisData.box_items,
+      ...diagnosisData.bag_items,
+    ];
+  }, [diagnosisData]);
+
+  // Items that need ordering (for order suggestion tab)
+  const orderSuggestions = useMemo(() => {
+    return allDiagnosisItems
+      .filter(d => d.health_status === 'critical' && d.suggested_order > 0)
+      .sort((a, b) => (a.days_of_stock ?? 0) - (b.days_of_stock ?? 0));  // Most urgent first
+  }, [allDiagnosisItems]);
+
   const filteredItems = items.filter((item) =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -459,6 +634,49 @@ export default function InventoryDashboard() {
   const breadItems = filteredItems.filter((i) => i.category === 'bread');
   const boxItems = filteredItems.filter((i) => i.category === 'box');
   const bagItems = filteredItems.filter((i) => i.category === 'bag');
+
+  // Filtered diagnosis items by category (from backend data)
+  const breadDiagnoses = useMemo(() => {
+    if (!diagnosisData) return [];
+    return diagnosisData.bread_items.filter(d =>
+      d.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [diagnosisData, searchTerm]);
+
+  const boxDiagnoses = useMemo(() => {
+    if (!diagnosisData) return [];
+    return diagnosisData.box_items.filter(d =>
+      d.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [diagnosisData, searchTerm]);
+
+  const bagDiagnoses = useMemo(() => {
+    if (!diagnosisData) return [];
+    return diagnosisData.bag_items.filter(d =>
+      d.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [diagnosisData, searchTerm]);
+
+  // Pair bread items with their matching bags (matched_bag comes from backend)
+  const pairedBreadDiagnoses = useMemo(() => {
+    return breadDiagnoses.map(bread => {
+      // matched_bag is already provided by backend via product_mappings table
+      return {
+        bread,
+        bag: bread.matched_bag || null,
+      };
+    });
+  }, [breadDiagnoses]);
+
+  // Bags that don't have a matching bread (standalone bags)
+  const standaloneBags = useMemo(() => {
+    const pairedBagNames = new Set(
+      pairedBreadDiagnoses
+        .filter(p => p.bag)
+        .map(p => p.bag!.name)
+    );
+    return bagDiagnoses.filter(bag => !pairedBagNames.has(bag.name));
+  }, [bagDiagnoses, pairedBreadDiagnoses]);
 
   // Loading state
   if (loading) {
@@ -549,6 +767,8 @@ export default function InventoryDashboard() {
               {/* Tab Navigation */}
               <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
                 {[
+                  { id: 'diagnosis' as TabType, label: '庫存診斷', icon: AlertCircle },
+                  { id: 'order' as TabType, label: '叫貨建議', icon: FileText },
                   { id: 'inventory' as TabType, label: '庫存總覽', icon: Package },
                   { id: 'analysis' as TabType, label: '銷量分析', icon: TrendingUp },
                   { id: 'restock' as TabType, label: '進貨紀錄', icon: ClipboardList },
@@ -557,7 +777,7 @@ export default function InventoryDashboard() {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`
-                      flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all
+                      flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all
                       ${
                         activeTab === tab.id
                           ? 'bg-white text-[#EB5C20] shadow-sm'
@@ -576,30 +796,575 @@ export default function InventoryDashboard() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Top Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <StatCard
-            title="麵包總庫存"
-            value={totals.bread}
-            unit="個"
-            icon={ShoppingBag}
-            colorClass="text-[#EB5C20]"
-          />
-          <StatCard
-            title="紙箱總庫存"
-            value={totals.box}
-            unit="個"
-            icon={Box}
-            colorClass="text-[#9FA0A0]"
-          />
-          <StatCard
-            title="塑膠袋總庫存"
-            value={Number(totals.bag.toFixed(1))}
-            unit="捲"
-            icon={Package}
-            colorClass="text-blue-500"
-          />
+        {/* Top Diagnosis Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
+          {/* Diagnosis Summary Cards */}
+          <div className="md:col-span-2 bg-white p-5 rounded-xl shadow-sm border-l-4 border-red-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">急需補貨 (低於前置期)</p>
+                <div className="flex items-baseline gap-2">
+                  <h3 className="text-3xl font-bold text-red-600">{diagnosisSummary.criticalCount}</h3>
+                  <span className="text-sm text-gray-400">項商品</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">庫存量已無法支撐到下次到貨，請盡快下單</p>
+              </div>
+              <div className="p-3 rounded-full bg-red-50">
+                <AlertTriangle className="w-8 h-8 text-red-500" />
+              </div>
+            </div>
+          </div>
+
+          <div className="md:col-span-2 bg-white p-5 rounded-xl shadow-sm border-l-4 border-orange-400">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">庫存積壓 (高於30天銷量)</p>
+                <div className="flex items-baseline gap-2">
+                  <h3 className="text-3xl font-bold text-orange-500">{diagnosisSummary.overstockCount}</h3>
+                  <span className="text-sm text-gray-400">項商品</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">高於正常水位，建議暫緩進貨或安排促銷</p>
+              </div>
+              <div className="p-3 rounded-full bg-orange-50">
+                <Box className="w-8 h-8 text-orange-500" />
+              </div>
+            </div>
+          </div>
+
+          <div className="md:col-span-2 bg-white p-5 rounded-xl shadow-sm border-l-4 border-green-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">水位健康</p>
+                <div className="flex items-baseline gap-2">
+                  <h3 className="text-3xl font-bold text-green-600">{diagnosisSummary.healthyCount}</h3>
+                  <span className="text-sm text-gray-400">項商品</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">庫存介於補貨點與正常水位之間</p>
+              </div>
+              <div className="p-3 rounded-full bg-green-50">
+                <CheckCircle2 className="w-8 h-8 text-green-500" />
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* Secondary Stats - Original totals */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500">麵包總庫存</p>
+              <p className="text-xl font-bold text-gray-800">{totals.bread.toLocaleString()} <span className="text-sm font-normal text-gray-400">個</span></p>
+            </div>
+            <ShoppingBag className="w-6 h-6 text-[#EB5C20]" />
+          </div>
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500">紙箱總庫存</p>
+              <p className="text-xl font-bold text-gray-800">{totals.box.toLocaleString()} <span className="text-sm font-normal text-gray-400">個</span></p>
+            </div>
+            <Box className="w-6 h-6 text-gray-500" />
+          </div>
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500">塑膠袋總庫存</p>
+              <p className="text-xl font-bold text-gray-800">{Number(totals.bag.toFixed(1)).toLocaleString()} <span className="text-sm font-normal text-gray-400">捲</span></p>
+              <p className="text-xs text-gray-400 mt-1">可包裝約 {diagnosisSummary.totalBagCapacity.toLocaleString()} 個</p>
+            </div>
+            <Package className="w-6 h-6 text-blue-500" />
+          </div>
+        </div>
+
+        {/* Tab Content: Diagnosis */}
+        {activeTab === 'diagnosis' && (
+          <div className="space-y-8">
+            {/* Search Filter */}
+            <div className="flex items-center gap-4 bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+              <Search className="text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="搜尋商品名稱..."
+                className="flex-1 outline-none text-gray-700 placeholder-gray-400"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span>低於{LEAD_TIME.bread}天(補貨點)</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span>正常</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400"></span>高於{TARGET_DAYS}天(積壓)</span>
+              </div>
+            </div>
+
+            {/* Bread + Bag Paired Diagnosis */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <span className="w-1.5 h-6 bg-[#EB5C20] rounded-full"></span>
+                  麵包庫存診斷 ({pairedBreadDiagnoses.length})
+                </h2>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  麵包前置期: {LEAD_TIME.bread} 天 | 塑膠袋前置期: {LEAD_TIME.bag} 天
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {pairedBreadDiagnoses.map(({ bread, bag }) => {
+                  // Bread bar calculations
+                  const breadBarMax = Math.max(bread.current_stock, bread.target_stock) * 1.2 || 1;
+                  const breadReorderPercent = (bread.reorder_point / breadBarMax) * 100;
+                  const breadTargetPercent = (bread.target_stock / breadBarMax) * 100;
+                  const breadCurrentPercent = Math.min((bread.current_stock / breadBarMax) * 100, 100);
+
+                  // Bag bar calculations (if exists)
+                  const bagBarMax = bag ? Math.max(bag.current_stock, bag.target_stock) * 1.2 || 1 : 1;
+                  const bagReorderPercent = bag ? (bag.reorder_point / bagBarMax) * 100 : 0;
+                  const bagTargetPercent = bag ? (bag.target_stock / bagBarMax) * 100 : 0;
+                  const bagCurrentPercent = bag ? Math.min((bag.current_stock / bagBarMax) * 100, 100) : 0;
+
+                  return (
+                    <div
+                      key={bread.name}
+                      className="bg-white p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow"
+                    >
+                      {/* Header: Title + Bread Status Badge (獨立顯示麵包狀態) */}
+                      <div className="flex justify-between items-start mb-1">
+                        <h3 className="font-bold text-gray-800 text-lg">{bread.name}</h3>
+                        <span
+                          className={`text-xs px-3 py-1 rounded-lg font-medium flex items-center gap-1 ${
+                            bread.health_status === 'critical'
+                              ? 'bg-red-100 text-red-600'
+                              : bread.health_status === 'overstock'
+                              ? 'bg-orange-100 text-orange-600'
+                              : 'bg-green-100 text-green-600'
+                          }`}
+                        >
+                          {bread.health_status === 'critical' && <AlertTriangle className="w-3 h-3" />}
+                          {bread.health_status === 'overstock' && <Box className="w-3 h-3" />}
+                          {bread.health_status === 'healthy' && <CheckCircle2 className="w-3 h-3" />}
+                          {bread.health_status === 'critical' ? '急需補貨' : bread.health_status === 'overstock' ? '庫存積壓' : '水位健康'}
+                        </span>
+                      </div>
+
+                      {/* Bread Section */}
+                      <div className="mb-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <ShoppingBag className="w-4 h-4 text-[#EB5C20]" />
+                          <span className="text-sm font-medium text-gray-700">麵包</span>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded ${
+                              bread.health_status === 'critical' ? 'bg-red-100 text-red-600' :
+                              bread.health_status === 'overstock' ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'
+                            }`}
+                          >
+                            {bread.days_of_stock} 天
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-2">
+                          日銷: {bread.daily_sales_30d.toLocaleString()} | 30日出庫: {bread.total_sales_30d.toLocaleString()}
+                        </p>
+                        <div className="flex items-baseline gap-2 mb-2">
+                          <span className="text-2xl font-bold text-gray-800">{bread.current_stock.toLocaleString()}</span>
+                          <span className="text-xs text-gray-400">/ 正常水位 {bread.target_stock.toLocaleString()}</span>
+                        </div>
+                        {/* Bread Bar */}
+                        <div className="relative h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              bread.health_status === 'critical' ? 'bg-red-400' :
+                              bread.health_status === 'overstock' ? 'bg-orange-400' : 'bg-green-400'
+                            }`}
+                            style={{ width: `${breadCurrentPercent}%` }}
+                          />
+                          {/* Markers */}
+                          <div className="absolute top-0 bottom-0 w-0.5 bg-red-500" style={{ left: `${breadReorderPercent}%` }} />
+                          <div className="absolute top-0 bottom-0 w-0.5 bg-blue-500" style={{ left: `${breadTargetPercent}%` }} />
+                        </div>
+                        {/* Bar Labels - 固定在兩端避免重疊 */}
+                        <div className="flex justify-between text-[10px] mt-1">
+                          <span className="text-red-500 font-medium">補貨點 {bread.reorder_point.toLocaleString()}</span>
+                          <span className="text-blue-500 font-medium">正常水位 {bread.target_stock.toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      {/* Bag Section */}
+                      {bag ? (
+                        <div className="pt-3 border-t border-gray-100">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Package className="w-4 h-4 text-blue-500" />
+                              <span className="text-sm font-medium text-gray-700">塑膠袋</span>
+                            </div>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded ${
+                                bag.health_status === 'critical' ? 'bg-red-100 text-red-600' :
+                                bag.health_status === 'overstock' ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'
+                              }`}
+                            >
+                              {bag.health_status === 'critical' ? '急需補貨' : bag.health_status === 'overstock' ? '庫存積壓' : '庫存充足'}
+                            </span>
+                          </div>
+                          <div className="flex items-baseline gap-2 mb-2">
+                            <span className="text-2xl font-bold text-gray-800">{bag.current_stock.toLocaleString()}</span>
+                            <span className="text-xs text-gray-400">{bag.unit} / 正常水位 {bag.target_stock.toLocaleString()}</span>
+                          </div>
+                          {/* Bag Bar */}
+                          <div className="relative h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                bag.health_status === 'critical' ? 'bg-red-400' :
+                                bag.health_status === 'overstock' ? 'bg-orange-400' : 'bg-green-400'
+                              }`}
+                              style={{ width: `${bagCurrentPercent}%` }}
+                            />
+                            {/* Markers */}
+                            <div className="absolute top-0 bottom-0 w-0.5 bg-red-500" style={{ left: `${bagReorderPercent}%` }} />
+                            <div className="absolute top-0 bottom-0 w-0.5 bg-blue-500" style={{ left: `${bagTargetPercent}%` }} />
+                          </div>
+                          {/* Bar Labels - 固定在兩端避免重疊 */}
+                          <div className="flex justify-between text-[10px] mt-1">
+                            <span className="text-red-500 font-medium">補貨點 {bag.reorder_point.toLocaleString()}</span>
+                            <span className="text-blue-500 font-medium">正常水位 {bag.target_stock.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="pt-3 border-t border-gray-100">
+                          <div className="flex items-center gap-2 text-gray-400">
+                            <Package className="w-4 h-4" />
+                            <span className="text-sm">無對應塑膠袋資料</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Bottom Alert Messages */}
+                      <div className="mt-3 space-y-1">
+                        {bread.health_status === 'critical' && (
+                          <div className="flex items-center gap-2 text-xs text-red-600">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>麵包庫存不足，距補貨點差 {Math.max(0, bread.reorder_point - bread.current_stock).toLocaleString()} 顆，距正常水位差 {Math.max(0, bread.target_stock - bread.current_stock).toLocaleString()} 顆</span>
+                          </div>
+                        )}
+                        {bread.health_status === 'healthy' && (
+                          <div className="flex items-center gap-2 text-xs text-green-600">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>庫存充足，距補貨點還有 {(bread.current_stock - bread.reorder_point).toLocaleString()} 顆</span>
+                          </div>
+                        )}
+                        {bread.health_status === 'overstock' && (
+                          <div className="flex items-center gap-2 text-xs text-orange-500">
+                            <Box className="w-3 h-3" />
+                            <span>庫存積壓，超出正常水位 {(bread.current_stock - bread.target_stock).toLocaleString()} 顆</span>
+                          </div>
+                        )}
+                        {bag?.health_status === 'critical' && (
+                          <div className="flex items-center gap-2 text-xs text-red-600">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>塑膠袋庫存不足，距補貨點差 {Math.max(0, bag.reorder_point - bag.current_stock).toLocaleString()} {bag.unit}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Box Diagnosis */}
+            {boxDiagnoses.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <span className="w-1.5 h-6 bg-gray-400 rounded-full"></span>
+                    紙箱庫存診斷 ({boxDiagnoses.length})
+                  </h2>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    前置期: {LEAD_TIME.box} 天 | 正常水位: {TARGET_DAYS} 天
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {boxDiagnoses.map((item) => {
+                    const barMax = Math.max(item.current_stock, item.target_stock) * 1.2;
+                    const reorderPercent = (item.reorder_point / barMax) * 100;
+                    const targetPercent = (item.target_stock / barMax) * 100;
+                    const currentPercent = Math.min((item.current_stock / barMax) * 100, 100);
+
+                    return (
+                      <div
+                        key={item.name}
+                        className="bg-white p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex justify-between items-start mb-1">
+                          <h3 className="font-bold text-gray-800 text-lg">{item.name}</h3>
+                          <span
+                            className={`text-xs px-3 py-1 rounded-lg font-medium flex items-center gap-1 ${
+                              item.health_status === 'critical'
+                                ? 'bg-red-100 text-red-600'
+                                : item.health_status === 'overstock'
+                                ? 'bg-orange-100 text-orange-600'
+                                : 'bg-green-100 text-green-600'
+                            }`}
+                          >
+                            {item.health_status === 'critical' && <AlertTriangle className="w-3 h-3" />}
+                            {item.health_status === 'overstock' && <Box className="w-3 h-3" />}
+                            {item.health_status === 'healthy' && <CheckCircle2 className="w-3 h-3" />}
+                            {item.health_status === 'critical' ? '急需補貨' : item.health_status === 'overstock' ? '庫存積壓' : '水位健康'}
+                          </span>
+                        </div>
+
+                        <p className="text-sm text-gray-500 mb-4">
+                          日銷: {item.daily_sales_30d.toLocaleString()} 個 | 30日出庫: {item.total_sales_30d.toLocaleString()} | 可售天數: <span className={`font-medium ${
+                            item.days_of_stock < LEAD_TIME.box ? 'text-red-600' :
+                            item.days_of_stock > TARGET_DAYS ? 'text-orange-500' : 'text-green-600'
+                          }`}>{item.days_of_stock} 天</span>
+                        </p>
+
+                        <div className="flex items-baseline gap-2 mb-3">
+                          <span className="text-3xl font-bold text-gray-800">{item.current_stock.toLocaleString()}</span>
+                          <span className="text-sm text-gray-400">/ 正常水位 {item.target_stock.toLocaleString()}</span>
+                        </div>
+
+                        <div className="relative mb-2">
+                          <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                item.health_status === 'critical' ? 'bg-red-400' :
+                                item.health_status === 'overstock' ? 'bg-orange-400' : 'bg-green-400'
+                              }`}
+                              style={{ width: `${currentPercent}%` }}
+                            />
+                          </div>
+                          {/* Markers */}
+                          <div className="absolute top-0 w-0.5 h-3 bg-red-500" style={{ left: `${reorderPercent}%` }} />
+                          <div className="absolute top-0 w-0.5 h-3 bg-blue-500" style={{ left: `${targetPercent}%` }} />
+                        </div>
+                        {/* Bar Labels - 固定在兩端避免重疊 */}
+                        <div className="flex justify-between text-[10px] mb-4">
+                          <span className="text-red-500 font-medium">補貨點 {item.reorder_point.toLocaleString()}</span>
+                          <span className="text-blue-500 font-medium">正常水位 {item.target_stock.toLocaleString()}</span>
+                        </div>
+
+                        {item.health_status === 'critical' && (
+                          <div className="flex items-center gap-2 text-sm text-red-600">
+                            <AlertTriangle className="w-4 h-4" />
+                            <span>庫存不足，距離補貨點還差 {Math.max(0, item.reorder_point - item.current_stock).toLocaleString()} 個</span>
+                          </div>
+                        )}
+                        {item.health_status === 'overstock' && (
+                          <div className="flex items-center gap-2 text-sm text-orange-500">
+                            <Box className="w-4 h-4" />
+                            <span>庫存積壓，超出30日出庫 {(item.current_stock - item.total_sales_30d).toLocaleString()} 個</span>
+                          </div>
+                        )}
+                        {item.health_status === 'healthy' && (
+                          <div className="flex items-center gap-2 text-sm text-gray-500">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>庫存正常，距離補貨點還有 {(item.current_stock - item.reorder_point).toLocaleString()} 個</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Standalone Bag Diagnosis (bags without matching bread) */}
+            {standaloneBags.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <span className="w-1.5 h-6 bg-blue-400 rounded-full"></span>
+                    其他塑膠袋 ({standaloneBags.length})
+                  </h2>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    前置期: {LEAD_TIME.bag} 天 | 1捲 ≈ {ITEMS_PER_ROLL.toLocaleString()} 個
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {standaloneBags.map((item) => {
+                    const barMax = Math.max(item.current_stock, item.target_stock) * 1.2;
+                    const reorderPercent = (item.reorder_point / barMax) * 100;
+                    const targetPercent = (item.target_stock / barMax) * 100;
+                    const currentPercent = Math.min((item.current_stock / barMax) * 100, 100);
+
+                    return (
+                      <div
+                        key={item.name}
+                        className="bg-white p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex justify-between items-start mb-1">
+                          <h3 className="font-bold text-gray-800 text-lg">{item.name}</h3>
+                          <span
+                            className={`text-xs px-3 py-1 rounded-lg font-medium flex items-center gap-1 ${
+                              item.health_status === 'critical'
+                                ? 'bg-red-100 text-red-600'
+                                : item.health_status === 'overstock'
+                                ? 'bg-orange-100 text-orange-600'
+                                : 'bg-green-100 text-green-600'
+                            }`}
+                          >
+                            {item.health_status === 'critical' && <AlertTriangle className="w-3 h-3" />}
+                            {item.health_status === 'overstock' && <Box className="w-3 h-3" />}
+                            {item.health_status === 'healthy' && <CheckCircle2 className="w-3 h-3" />}
+                            {item.health_status === 'critical' ? '急需補貨' : item.health_status === 'overstock' ? '庫存積壓' : '水位健康'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-baseline gap-2 mb-3">
+                          <span className="text-3xl font-bold text-gray-800">{item.current_stock.toLocaleString()}</span>
+                          <span className="text-sm text-gray-400">{item.unit} / 正常水位 {item.target_stock.toLocaleString()} {item.unit}</span>
+                        </div>
+
+                        <div className="relative mb-2">
+                          <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                item.health_status === 'critical' ? 'bg-red-400' :
+                                item.health_status === 'overstock' ? 'bg-orange-400' : 'bg-green-400'
+                              }`}
+                              style={{ width: `${currentPercent}%` }}
+                            />
+                          </div>
+                          {/* Markers */}
+                          <div className="absolute top-0 w-0.5 h-3 bg-red-500" style={{ left: `${reorderPercent}%` }} />
+                          <div className="absolute top-0 w-0.5 h-3 bg-blue-500" style={{ left: `${targetPercent}%` }} />
+                        </div>
+                        {/* Bar Labels - 固定在兩端避免重疊 */}
+                        <div className="flex justify-between text-[10px] mb-4">
+                          <span className="text-red-500 font-medium">補貨點 {item.reorder_point.toLocaleString()}</span>
+                          <span className="text-blue-500 font-medium">正常水位 {item.target_stock.toLocaleString()}</span>
+                        </div>
+
+                        {item.health_status === 'critical' && (
+                          <div className="flex items-center gap-2 text-sm text-red-600">
+                            <AlertTriangle className="w-4 h-4" />
+                            <span>庫存不足，距補貨點差 {Math.max(0, item.reorder_point - item.current_stock).toLocaleString()} {item.unit}</span>
+                          </div>
+                        )}
+                        {item.health_status === 'overstock' && (
+                          <div className="flex items-center gap-2 text-sm text-orange-500">
+                            <Box className="w-4 h-4" />
+                            <span>庫存積壓，超出正常水位 {(item.current_stock - item.target_stock).toLocaleString()} {item.unit}</span>
+                          </div>
+                        )}
+                        {item.health_status === 'healthy' && (
+                          <div className="flex items-center gap-2 text-sm text-gray-500">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>庫存正常，距補貨點還有 {(item.current_stock - item.reorder_point).toLocaleString()} {item.unit}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab Content: Order Suggestions */}
+        {activeTab === 'order' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold text-gray-800">
+                叫貨建議表 {orderSuggestions.length > 0 && `(${orderSuggestions.length} 項需要叫貨)`}
+              </h2>
+            </div>
+
+            {orderSuggestions.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+                <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-4" />
+                <p className="text-gray-600 font-medium">目前沒有急需叫貨的商品</p>
+                <p className="text-sm text-gray-400 mt-1">所有商品庫存都在安全水位以上</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-red-50 text-red-700 font-medium">
+                    <tr>
+                      <th className="px-6 py-4">商品名稱</th>
+                      <th className="px-6 py-4">分類</th>
+                      <th className="px-6 py-4 text-right">目前庫存</th>
+                      <th className="px-6 py-4 text-right">日銷量</th>
+                      <th className="px-6 py-4 text-right">可售天數</th>
+                      <th className="px-6 py-4 text-right">補貨點</th>
+                      <th className="px-6 py-4 text-right">建議叫貨量</th>
+                      <th className="px-6 py-4 text-center">緊急程度</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {orderSuggestions.map((item, idx) => (
+                      <tr key={item.name} className={`hover:bg-gray-50 ${idx < 3 ? 'bg-red-50/30' : ''}`}>
+                        <td className="px-6 py-4 font-medium text-gray-800">{item.name}</td>
+                        <td className="px-6 py-4 text-gray-600">
+                          <span className="bg-gray-100 px-2 py-1 rounded text-xs">
+                            {item.category === 'bread' ? '麵包' : item.category === 'box' ? '紙箱' : '塑膠袋'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right text-gray-800">
+                          {item.current_stock.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-right text-gray-600">
+                          {item.category === 'bag' ? '-' : (item.daily_sales_30d ?? 0).toLocaleString()}
+                        </td>
+                        <td className={`px-6 py-4 text-right font-bold ${
+                          item.category === 'bag' ? 'text-gray-500' :
+                          (item.days_of_stock ?? 0) < 10 ? 'text-red-600' : 'text-orange-500'
+                        }`}>
+                          {item.category === 'bag' ? '-' : `${item.days_of_stock ?? 0} 天`}
+                        </td>
+                        <td className="px-6 py-4 text-right text-gray-500">
+                          {item.reorder_point.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-right font-bold text-[#EB5C20]">
+                          +{item.suggested_order.toLocaleString()} {item.unit}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {item.category === 'bag' ? (
+                            // 塑膠袋：庫存 < 補貨點即為緊急
+                            item.current_stock < item.reorder_point ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                                <XCircle className="w-3 h-3" />
+                                緊急
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
+                                <AlertTriangle className="w-3 h-3" />
+                                注意
+                              </span>
+                            )
+                          ) : (
+                            // 麵包/紙箱：使用可售天數判斷
+                            (item.days_of_stock ?? 0) < 10 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                                <XCircle className="w-3 h-3" />
+                                緊急
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
+                                <AlertTriangle className="w-3 h-3" />
+                                注意
+                              </span>
+                            )
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />
+              <div>
+                <h4 className="font-bold text-blue-700 text-sm">叫貨邏輯說明</h4>
+                <p className="text-sm text-blue-600 mt-1">
+                  當庫存可售天數低於前置期（麵包/紙箱 {LEAD_TIME.bread} 天，塑膠袋 {LEAD_TIME.bag} 天）時，系統會建議叫貨。
+                  建議叫貨量 = 正常水位 ({TARGET_DAYS} 天銷量) - 目前庫存。
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tab Content: Inventory */}
         {activeTab === 'inventory' && (
@@ -623,9 +1388,6 @@ export default function InventoryDashboard() {
                   <span className="w-1.5 h-6 bg-[#EB5C20] rounded-full"></span>
                   麵包庫存 ({breadItems.length})
                 </h2>
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                  資料來源: 倉庫明細表 (12/25)
-                </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -653,11 +1415,8 @@ export default function InventoryDashboard() {
                       <span className="text-xs text-gray-400 font-normal">{item.unit || '個'}</span>
                     </div>
                     <StockLevelBar current={item.stock} max={item.minStock * 3} lowThreshold={item.minStock} />
-                    <div className="mt-3 text-xs text-gray-400 flex justify-between">
-                      <span>最低庫存: {item.minStock.toLocaleString()}</span>
-                      <span>
-                        可用量: {item.availableStock.toLocaleString()}
-                      </span>
+                    <div className="mt-3 text-xs text-gray-400 text-right">
+                      <span>可用量: {item.availableStock.toLocaleString()}</span>
                     </div>
                   </div>
                 ))}
@@ -684,18 +1443,18 @@ export default function InventoryDashboard() {
                           {item.stock.toLocaleString()}
                         </span>
                       </div>
-                      <StockLevelBar current={item.stock} max={6000} lowThreshold={500} />
+                      <StockLevelBar current={item.stock} max={item.minStock * 3 || 6000} lowThreshold={item.minStock || 500} />
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Bags */}
+              {/* Bags - using diagnosis data for unified status calculation */}
               <div className="lg:col-span-2">
                 <div className="flex items-center gap-3 mb-4">
                   <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                     <span className="w-1.5 h-6 bg-blue-400 rounded-full"></span>
-                    塑膠袋庫存
+                    塑膠袋庫存 ({bagDiagnoses.length})
                   </h2>
                   <span className="text-xs text-gray-500 bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-100">
                     1 捲 ≈ 6,000 個袋子
@@ -714,23 +1473,27 @@ export default function InventoryDashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {bagItems.map((item) => (
-                          <tr key={item.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-3 font-medium text-gray-700">{item.name}</td>
+                        {bagDiagnoses.map((bag) => (
+                          <tr key={bag.name} className="hover:bg-gray-50">
+                            <td className="px-6 py-3 font-medium text-gray-700">{bag.name}</td>
                             <td className="px-6 py-3 text-right font-bold text-gray-800">
-                              {item.stock.toLocaleString()} {item.unit || '捲'}
+                              {bag.current_stock.toLocaleString()} {bag.unit || '捲'}
                             </td>
                             <td className="px-6 py-3 text-right text-gray-500">
-                              {item.itemsPerRoll
-                                ? (item.stock * item.itemsPerRoll).toLocaleString()
-                                : '-'} 個
+                              {(bag.current_stock * 6000).toLocaleString()} 個
                             </td>
                             <td className="px-6 py-3 text-right">
                               <span
-                                className={`inline-block w-2.5 h-2.5 rounded-full ${
-                                  item.stockStatus === 'low' ? 'bg-red-500' : item.stockStatus === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                                className={`text-xs px-2 py-0.5 rounded-full ${
+                                  bag.health_status === 'critical'
+                                    ? 'bg-red-100 text-red-600'
+                                    : bag.health_status === 'overstock'
+                                    ? 'bg-yellow-100 text-yellow-600'
+                                    : 'bg-green-100 text-green-600'
                                 }`}
-                              ></span>
+                              >
+                                {bag.health_status === 'critical' ? '急需補貨' : bag.health_status === 'overstock' ? '庫存積壓' : '庫存充足'}
+                              </span>
                             </td>
                           </tr>
                         ))}
@@ -838,58 +1601,105 @@ export default function InventoryDashboard() {
             {analysisMode === 'sales' && (
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-bold text-gray-800">
-                    銷量趨勢圖 (出庫量)
-                  </h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-bold text-gray-800">
+                      銷量趨勢圖 (出庫量)
+                    </h3>
+                    {focusedItem && (
+                      <button
+                        onClick={() => setFocusedItem(null)}
+                        className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+                      >
+                        清除聚焦
+                      </button>
+                    )}
+                  </div>
                   <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
                     近 {trendDays} 天資料
                   </span>
                 </div>
 
-                {salesTrendData.length === 0 ? (
-                  <div className="h-80 flex items-center justify-center text-gray-400">
+                {analysisLoading ? (
+                  <div className="h-96 flex items-center justify-center text-gray-400">
                     <div className="text-center">
-                      <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <Loader2 className="w-12 h-12 mx-auto mb-2 animate-spin text-[#EB5C20]" />
                       <p>載入銷量資料中...</p>
                     </div>
                   </div>
+                ) : salesTrendData.length === 0 ? (
+                  <div className="h-96 flex items-center justify-center text-gray-400">
+                    <div className="text-center">
+                      <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>無銷量資料</p>
+                    </div>
+                  </div>
                 ) : selectedSalesItems.size === 0 ? (
-                  <div className="h-80 flex items-center justify-center text-gray-400">
+                  <div className="h-96 flex items-center justify-center text-gray-400">
                     <div className="text-center">
                       <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
                       <p>請在下方表格選擇要顯示的品項</p>
                     </div>
                   </div>
                 ) : (
-                  <div className="h-80 w-full">
+                  <div className="h-96 w-full relative">
+                    {/* Focused item info panel */}
+                    {focusedItem && (
+                      <div className="absolute top-2 right-2 bg-white p-3 rounded-lg shadow-lg border border-gray-200 z-10 min-w-[200px]">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-4 h-4 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: CHART_COLORS[salesTrendData.findIndex(i => i.name === focusedItem) % CHART_COLORS.length] }}
+                          />
+                          <span className="font-bold text-gray-800">{focusedItem}</span>
+                        </div>
+                        {salesStats[String(trendDays)]?.[focusedItem] && (
+                          <div className="mt-2 text-xs text-gray-500 space-y-1">
+                            <div>總銷量: {salesStats[String(trendDays)][focusedItem].total.toLocaleString()}</div>
+                            <div>日均: {salesStats[String(trendDays)][focusedItem].avg.toLocaleString()}</div>
+                            <div>最高: {salesStats[String(trendDays)][focusedItem].max.toLocaleString()}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
                         data={(() => {
-                          // Merge all selected items data by date
-                          const dateMap = new Map<string, Record<string, number>>();
+                          // Calculate date cutoff based on trendDays
+                          const cutoffDate = new Date();
+                          cutoffDate.setDate(cutoffDate.getDate() - trendDays);
+                          const cutoffStr = cutoffDate.toISOString().slice(0, 10);
+
+                          // Merge all selected items data by date, filtered by trendDays
+                          const dateMap = new Map<string, Record<string, string | number>>();
                           salesTrendData
                             .filter(item => selectedSalesItems.has(item.name))
                             .forEach(item => {
-                              item.data.forEach(d => {
-                                const dateKey = d.date.slice(5); // MM-DD
-                                if (!dateMap.has(dateKey)) {
-                                  dateMap.set(dateKey, { date: dateKey });
-                                }
-                                dateMap.get(dateKey)![item.name] = d.sales;
-                              });
+                              item.data
+                                .filter(d => d.date >= cutoffStr)
+                                .forEach(d => {
+                                  const dateKey = d.date.slice(5); // MM-DD
+                                  if (!dateMap.has(dateKey)) {
+                                    dateMap.set(dateKey, { date: dateKey });
+                                  }
+                                  dateMap.get(dateKey)![item.name] = d.sales;
+                                });
                             });
-                          return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+                          return Array.from(dateMap.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
                         })()}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                        margin={{ top: 20, right: 20, left: 20, bottom: 5 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="date" tick={{ fontSize: 11 }} tickMargin={10} />
                         <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v.toLocaleString()} />
                         <RechartsTooltip
-                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                          formatter={(value: number) => [value.toLocaleString(), '']}
+                          contentStyle={{
+                            borderRadius: '8px',
+                            border: 'none',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                            padding: '8px 12px'
+                          }}
+                          labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
                         />
-                        <Legend />
                         {salesTrendData
                           .filter(item => selectedSalesItems.has(item.name))
                           .map((item, idx) => (
@@ -898,9 +1708,10 @@ export default function InventoryDashboard() {
                               type="monotone"
                               dataKey={item.name}
                               stroke={CHART_COLORS[idx % CHART_COLORS.length]}
-                              strokeWidth={2}
-                              dot={{ fill: CHART_COLORS[idx % CHART_COLORS.length], strokeWidth: 2, r: 3 }}
-                              activeDot={{ r: 5 }}
+                              strokeWidth={focusedItem === item.name ? 4 : (focusedItem ? 1 : 2)}
+                              strokeOpacity={focusedItem && focusedItem !== item.name ? 0.2 : 1}
+                              dot={false}
+                              activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff' }}
                             />
                           ))}
                       </LineChart>
@@ -914,58 +1725,105 @@ export default function InventoryDashboard() {
             {analysisMode === 'stock' && (
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-bold text-gray-800">
-                    庫存趨勢圖 (預計可用量)
-                  </h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-bold text-gray-800">
+                      庫存趨勢圖 (預計可用量)
+                    </h3>
+                    {focusedItem && (
+                      <button
+                        onClick={() => setFocusedItem(null)}
+                        className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+                      >
+                        清除聚焦
+                      </button>
+                    )}
+                  </div>
                   <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
                     近 {trendDays} 天資料
                   </span>
                 </div>
 
-                {trendData.length === 0 ? (
-                  <div className="h-80 flex items-center justify-center text-gray-400">
+                {analysisLoading ? (
+                  <div className="h-96 flex items-center justify-center text-gray-400">
                     <div className="text-center">
-                      <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <Loader2 className="w-12 h-12 mx-auto mb-2 animate-spin text-[#EB5C20]" />
                       <p>載入趨勢資料中...</p>
                     </div>
                   </div>
+                ) : trendData.length === 0 ? (
+                  <div className="h-96 flex items-center justify-center text-gray-400">
+                    <div className="text-center">
+                      <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>無庫存趨勢資料</p>
+                    </div>
+                  </div>
                 ) : selectedTrendItems.size === 0 ? (
-                  <div className="h-80 flex items-center justify-center text-gray-400">
+                  <div className="h-96 flex items-center justify-center text-gray-400">
                     <div className="text-center">
                       <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
                       <p>請在下方表格選擇要顯示的品項</p>
                     </div>
                   </div>
                 ) : (
-                  <div className="h-80 w-full">
+                  <div className="h-96 w-full relative">
+                    {/* Focused item info panel */}
+                    {focusedItem && (
+                      <div className="absolute top-2 right-2 bg-white p-3 rounded-lg shadow-lg border border-gray-200 z-10 min-w-[200px]">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-4 h-4 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: CHART_COLORS[trendData.findIndex(i => i.name === focusedItem) % CHART_COLORS.length] }}
+                          />
+                          <span className="font-bold text-gray-800">{focusedItem}</span>
+                        </div>
+                        {stockStats[String(trendDays)]?.[focusedItem] && (
+                          <div className="mt-2 text-xs text-gray-500 space-y-1">
+                            <div>目前庫存: {stockStats[String(trendDays)][focusedItem].latest.toLocaleString()}</div>
+                            <div>{trendDays}天前: {stockStats[String(trendDays)][focusedItem].oldest.toLocaleString()}</div>
+                            <div>變化: {stockStats[String(trendDays)][focusedItem].change > 0 ? '+' : ''}{stockStats[String(trendDays)][focusedItem].change.toLocaleString()}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
                         data={(() => {
-                          // Merge all selected items data by date
-                          const dateMap = new Map<string, Record<string, number>>();
+                          // Calculate date cutoff based on trendDays
+                          const cutoffDate = new Date();
+                          cutoffDate.setDate(cutoffDate.getDate() - trendDays);
+                          const cutoffStr = cutoffDate.toISOString().slice(0, 10);
+
+                          // Merge all selected items data by date, filtered by trendDays
+                          const dateMap = new Map<string, Record<string, string | number>>();
                           trendData
                             .filter(item => selectedTrendItems.has(item.name))
                             .forEach(item => {
-                              item.data.forEach(d => {
-                                const dateKey = d.date.slice(5); // MM-DD
-                                if (!dateMap.has(dateKey)) {
-                                  dateMap.set(dateKey, { date: dateKey });
-                                }
-                                dateMap.get(dateKey)![item.name] = d.stock;
-                              });
+                              item.data
+                                .filter(d => d.date >= cutoffStr)
+                                .forEach(d => {
+                                  const dateKey = d.date.slice(5); // MM-DD
+                                  if (!dateMap.has(dateKey)) {
+                                    dateMap.set(dateKey, { date: dateKey });
+                                  }
+                                  dateMap.get(dateKey)![item.name] = d.stock;
+                                });
                             });
-                          return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+                          return Array.from(dateMap.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
                         })()}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                        margin={{ top: 20, right: 20, left: 20, bottom: 5 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="date" tick={{ fontSize: 11 }} tickMargin={10} />
                         <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v.toLocaleString()} />
                         <RechartsTooltip
-                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                          formatter={(value: number) => [value.toLocaleString(), '']}
+                          contentStyle={{
+                            borderRadius: '8px',
+                            border: 'none',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                            padding: '8px 12px'
+                          }}
+                          labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
                         />
-                        <Legend />
                         {trendData
                           .filter(item => selectedTrendItems.has(item.name))
                           .map((item, idx) => (
@@ -974,9 +1832,10 @@ export default function InventoryDashboard() {
                               type="monotone"
                               dataKey={item.name}
                               stroke={CHART_COLORS[idx % CHART_COLORS.length]}
-                              strokeWidth={2}
-                              dot={{ fill: CHART_COLORS[idx % CHART_COLORS.length], strokeWidth: 2, r: 3 }}
-                              activeDot={{ r: 5 }}
+                              strokeWidth={focusedItem === item.name ? 4 : (focusedItem ? 1 : 2)}
+                              strokeOpacity={focusedItem && focusedItem !== item.name ? 0.2 : 1}
+                              dot={false}
+                              activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff' }}
                             />
                           ))}
                       </LineChart>
@@ -990,7 +1849,7 @@ export default function InventoryDashboard() {
             {analysisMode === 'sales' && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100">
-                  <h3 className="font-bold text-gray-800">各品項銷量統計 (出庫量) - 點擊列可切換顯示</h3>
+                  <h3 className="font-bold text-gray-800">各品項銷量統計 (出庫量) - 點擊顏色圓點可聚焦該品項</h3>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left">
@@ -1012,20 +1871,25 @@ export default function InventoryDashboard() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {salesTrendData
-                        .map((item, originalIdx) => {
-                          const totalSales = item.data.reduce((sum, d) => sum + d.sales, 0);
-                          const avgSales = item.data.length > 0 ? Math.round(totalSales / item.data.length) : 0;
-                          const maxSales = Math.max(...item.data.map(d => d.sales), 0);
-                          return { ...item, totalSales, avgSales, maxSales, originalIdx };
+                        .map((item) => {
+                          // Use backend-calculated stats for current period
+                          const stats = salesStats[String(trendDays)]?.[item.name];
+                          return {
+                            ...item,
+                            totalSales: stats?.total ?? 0,
+                            avgSales: stats?.avg ?? 0,
+                            maxSales: stats?.max ?? 0,
+                          };
                         })
                         .sort((a, b) => b.totalSales - a.totalSales)
                         .map((item) => {
                           const isSelected = selectedSalesItems.has(item.name);
+                          const isFocused = focusedItem === item.name;
                           const colorIdx = salesTrendData.findIndex(i => i.name === item.name);
                           return (
                             <tr
                               key={item.name}
-                              className={`hover:bg-gray-50 cursor-pointer ${isSelected ? 'bg-green-50' : ''}`}
+                              className={`hover:bg-gray-50 cursor-pointer ${isFocused ? 'bg-orange-100' : isSelected ? 'bg-green-50' : ''}`}
                               onClick={() => toggleSalesItem(item.name)}
                             >
                               <td className="px-4 py-3">
@@ -1040,12 +1904,17 @@ export default function InventoryDashboard() {
                               <td className="px-4 py-3 font-medium text-gray-700">
                                 <div className="flex items-center gap-2">
                                   {isSelected && (
-                                    <span
-                                      className="w-3 h-3 rounded-full"
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setFocusedItem(isFocused ? null : item.name);
+                                      }}
+                                      className={`w-4 h-4 rounded-full flex-shrink-0 transition-transform ${isFocused ? 'ring-2 ring-offset-1 ring-gray-400 scale-125' : 'hover:scale-110'}`}
                                       style={{ backgroundColor: CHART_COLORS[colorIdx % CHART_COLORS.length] }}
+                                      title={isFocused ? '取消聚焦' : '點擊聚焦此品項'}
                                     />
                                   )}
-                                  {item.name}
+                                  <span className={isFocused ? 'font-bold' : ''}>{item.name}</span>
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-right font-bold text-gray-900">
@@ -1070,7 +1939,7 @@ export default function InventoryDashboard() {
             {analysisMode === 'stock' && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100">
-                  <h3 className="font-bold text-gray-800">各品項庫存走勢 (預計可用量) - 點擊列可切換顯示</h3>
+                  <h3 className="font-bold text-gray-800">各品項庫存走勢 (預計可用量) - 點擊顏色圓點可聚焦該品項</h3>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left">
@@ -1093,17 +1962,20 @@ export default function InventoryDashboard() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {trendData.map((item) => {
-                        const latestStock = item.data[item.data.length - 1]?.stock || 0;
-                        const oldestStock = item.data[0]?.stock || 0;
-                        const change = latestStock - oldestStock;
+                        // Use backend-calculated stats for current period
+                        const stats = stockStats[String(trendDays)]?.[item.name];
+                        const latestStock = stats?.latest ?? 0;
+                        const oldestStock = stats?.oldest ?? 0;
+                        const change = stats?.change ?? 0;
                         const changePercent = oldestStock > 0 ? ((change / oldestStock) * 100).toFixed(1) : 0;
                         const isSelected = selectedTrendItems.has(item.name);
+                        const isFocused = focusedItem === item.name;
                         const colorIdx = trendData.findIndex(i => i.name === item.name);
 
                         return (
                           <tr
                             key={item.name}
-                            className={`hover:bg-gray-50 cursor-pointer ${isSelected ? 'bg-orange-50' : ''}`}
+                            className={`hover:bg-gray-50 cursor-pointer ${isFocused ? 'bg-orange-100' : isSelected ? 'bg-orange-50' : ''}`}
                             onClick={() => toggleTrendItem(item.name)}
                           >
                             <td className="px-4 py-3">
@@ -1118,12 +1990,17 @@ export default function InventoryDashboard() {
                             <td className="px-4 py-3 font-medium text-gray-700">
                               <div className="flex items-center gap-2">
                                 {isSelected && (
-                                  <span
-                                    className="w-3 h-3 rounded-full"
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setFocusedItem(isFocused ? null : item.name);
+                                    }}
+                                    className={`w-4 h-4 rounded-full flex-shrink-0 transition-transform ${isFocused ? 'ring-2 ring-offset-1 ring-gray-400 scale-125' : 'hover:scale-110'}`}
                                     style={{ backgroundColor: CHART_COLORS[colorIdx % CHART_COLORS.length] }}
+                                    title={isFocused ? '取消聚焦' : '點擊聚焦此品項'}
                                   />
                                 )}
-                                {item.name}
+                                <span className={isFocused ? 'font-bold' : ''}>{item.name}</span>
                               </div>
                             </td>
                             <td className="px-4 py-3 text-right font-bold text-gray-900">
@@ -1167,17 +2044,92 @@ export default function InventoryDashboard() {
         {/* Tab Content: Restock Log */}
         {activeTab === 'restock' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold text-gray-800">
-                入庫紀錄 {restockLogs.length > 0 && `(${restockLogs.length} 筆)`}
-              </h2>
-              <button
-                onClick={fetchRestockLogs}
-                className="bg-[#EB5C20] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#d44c15] transition-colors flex items-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                重新整理
-              </button>
+            {/* Filters */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <div className="flex flex-wrap items-end gap-4">
+                {/* Product filter */}
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-sm text-gray-600 mb-1">品項搜尋</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="輸入品項名稱..."
+                      value={restockProductFilter}
+                      onChange={(e) => setRestockProductFilter(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#EB5C20] focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Date from */}
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">起始日期</label>
+                  <input
+                    type="date"
+                    value={restockDateFrom}
+                    onChange={(e) => setRestockDateFrom(e.target.value)}
+                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#EB5C20] focus:border-transparent"
+                  />
+                </div>
+
+                {/* Date to */}
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">結束日期</label>
+                  <input
+                    type="date"
+                    value={restockDateTo}
+                    onChange={(e) => setRestockDateTo(e.target.value)}
+                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#EB5C20] focus:border-transparent"
+                  />
+                </div>
+
+                {/* Clear filters */}
+                {(restockProductFilter || restockDateFrom || restockDateTo) && (
+                  <button
+                    onClick={() => {
+                      setRestockProductFilter('');
+                      setRestockDateFrom('');
+                      setRestockDateTo('');
+                    }}
+                    className="px-3 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    清除篩選
+                  </button>
+                )}
+
+                {/* Refresh button */}
+                <button
+                  onClick={fetchRestockLogs}
+                  className="bg-[#EB5C20] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#d44c15] transition-colors flex items-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  重新整理
+                </button>
+              </div>
+
+              {/* Filter summary */}
+              <div className="mt-3 text-sm text-gray-500">
+                {(() => {
+                  const filteredLogs = restockLogs.filter(log => {
+                    // Product name filter
+                    if (restockProductFilter && !log.product_name.toLowerCase().includes(restockProductFilter.toLowerCase())) {
+                      return false;
+                    }
+                    // Date from filter
+                    if (restockDateFrom && log.date && log.date < restockDateFrom) {
+                      return false;
+                    }
+                    // Date to filter
+                    if (restockDateTo && log.date && log.date > restockDateTo) {
+                      return false;
+                    }
+                    return true;
+                  });
+                  const totalStockIn = filteredLogs.reduce((sum, log) => sum + log.stock_in, 0);
+                  return `顯示 ${filteredLogs.length} 筆紀錄，共入庫 ${totalStockIn.toLocaleString()} 個`;
+                })()}
+              </div>
             </div>
 
             {restockLogs.length === 0 ? (
@@ -1200,7 +2152,23 @@ export default function InventoryDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {restockLogs.map((log, idx) => (
+                    {restockLogs
+                      .filter(log => {
+                        // Product name filter
+                        if (restockProductFilter && !log.product_name.toLowerCase().includes(restockProductFilter.toLowerCase())) {
+                          return false;
+                        }
+                        // Date from filter
+                        if (restockDateFrom && log.date && log.date < restockDateFrom) {
+                          return false;
+                        }
+                        // Date to filter
+                        if (restockDateTo && log.date && log.date > restockDateTo) {
+                          return false;
+                        }
+                        return true;
+                      })
+                      .map((log, idx) => (
                       <tr key={`${log.date}-${log.product_name}-${idx}`} className="hover:bg-gray-50">
                         <td className="px-6 py-4 text-gray-600 flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-gray-400" />

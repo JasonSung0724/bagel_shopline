@@ -172,6 +172,116 @@ CREATE POLICY "Allow read for anon" ON inventory_changes
     FOR SELECT TO anon USING (true);
 
 -- =============================================
+-- Table: master_breads
+-- 麵包主檔 (所有麵包品項)
+-- =============================================
+CREATE TABLE IF NOT EXISTS master_breads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL UNIQUE,             -- 麵包品名
+    code TEXT,                             -- 編號 (可為空)
+    is_active BOOLEAN DEFAULT true,        -- 是否啟用
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_master_breads_name ON master_breads(name);
+CREATE INDEX IF NOT EXISTS idx_master_breads_code ON master_breads(code);
+
+ALTER TABLE master_breads ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all for authenticated" ON master_breads
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all for service role" ON master_breads
+    FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Allow read for anon" ON master_breads
+    FOR SELECT TO anon USING (true);
+
+-- =============================================
+-- Table: master_bags
+-- 塑膠袋主檔 (所有塑膠袋品項)
+-- =============================================
+CREATE TABLE IF NOT EXISTS master_bags (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL UNIQUE,             -- 塑膠袋品名
+    code TEXT,                             -- 編號 (可為空)
+    is_active BOOLEAN DEFAULT true,        -- 是否啟用
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_master_bags_name ON master_bags(name);
+CREATE INDEX IF NOT EXISTS idx_master_bags_code ON master_bags(code);
+
+ALTER TABLE master_bags ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all for authenticated" ON master_bags
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all for service role" ON master_bags
+    FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Allow read for anon" ON master_bags
+    FOR SELECT TO anon USING (true);
+
+-- =============================================
+-- Table: master_boxes
+-- 箱子主檔 (所有箱子品項)
+-- =============================================
+CREATE TABLE IF NOT EXISTS master_boxes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL UNIQUE,             -- 箱子品名
+    code TEXT,                             -- 編號 (可為空)
+    is_active BOOLEAN DEFAULT true,        -- 是否啟用
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_master_boxes_name ON master_boxes(name);
+CREATE INDEX IF NOT EXISTS idx_master_boxes_code ON master_boxes(code);
+
+ALTER TABLE master_boxes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all for authenticated" ON master_boxes
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all for service role" ON master_boxes
+    FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Allow read for anon" ON master_boxes
+    FOR SELECT TO anon USING (true);
+
+-- =============================================
+-- Table: product_mappings
+-- 產品對照表 (麵包與塑膠袋的對應關係)
+-- 使用外鍵關聯到主檔
+-- =============================================
+CREATE TABLE IF NOT EXISTS product_mappings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    bread_id UUID REFERENCES master_breads(id) ON DELETE CASCADE,
+    bag_id UUID REFERENCES master_bags(id) ON DELETE CASCADE,
+    bread_name TEXT NOT NULL,              -- 麵包品名 (冗餘欄位，方便查詢)
+    bag_name TEXT NOT NULL,                -- 對應的塑膠袋品名 (冗餘欄位)
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(bread_name, bag_name)           -- 確保不重複對應
+);
+
+-- Indexes for product mappings
+CREATE INDEX IF NOT EXISTS idx_mappings_bread ON product_mappings(bread_name);
+CREATE INDEX IF NOT EXISTS idx_mappings_bag ON product_mappings(bag_name);
+CREATE INDEX IF NOT EXISTS idx_mappings_bread_id ON product_mappings(bread_id);
+CREATE INDEX IF NOT EXISTS idx_mappings_bag_id ON product_mappings(bag_id);
+
+-- Enable RLS
+ALTER TABLE product_mappings ENABLE ROW LEVEL SECURITY;
+
+-- Policies for product_mappings
+CREATE POLICY "Allow all for authenticated" ON product_mappings
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow all for service role" ON product_mappings
+    FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow read for anon" ON product_mappings
+    FOR SELECT TO anon USING (true);
+
+-- =============================================
 -- Helper Functions
 -- =============================================
 
