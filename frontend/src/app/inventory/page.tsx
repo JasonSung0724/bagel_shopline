@@ -330,8 +330,19 @@ export default function InventoryDashboard() {
   // Refresh data from database (no sync from email)
   const handleRefresh = async () => {
     setSyncing(true);
-    await fetchInventory();
-    await fetchRestockLogs();
+
+    switch (activeTab) {
+      case 'inventory':
+        await fetchInventory();
+        break;
+      case 'analysis':
+        await fetchTrendData('bread');
+        break;
+      case 'restock':
+        await fetchRestockLogs();
+        break;
+    }
+
     setSyncing(false);
   };
 
