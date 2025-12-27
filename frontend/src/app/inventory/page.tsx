@@ -895,9 +895,9 @@ export default function InventoryDashboard() {
               <div>
                 <h4 className="font-bold text-[#EB5C20] text-sm">系統提示</h4>
                 <p className="text-sm text-gray-600 mt-1">
-                  {lastSyncDate
-                    ? `以上數據已與 ${lastSyncDate} 的倉庫明細表同步。系統每日 21:05 自動從郵件同步庫存資料。`
-                    : '尚未同步資料，請點擊「同步資料」按鈕從郵件匯入庫存明細。'}
+                  {snapshotInfo?.snapshotDate
+                    ? `以上數據已與 ${snapshotInfo.snapshotDate} 的倉庫明細表同步。系統每日 21:05 自動從郵件同步庫存資料。`
+                    : '尚未同步資料，系統每日 21:05 自動從郵件同步庫存資料。'}
                 </p>
               </div>
             </div>
