@@ -29,6 +29,9 @@ import {
   CheckCircle2,
   XCircle,
   FileText,
+  Lock,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 // API Base URL - empty string means same origin (use Nginx proxy)
@@ -316,7 +319,22 @@ const StockLevelBar = ({ current, max = 12000, lowThreshold = 1000 }: StockLevel
 // Tab types
 type TabType = 'diagnosis' | 'inventory' | 'analysis' | 'restock' | 'order';
 
+// Session storage key for auth
+const AUTH_SESSION_KEY = 'inventory_auth';
+
 export default function InventoryDashboard() {
+  // Authentication state - check sessionStorage immediately to avoid flash
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem(AUTH_SESSION_KEY) === 'true';
+    }
+    return false;
+  });
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
   const [activeTab, setActiveTab] = useState<TabType>('diagnosis');
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [restockLogs, setRestockLogs] = useState<RestockLog[]>([]);
@@ -351,6 +369,43 @@ export default function InventoryDashboard() {
   const [restockProductFilter, setRestockProductFilter] = useState<string>('');
   const [restockDateFrom, setRestockDateFrom] = useState<string>('');
   const [restockDateTo, setRestockDateTo] = useState<string>(new Date().toISOString().slice(0, 10));
+
+
+  // Handle password submission
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
+        // Start loading data immediately while updating auth state
+        // This saves a React render cycle
+        setLoading(true);
+        setIsAuthenticated(true);
+        Promise.all([fetchInventory(), fetchDiagnosis()]).then(() => {
+          setLoading(false);
+        });
+      } else {
+        setAuthError(result.message || '密碼錯誤');
+      }
+    } catch {
+      setAuthError('連線錯誤，請稍後再試');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   // Fetch inventory from API
   const fetchInventory = useCallback(async () => {
@@ -529,8 +584,12 @@ export default function InventoryDashboard() {
     setSelectedSalesItems(new Set());
   };
 
-  // Initialize: fetch inventory and diagnosis data (on mount)
+  // Initialize: fetch inventory and diagnosis data on page reload (when already authenticated)
   useEffect(() => {
+    // Only run on mount when already authenticated from session storage
+    // (handleLogin handles fresh logins and starts loading there)
+    if (!isAuthenticated) return;
+
     const init = async () => {
       setLoading(true);
       await Promise.all([
@@ -679,7 +738,73 @@ export default function InventoryDashboard() {
     return bagDiagnoses.filter(bag => !pairedBagNames.has(bag.name));
   }, [bagDiagnoses, pairedBreadDiagnoses]);
 
-  // Loading state
+  // Show login form if not authenticated (must be checked FIRST before loading/error states)
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 w-full max-w-sm">
+          <div className="text-center mb-6">
+            <div className="w-14 h-14 rounded-xl bg-[#EB5C20] flex items-center justify-center text-white font-bold text-xl mx-auto mb-4">
+              CR
+            </div>
+            <h1 className="text-xl font-bold text-gray-900">減醣市集 庫存系統</h1>
+            <p className="text-sm text-gray-500 mt-1">請輸入密碼以存取庫存管理系統</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                密碼
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#EB5C20] focus:border-[#EB5C20] outline-none transition-colors"
+                  placeholder="請輸入密碼"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            {authError && (
+              <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-lg">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{authError}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={authLoading || !password}
+              className="w-full py-2.5 bg-[#EB5C20] text-white font-medium rounded-lg hover:bg-[#d54e18] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+            >
+              {authLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  驗證中...
+                </>
+              ) : (
+                '登入'
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state (only shown after authenticated)
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -691,7 +816,7 @@ export default function InventoryDashboard() {
     );
   }
 
-  // Error state with no data
+  // Error state with no data (only shown after authenticated)
   if (error && items.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -699,22 +824,14 @@ export default function InventoryDashboard() {
           <AlertCircle className="w-12 h-12 text-[#EB5C20] mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-800 mb-2">無法載入庫存資料</h2>
           <p className="text-gray-600 mb-6">{error}</p>
-          <div className="space-y-3">
-            <button
-              onClick={handleRefresh}
-              disabled={syncing}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#EB5C20] text-white rounded-lg hover:bg-[#d44c15] transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? '載入中...' : '重新載入'}
-            </button>
-            <Link
-              href="/"
-              className="block w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              返回首頁
-            </Link>
-          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={syncing}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#EB5C20] text-white rounded-lg hover:bg-[#d44c15] transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? '載入中...' : '重新載入'}
+          </button>
         </div>
       </div>
     );

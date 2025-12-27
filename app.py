@@ -5,7 +5,9 @@ This is a minimal API for health checks and future extensions.
 Order processing is handled by scheduled workers (main_scripts.py, sub_scripts.py).
 """
 import os
-from flask import Flask, jsonify, request
+import hashlib
+import secrets
+from flask import Flask, jsonify, request, session
 from flask_cors import CORS
 
 from src.utils.logger import setup_logger
@@ -16,7 +18,11 @@ from src.services.inventory_service import InventoryService
 setup_logger(log_file="logs/flask.log")
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for frontend
+app.secret_key = os.getenv("FLASK_SECRET_KEY", secrets.token_hex(32))
+CORS(app, supports_credentials=True)  # Enable CORS for frontend with credentials
+
+# Inventory page password (from environment variable, required)
+INVENTORY_PASSWORD = os.getenv("INVENTORY_PASSWORD")
 
 
 @app.route("/health", methods=["GET"])
@@ -44,8 +50,51 @@ def index():
             "/api/inventory/trend": "Get stock trend (庫存趨勢)",
             "/api/inventory/sales-trend": "Get sales trend based on stock_out (銷量趨勢)",
             "/api/inventory/product-mappings": "Get/Add/Delete product mappings (麵包與塑膠袋對照)",
+            "/api/auth/verify": "Verify inventory page password",
         }
     }), 200
+
+
+# ===========================================
+# Authentication Endpoints
+# ===========================================
+
+@app.route("/api/auth/verify", methods=["POST"])
+def verify_password():
+    """
+    Verify password for inventory page access.
+
+    Request body:
+        {"password": "your_password"}
+
+    Returns:
+        {"success": true} if password matches
+        {"success": false, "message": "..."} if password is incorrect or not configured
+    """
+    try:
+        # Check if password is configured
+        if not INVENTORY_PASSWORD:
+            return jsonify({
+                "success": False,
+                "message": "系統密碼未設定，請聯繫管理員"
+            }), 500
+
+        data = request.get_json()
+        password = data.get("password", "") if data else ""
+
+        if password == INVENTORY_PASSWORD:
+            return jsonify({"success": True}), 200
+        else:
+            return jsonify({
+                "success": False,
+                "message": "密碼錯誤"
+            }), 401
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
 
 
 # ===========================================
