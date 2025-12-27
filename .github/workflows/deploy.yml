@@ -187,8 +187,10 @@ jobs:
 
       - name: Deploy to VM
         run: |
-          # Copy docker-compose.yml to VM
+          # Copy docker-compose.yml and nginx config to VM
           gcloud compute scp docker-compose.yml ${{ env.GCE_INSTANCE }}:/opt/bagel-shop/docker-compose.yml --zone=${{ env.GCE_ZONE }}
+          gcloud compute ssh ${{ env.GCE_INSTANCE }} --zone=${{ env.GCE_ZONE }} --command="mkdir -p /opt/bagel-shop/nginx"
+          gcloud compute scp nginx/nginx.conf ${{ env.GCE_INSTANCE }}:/opt/bagel-shop/nginx/nginx.conf --zone=${{ env.GCE_ZONE }}
 
           # Run deployment commands on VM
           gcloud compute ssh ${{ env.GCE_INSTANCE }} --zone=${{ env.GCE_ZONE }} --command="
@@ -203,8 +205,8 @@ jobs:
             # Pull latest images
             docker compose pull
 
-            # Restart containers with new images
-            docker compose up -d --force-recreate api worker frontend
+            # Restart containers with new images (including nginx)
+            docker compose up -d --force-recreate api worker frontend nginx
 
             # Clean up old images
             docker image prune -f
@@ -217,7 +219,7 @@ jobs:
         run: |
           sleep 30
           gcloud compute ssh ${{ env.GCE_INSTANCE }} --zone=${{ env.GCE_ZONE }} \
-            --command="curl -f http://localhost:8080/health || exit 1"
+            --command="curl -f http://localhost:3000/health || exit 1"
 
       - name: Cleanup Old Images in Artifact Registry
         if: success()
