@@ -67,14 +67,12 @@ interface InventoryItem {
 }
 
 interface RestockLog {
-  id: string;
   date: string;
-  item_name: string;
+  product_name: string;
   category: string;
-  previous_stock: number;
-  new_stock: number;
-  change_amount: number;
-  source: string;
+  stock_in: number;
+  expiry_date: string | null;
+  warehouse_date: string | null;
 }
 
 interface SnapshotSummary {
@@ -301,10 +299,10 @@ export default function InventoryDashboard() {
     }
   }, []);
 
-  // Fetch restock logs
+  // Fetch restock logs (入庫紀錄)
   const fetchRestockLogs = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/inventory/changes?limit=20`);
+      const response = await fetch(`${API_BASE_URL}/api/inventory/restock?days=30`);
       const result = await response.json();
 
       if (result.success && result.data) {
@@ -1171,7 +1169,7 @@ export default function InventoryDashboard() {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-bold text-gray-800">
-                近期庫存變動紀錄 {restockLogs.length > 0 && `(${restockLogs.length} 筆)`}
+                入庫紀錄 {restockLogs.length > 0 && `(${restockLogs.length} 筆)`}
               </h2>
               <button
                 onClick={fetchRestockLogs}
@@ -1185,49 +1183,43 @@ export default function InventoryDashboard() {
             {restockLogs.length === 0 ? (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
                 <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">尚無庫存變動紀錄</p>
-                <p className="text-sm text-gray-400 mt-1">當庫存發生變化時，紀錄會顯示在這裡</p>
+                <p className="text-gray-500">尚無入庫紀錄</p>
+                <p className="text-sm text-gray-400 mt-1">當有進貨入庫時，紀錄會顯示在這裡</p>
               </div>
             ) : (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-gray-50 text-gray-500 font-medium">
                     <tr>
-                      <th className="px-6 py-3">日期</th>
+                      <th className="px-6 py-3">資料日期</th>
                       <th className="px-6 py-3">品項</th>
                       <th className="px-6 py-3">分類</th>
-                      <th className="px-6 py-3 text-right">變動前</th>
-                      <th className="px-6 py-3 text-right">變動後</th>
-                      <th className="px-6 py-3 text-right">變動量</th>
-                      <th className="px-6 py-3 text-right">來源</th>
+                      <th className="px-6 py-3 text-right">入庫數量</th>
+                      <th className="px-6 py-3 text-right">效期</th>
+                      <th className="px-6 py-3 text-right">入倉日期</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {restockLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-gray-50">
+                    {restockLogs.map((log, idx) => (
+                      <tr key={`${log.date}-${log.product_name}-${idx}`} className="hover:bg-gray-50">
                         <td className="px-6 py-4 text-gray-600 flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-gray-400" />
-                          {new Date(log.date).toLocaleDateString('zh-TW')}
+                          {log.date ? new Date(log.date).toLocaleDateString('zh-TW') : '-'}
                         </td>
-                        <td className="px-6 py-4 font-medium text-gray-800">{log.item_name}</td>
+                        <td className="px-6 py-4 font-medium text-gray-800">{log.product_name}</td>
                         <td className="px-6 py-4 text-gray-600">
                           <span className="bg-gray-100 px-2 py-1 rounded text-xs">
                             {log.category === 'bread' ? '麵包' : log.category === 'box' ? '紙箱' : '袋子'}
                           </span>
                         </td>
+                        <td className="px-6 py-4 text-right font-bold text-green-600">
+                          +{log.stock_in.toLocaleString()}
+                        </td>
                         <td className="px-6 py-4 text-right text-gray-500">
-                          {log.previous_stock.toLocaleString()}
+                          {log.expiry_date || '-'}
                         </td>
-                        <td className="px-6 py-4 text-right text-gray-800">
-                          {log.new_stock.toLocaleString()}
-                        </td>
-                        <td className={`px-6 py-4 text-right font-bold ${log.change_amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {log.change_amount >= 0 ? '+' : ''}{log.change_amount.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className="text-xs font-medium border px-2 py-1 rounded-full bg-blue-50 text-blue-600 border-blue-200">
-                            {log.source === 'email' ? '郵件同步' : log.source}
-                          </span>
+                        <td className="px-6 py-4 text-right text-gray-500">
+                          {log.warehouse_date || '-'}
                         </td>
                       </tr>
                     ))}

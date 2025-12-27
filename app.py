@@ -37,7 +37,8 @@ def index():
             "/api/inventory/sync": "Trigger inventory sync from email",
             "/api/inventory/backfill": "Backfill historical data",
             "/api/inventory/history": "Get historical snapshots (for trends)",
-            "/api/inventory/changes": "Get inventory changes (restock logs)",
+            "/api/inventory/changes": "Get inventory changes (detected changes)",
+            "/api/inventory/restock": "Get restock records (入庫紀錄)",
             "/api/inventory/raw-items": "Get raw Excel items (with batch details)",
             "/api/inventory/trend": "Get stock trend (庫存趨勢)",
             "/api/inventory/sales-trend": "Get sales trend based on stock_out (銷量趨勢)",
@@ -356,6 +357,44 @@ def get_inventory_trend():
             "success": True,
             "data": trend_data,
             "count": len(trend_data)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/inventory/restock", methods=["GET"])
+def get_restock_records():
+    """
+    Get restock records (入庫紀錄).
+
+    Query params:
+        days: Number of days to look back (default: 30)
+        category: Filter by category - 'bread', 'box', 'bag' (optional)
+
+    Returns:
+        JSON with restock records
+    """
+    try:
+        days = request.args.get("days", 30, type=int)
+        category = request.args.get("category")
+
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        restock_data = workflow.inventory_repo.get_restock_records(days=days, category=category)
+
+        return jsonify({
+            "success": True,
+            "data": restock_data,
+            "count": len(restock_data)
         }), 200
 
     except Exception as e:

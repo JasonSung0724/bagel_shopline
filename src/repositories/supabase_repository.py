@@ -579,3 +579,86 @@ class InventoryRepository(SupabaseRepository):
         except Exception as e:
             logger.error(f"Failed to get sales trend: {e}")
             return []
+
+    def get_restock_records(
+        self,
+        days: int = 30,
+        category: Optional[str] = None
+    ) -> List[Dict]:
+        """
+        Get restock records (入庫) from raw items.
+
+        Args:
+            days: Number of days to look back
+            category: Filter by category ('bread', 'box', 'bag') - optional
+
+        Returns:
+            List of restock records:
+            [
+                {
+                    "date": "2025-12-25",
+                    "product_name": "低糖原味貝果",
+                    "category": "bread",
+                    "stock_in": 500,
+                    "expiry_date": "2026-01-25",
+                    "warehouse_date": "2025-12-25"
+                },
+                ...
+            ]
+        """
+        if not self.is_connected:
+            return []
+
+        try:
+            from datetime import timedelta
+            start_date = datetime.now() - timedelta(days=days)
+
+            # Query raw items with stock_in > 0
+            query = self.client.table(self.TABLE_RAW_ITEMS) \
+                .select("product_name, stock_in, expiry_date, warehouse_date, snapshot_id, inventory_snapshots(snapshot_date)") \
+                .gt("stock_in", 0) \
+                .gte("created_at", start_date.isoformat())
+
+            result = query.order("created_at", desc=True).execute()
+
+            if not result.data:
+                return []
+
+            # Get category mapping from inventory_items
+            category_map = {}
+            items_result = self.client.table(self.TABLE_ITEMS) \
+                .select("name, category") \
+                .execute()
+            if items_result.data:
+                category_map = {item['name']: item['category'] for item in items_result.data}
+
+            # Transform data
+            records = []
+            for row in result.data:
+                name = row['product_name']
+                item_category = category_map.get(name, 'bread')
+
+                # Filter by category if specified
+                if category and item_category != category:
+                    continue
+
+                # Extract snapshot date
+                snapshot_info = row.get('inventory_snapshots')
+                date_str = None
+                if snapshot_info and snapshot_info.get('snapshot_date'):
+                    date_str = snapshot_info['snapshot_date'][:10]  # YYYY-MM-DD
+
+                records.append({
+                    'date': date_str or row.get('warehouse_date', ''),
+                    'product_name': name,
+                    'category': item_category,
+                    'stock_in': int(row.get('stock_in', 0)),
+                    'expiry_date': row.get('expiry_date'),
+                    'warehouse_date': row.get('warehouse_date'),
+                })
+
+            return records
+
+        except Exception as e:
+            logger.error(f"Failed to get restock records: {e}")
+            return []
