@@ -1,6 +1,6 @@
 services:
   # ===========================================
-  # Backend API (Flask)
+  # Backend API (Flask) - internal only, accessed via nginx
   # ===========================================
   api:
     build:
@@ -9,8 +9,7 @@ services:
     image: ${REGISTRY:-bagel}/api:${TAG:-latest}
     container_name: bagel-api
     restart: unless-stopped
-    ports:
-      - "8080:8080"
+    # No external port - accessed through nginx
     environment:
       - TZ=Asia/Taipei
       - PORT=8080
@@ -56,7 +55,7 @@ services:
       - bagel-network
 
   # ===========================================
-  # Frontend (Next.js)
+  # Frontend (Next.js) - internal only, accessed via nginx
   # ===========================================
   frontend:
     build:
@@ -65,12 +64,12 @@ services:
     image: ${REGISTRY:-bagel}/frontend:${TAG:-latest}
     container_name: bagel-frontend
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    # No external port - accessed through nginx
     environment:
       - TZ=Asia/Taipei
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=http://api:8080
+      # Empty string = use same origin (nginx proxy handles /api/*)
+      - NEXT_PUBLIC_API_URL=
     networks:
       - bagel-network
     depends_on:
@@ -103,25 +102,21 @@ services:
       - with-db
 
   # ===========================================
-  # Nginx Reverse Proxy
+  # Nginx Reverse Proxy (main entry point)
   # ===========================================
   nginx:
     image: nginx:alpine
     container_name: bagel-nginx
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "3000:3000"  # Only expose port 3000 (GCP firewall)
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
     networks:
       - bagel-network
     depends_on:
       - api
       - frontend
-    profiles:
-      - production
 
 networks:
   bagel-network:

@@ -27,8 +27,8 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 
-// API Base URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+// API Base URL - empty string means same origin (use Nginx proxy)
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 // Brand colors
 const BRAND_ORANGE = '#EB5C20';
