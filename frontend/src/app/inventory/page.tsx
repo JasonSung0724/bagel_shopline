@@ -320,6 +320,13 @@ export default function InventoryDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto-fetch trend data when switching to analysis tab
+  useEffect(() => {
+    if (activeTab === 'analysis' && trendData.length === 0) {
+      fetchTrendData('bread');
+    }
+  }, [activeTab, trendData.length, fetchTrendData]);
+
   // Refresh data from database (no sync from email)
   const handleRefresh = async () => {
     setSyncing(true);

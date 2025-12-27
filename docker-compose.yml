@@ -19,6 +19,8 @@ services:
       - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}
       - LINE_ACCESS_TOKEN=${LINE_ACCESS_TOKEN}
       - LINE_GROUP_ID=${LINE_GROUP_ID}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
     volumes:
       - ./logs:/app/logs
       # Note: src/config is baked into the image, no need to mount in production
@@ -48,6 +50,8 @@ services:
       - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}
       - LINE_ACCESS_TOKEN=${LINE_ACCESS_TOKEN}
       - LINE_GROUP_ID=${LINE_GROUP_ID}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
     volumes:
       - ./logs:/app/logs
       # Note: src/config is baked into the image, no need to mount in production
