@@ -173,16 +173,16 @@ export default function Home() {
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="max-w-4xl mx-auto">
-        <header className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-2">
-            <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
-              <FileSpreadsheet className="w-6 h-6 text-white" />
+        <header className="text-center mb-6 sm:mb-8">
+          <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
+              <FileSpreadsheet className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-800">
+            <h1 className="text-xl sm:text-3xl font-bold text-gray-800">
               減醣市集 訂單報告生成器
             </h1>
           </div>
-          <p className="text-gray-500">
+          <p className="text-sm sm:text-base text-gray-500">
             快速整合多平台訂單，一鍵生成出貨報告
           </p>
         </header>

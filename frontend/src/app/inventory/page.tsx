@@ -724,124 +724,144 @@ export default function InventoryDashboard() {
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
+          {/* Top row: Logo + Title + Refresh */}
+          <div className="flex justify-between items-center h-14 lg:h-16">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
               <Link
                 href="/"
-                className="flex items-center gap-2 text-gray-600 hover:text-[#EB5C20] transition-colors mr-4"
+                className="flex items-center gap-2 text-gray-600 hover:text-[#EB5C20] transition-colors flex-shrink-0"
               >
                 <ArrowLeft className="w-4 h-4" />
               </Link>
-              <div className="w-8 h-8 rounded bg-[#EB5C20] flex items-center justify-center text-white font-bold">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded bg-[#EB5C20] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                 CR
               </div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-                減醣市集{' '}
-                <span className="text-[#9FA0A0] font-normal text-sm ml-2">
-                  庫存管理儀表板
-                </span>
-                {snapshotInfo && (
-                  <span className="ml-2 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200">
-                    資料時間: {snapshotInfo.snapshotDate} {snapshotInfo.snapshotTime}
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base sm:text-xl font-bold text-gray-900 tracking-tight truncate">
+                  減醣市集{' '}
+                  <span className="hidden sm:inline text-[#9FA0A0] font-normal text-sm ml-2">
+                    庫存管理儀表板
                   </span>
-                )}
-                {snapshotInfo && snapshotInfo.lowStockCount > 0 && (
-                  <span className="ml-2 text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
-                    {snapshotInfo.lowStockCount} 項低庫存
-                  </span>
-                )}
-              </h1>
+                </h1>
+                {/* Mobile: show badges below title */}
+                <div className="flex items-center gap-1 mt-0.5 sm:hidden">
+                  {snapshotInfo && (
+                    <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full border border-blue-200">
+                      {snapshotInfo.snapshotDate}
+                    </span>
+                  )}
+                  {snapshotInfo && snapshotInfo.lowStockCount > 0 && (
+                    <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">
+                      {snapshotInfo.lowStockCount} 項低庫存
+                    </span>
+                  )}
+                </div>
+                {/* Desktop: show badges inline */}
+                <div className="hidden sm:inline-flex items-center gap-2 ml-2">
+                  {snapshotInfo && (
+                    <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-200">
+                      資料時間: {snapshotInfo.snapshotDate} {snapshotInfo.snapshotTime}
+                    </span>
+                  )}
+                  {snapshotInfo && snapshotInfo.lowStockCount > 0 && (
+                    <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
+                      {snapshotInfo.lowStockCount} 項低庫存
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              {/* Refresh Button */}
-              <button
-                onClick={handleRefresh}
-                disabled={syncing}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-                {syncing ? '載入中...' : '重新整理'}
-              </button>
+            {/* Refresh Button */}
+            <button
+              onClick={handleRefresh}
+              disabled={syncing}
+              className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex-shrink-0 ml-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{syncing ? '載入中...' : '重新整理'}</span>
+            </button>
+          </div>
 
-              {/* Tab Navigation */}
-              <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-                {[
-                  { id: 'diagnosis' as TabType, label: '庫存診斷', icon: AlertCircle },
-                  { id: 'order' as TabType, label: '叫貨建議', icon: FileText },
-                  { id: 'inventory' as TabType, label: '庫存總覽', icon: Package },
-                  { id: 'analysis' as TabType, label: '銷量分析', icon: TrendingUp },
-                  { id: 'restock' as TabType, label: '進貨紀錄', icon: ClipboardList },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`
-                      flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all
-                      ${
-                        activeTab === tab.id
-                          ? 'bg-white text-[#EB5C20] shadow-sm'
-                          : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
-                      }
-                    `}
-                  >
-                    <tab.icon className="w-4 h-4" />
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
+          {/* Tab Navigation - scrollable on mobile */}
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-2 sm:pb-0">
+            <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-max sm:w-auto">
+              {[
+                { id: 'diagnosis' as TabType, label: '庫存診斷', shortLabel: '診斷', icon: AlertCircle },
+                { id: 'order' as TabType, label: '叫貨建議', shortLabel: '叫貨', icon: FileText },
+                { id: 'inventory' as TabType, label: '庫存總覽', shortLabel: '總覽', icon: Package },
+                { id: 'analysis' as TabType, label: '銷量分析', shortLabel: '分析', icon: TrendingUp },
+                { id: 'restock' as TabType, label: '進貨紀錄', shortLabel: '進貨', icon: ClipboardList },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`
+                    flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md transition-all whitespace-nowrap
+                    ${
+                      activeTab === tab.id
+                        ? 'bg-white text-[#EB5C20] shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
+                    }
+                  `}
+                >
+                  <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="sm:hidden">{tab.shortLabel}</span>
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Top Diagnosis Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
-          {/* Diagnosis Summary Cards */}
-          <div className="md:col-span-2 bg-white p-5 rounded-xl shadow-sm border-l-4 border-red-500">
-            <div className="flex items-center justify-between">
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-2 sm:gap-4 mb-4 sm:mb-8">
+          {/* Diagnosis Summary Cards - compact on mobile */}
+          <div className="col-span-1 md:col-span-2 bg-white p-3 sm:p-5 rounded-xl shadow-sm border-l-4 border-red-500">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500 mb-1">急需補貨 (低於前置期)</p>
-                <div className="flex items-baseline gap-2">
-                  <h3 className="text-3xl font-bold text-red-600">{diagnosisSummary.criticalCount}</h3>
-                  <span className="text-sm text-gray-400">項商品</span>
+                <p className="text-[10px] sm:text-sm font-medium text-gray-500 mb-0.5 sm:mb-1">急需補貨</p>
+                <div className="flex items-baseline gap-1 sm:gap-2">
+                  <h3 className="text-xl sm:text-3xl font-bold text-red-600">{diagnosisSummary.criticalCount}</h3>
+                  <span className="text-[10px] sm:text-sm text-gray-400">項</span>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">庫存量已無法支撐到下次到貨，請盡快下單</p>
+                <p className="hidden sm:block text-xs text-gray-400 mt-1">庫存量已無法支撐到下次到貨</p>
               </div>
-              <div className="p-3 rounded-full bg-red-50">
+              <div className="hidden sm:block p-3 rounded-full bg-red-50">
                 <AlertTriangle className="w-8 h-8 text-red-500" />
               </div>
             </div>
           </div>
 
-          <div className="md:col-span-2 bg-white p-5 rounded-xl shadow-sm border-l-4 border-orange-400">
-            <div className="flex items-center justify-between">
+          <div className="col-span-1 md:col-span-2 bg-white p-3 sm:p-5 rounded-xl shadow-sm border-l-4 border-orange-400">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500 mb-1">庫存積壓 (高於30天銷量)</p>
-                <div className="flex items-baseline gap-2">
-                  <h3 className="text-3xl font-bold text-orange-500">{diagnosisSummary.overstockCount}</h3>
-                  <span className="text-sm text-gray-400">項商品</span>
+                <p className="text-[10px] sm:text-sm font-medium text-gray-500 mb-0.5 sm:mb-1">庫存積壓</p>
+                <div className="flex items-baseline gap-1 sm:gap-2">
+                  <h3 className="text-xl sm:text-3xl font-bold text-orange-500">{diagnosisSummary.overstockCount}</h3>
+                  <span className="text-[10px] sm:text-sm text-gray-400">項</span>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">高於正常水位，建議暫緩進貨或安排促銷</p>
+                <p className="hidden sm:block text-xs text-gray-400 mt-1">高於正常水位，建議暫緩進貨</p>
               </div>
-              <div className="p-3 rounded-full bg-orange-50">
+              <div className="hidden sm:block p-3 rounded-full bg-orange-50">
                 <Box className="w-8 h-8 text-orange-500" />
               </div>
             </div>
           </div>
 
-          <div className="md:col-span-2 bg-white p-5 rounded-xl shadow-sm border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
+          <div className="col-span-1 md:col-span-2 bg-white p-3 sm:p-5 rounded-xl shadow-sm border-l-4 border-green-500">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500 mb-1">水位健康</p>
-                <div className="flex items-baseline gap-2">
-                  <h3 className="text-3xl font-bold text-green-600">{diagnosisSummary.healthyCount}</h3>
-                  <span className="text-sm text-gray-400">項商品</span>
+                <p className="text-[10px] sm:text-sm font-medium text-gray-500 mb-0.5 sm:mb-1">水位健康</p>
+                <div className="flex items-baseline gap-1 sm:gap-2">
+                  <h3 className="text-xl sm:text-3xl font-bold text-green-600">{diagnosisSummary.healthyCount}</h3>
+                  <span className="text-[10px] sm:text-sm text-gray-400">項</span>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">庫存介於補貨點與正常水位之間</p>
+                <p className="hidden sm:block text-xs text-gray-400 mt-1">庫存介於補貨點與正常水位之間</p>
               </div>
-              <div className="p-3 rounded-full bg-green-50">
+              <div className="hidden sm:block p-3 rounded-full bg-green-50">
                 <CheckCircle2 className="w-8 h-8 text-green-500" />
               </div>
             </div>
@@ -849,59 +869,61 @@ export default function InventoryDashboard() {
         </div>
 
         {/* Secondary Stats - Original totals */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 flex items-center justify-between">
+        <div className="grid grid-cols-3 md:grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-8">
+          <div className="bg-gray-50 p-2 sm:p-4 rounded-lg border border-gray-200 flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-500">麵包總庫存</p>
-              <p className="text-xl font-bold text-gray-800">{totals.bread.toLocaleString()} <span className="text-sm font-normal text-gray-400">個</span></p>
+              <p className="text-[10px] sm:text-xs text-gray-500">麵包總庫存</p>
+              <p className="text-sm sm:text-xl font-bold text-gray-800">{totals.bread.toLocaleString()} <span className="text-[10px] sm:text-sm font-normal text-gray-400">個</span></p>
             </div>
-            <ShoppingBag className="w-6 h-6 text-[#EB5C20]" />
+            <ShoppingBag className="w-4 h-4 sm:w-6 sm:h-6 text-[#EB5C20]" />
           </div>
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 flex items-center justify-between">
+          <div className="bg-gray-50 p-2 sm:p-4 rounded-lg border border-gray-200 flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-500">紙箱總庫存</p>
-              <p className="text-xl font-bold text-gray-800">{totals.box.toLocaleString()} <span className="text-sm font-normal text-gray-400">個</span></p>
+              <p className="text-[10px] sm:text-xs text-gray-500">紙箱總庫存</p>
+              <p className="text-sm sm:text-xl font-bold text-gray-800">{totals.box.toLocaleString()} <span className="text-[10px] sm:text-sm font-normal text-gray-400">個</span></p>
             </div>
-            <Box className="w-6 h-6 text-gray-500" />
+            <Box className="w-4 h-4 sm:w-6 sm:h-6 text-gray-500" />
           </div>
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 flex items-center justify-between">
+          <div className="bg-gray-50 p-2 sm:p-4 rounded-lg border border-gray-200 flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-500">塑膠袋總庫存</p>
-              <p className="text-xl font-bold text-gray-800">{Number(totals.bag.toFixed(1)).toLocaleString()} <span className="text-sm font-normal text-gray-400">捲</span></p>
-              <p className="text-xs text-gray-400 mt-1">可包裝約 {diagnosisSummary.totalBagCapacity.toLocaleString()} 個</p>
+              <p className="text-[10px] sm:text-xs text-gray-500">塑膠袋總庫存</p>
+              <p className="text-sm sm:text-xl font-bold text-gray-800">{Number(totals.bag.toFixed(1)).toLocaleString()} <span className="text-[10px] sm:text-sm font-normal text-gray-400">捲</span></p>
+              <p className="hidden sm:block text-xs text-gray-400 mt-1">可包裝約 {diagnosisSummary.totalBagCapacity.toLocaleString()} 個</p>
             </div>
-            <Package className="w-6 h-6 text-blue-500" />
+            <Package className="w-4 h-4 sm:w-6 sm:h-6 text-blue-500" />
           </div>
         </div>
 
         {/* Tab Content: Diagnosis */}
         {activeTab === 'diagnosis' && (
-          <div className="space-y-8">
+          <div className="space-y-4 sm:space-y-8">
             {/* Search Filter */}
-            <div className="flex items-center gap-4 bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-              <Search className="text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="搜尋商品名稱..."
-                className="flex-1 outline-none text-gray-700 placeholder-gray-400"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span>低於{LEAD_TIME.bread}天(補貨點)</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span>正常</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400"></span>高於{TARGET_DAYS}天(積壓)</span>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-100">
+              <div className="flex items-center gap-2 flex-1">
+                <Search className="text-gray-400 w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                <input
+                  type="text"
+                  placeholder="搜尋商品名稱..."
+                  className="flex-1 outline-none text-sm sm:text-base text-gray-700 placeholder-gray-400"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-gray-500 overflow-x-auto">
+                <span className="flex items-center gap-1 whitespace-nowrap"><span className="w-2 h-2 rounded-full bg-red-500"></span>低於{LEAD_TIME.bread}天</span>
+                <span className="flex items-center gap-1 whitespace-nowrap"><span className="w-2 h-2 rounded-full bg-green-500"></span>正常</span>
+                <span className="flex items-center gap-1 whitespace-nowrap"><span className="w-2 h-2 rounded-full bg-orange-400"></span>高於{TARGET_DAYS}天</span>
               </div>
             </div>
 
             {/* Bread + Bag Paired Diagnosis */}
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                  <span className="w-1.5 h-6 bg-[#EB5C20] rounded-full"></span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 sm:mb-4">
+                <h2 className="text-base sm:text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <span className="w-1 sm:w-1.5 h-5 sm:h-6 bg-[#EB5C20] rounded-full"></span>
                   麵包庫存診斷 ({pairedBreadDiagnoses.length})
                 </h2>
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                <span className="text-[10px] sm:text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
                   麵包前置期: {LEAD_TIME.bread} 天 | 塑膠袋前置期: {LEAD_TIME.bag} 天
                 </span>
               </div>
@@ -1262,95 +1284,149 @@ export default function InventoryDashboard() {
 
         {/* Tab Content: Order Suggestions */}
         {activeTab === 'order' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold text-gray-800">
+              <h2 className="text-base sm:text-lg font-bold text-gray-800">
                 叫貨建議表 {orderSuggestions.length > 0 && `(${orderSuggestions.length} 項需要叫貨)`}
               </h2>
             </div>
 
             {orderSuggestions.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-                <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-4" />
-                <p className="text-gray-600 font-medium">目前沒有急需叫貨的商品</p>
-                <p className="text-sm text-gray-400 mt-1">所有商品庫存都在安全水位以上</p>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 sm:p-12 text-center">
+                <CheckCircle2 className="w-10 h-10 sm:w-12 sm:h-12 text-green-400 mx-auto mb-3 sm:mb-4" />
+                <p className="text-sm sm:text-base text-gray-600 font-medium">目前沒有急需叫貨的商品</p>
+                <p className="text-xs sm:text-sm text-gray-400 mt-1">所有商品庫存都在安全水位以上</p>
               </div>
             ) : (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-red-50 text-red-700 font-medium">
-                    <tr>
-                      <th className="px-6 py-4">商品名稱</th>
-                      <th className="px-6 py-4">分類</th>
-                      <th className="px-6 py-4 text-right">目前庫存</th>
-                      <th className="px-6 py-4 text-right">日銷量</th>
-                      <th className="px-6 py-4 text-right">可售天數</th>
-                      <th className="px-6 py-4 text-right">補貨點</th>
-                      <th className="px-6 py-4 text-right">建議叫貨量</th>
-                      <th className="px-6 py-4 text-center">緊急程度</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {orderSuggestions.map((item, idx) => (
-                      <tr key={item.name} className={`hover:bg-gray-50 ${idx < 3 ? 'bg-red-50/30' : ''}`}>
-                        <td className="px-6 py-4 font-medium text-gray-800">{item.name}</td>
-                        <td className="px-6 py-4 text-gray-600">
-                          <span className="bg-gray-100 px-2 py-1 rounded text-xs">
+              <>
+                {/* Mobile: Card layout */}
+                <div className="sm:hidden space-y-3">
+                  {orderSuggestions.map((item, idx) => (
+                    <div key={item.name} className={`bg-white rounded-lg shadow-sm border border-gray-100 p-3 ${idx < 3 ? 'border-l-4 border-l-red-500' : ''}`}>
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-gray-800 text-sm truncate">{item.name}</h3>
+                          <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
                             {item.category === 'bread' ? '麵包' : item.category === 'box' ? '紙箱' : '塑膠袋'}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 text-right text-gray-800">
-                          {item.current_stock.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 text-right text-gray-600">
-                          {item.category === 'bag' ? '-' : (item.daily_sales_30d ?? 0).toLocaleString()}
-                        </td>
-                        <td className={`px-6 py-4 text-right font-bold ${
-                          item.category === 'bag' ? 'text-gray-500' :
-                          (item.days_of_stock ?? 0) < 10 ? 'text-red-600' : 'text-orange-500'
-                        }`}>
-                          {item.category === 'bag' ? '-' : `${item.days_of_stock ?? 0} 天`}
-                        </td>
-                        <td className="px-6 py-4 text-right text-gray-500">
-                          {item.reorder_point.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 text-right font-bold text-[#EB5C20]">
-                          +{item.suggested_order.toLocaleString()} {item.unit}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          {item.category === 'bag' ? (
-                            // 塑膠袋：庫存 < 補貨點即為緊急
-                            item.current_stock < item.reorder_point ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
-                                <XCircle className="w-3 h-3" />
-                                緊急
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
-                                <AlertTriangle className="w-3 h-3" />
-                                注意
-                              </span>
-                            )
+                        </div>
+                        {item.category === 'bag' ? (
+                          item.current_stock < item.reorder_point ? (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-medium">
+                              <XCircle className="w-2.5 h-2.5" />緊急
+                            </span>
                           ) : (
-                            // 麵包/紙箱：使用可售天數判斷
-                            (item.days_of_stock ?? 0) < 10 ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
-                                <XCircle className="w-3 h-3" />
-                                緊急
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
-                                <AlertTriangle className="w-3 h-3" />
-                                注意
-                              </span>
-                            )
-                          )}
-                        </td>
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded-full text-[10px] font-medium">
+                              <AlertTriangle className="w-2.5 h-2.5" />注意
+                            </span>
+                          )
+                        ) : (
+                          (item.days_of_stock ?? 0) < 10 ? (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-medium">
+                              <XCircle className="w-2.5 h-2.5" />緊急
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded-full text-[10px] font-medium">
+                              <AlertTriangle className="w-2.5 h-2.5" />注意
+                            </span>
+                          )
+                        )}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <p className="text-gray-400 text-[10px]">目前庫存</p>
+                          <p className="font-medium text-gray-800">{item.current_stock.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400 text-[10px]">可售天數</p>
+                          <p className={`font-bold ${(item.days_of_stock ?? 0) < 10 ? 'text-red-600' : 'text-orange-500'}`}>
+                            {item.category === 'bag' ? '-' : `${item.days_of_stock ?? 0} 天`}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400 text-[10px]">建議叫貨</p>
+                          <p className="font-bold text-[#EB5C20]">+{item.suggested_order.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop: Table layout */}
+                <div className="hidden sm:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-red-50 text-red-700 font-medium">
+                      <tr>
+                        <th className="px-4 lg:px-6 py-3 lg:py-4">商品名稱</th>
+                        <th className="px-4 lg:px-6 py-3 lg:py-4">分類</th>
+                        <th className="px-4 lg:px-6 py-3 lg:py-4 text-right">目前庫存</th>
+                        <th className="px-4 lg:px-6 py-3 lg:py-4 text-right">日銷量</th>
+                        <th className="px-4 lg:px-6 py-3 lg:py-4 text-right">可售天數</th>
+                        <th className="px-4 lg:px-6 py-3 lg:py-4 text-right">補貨點</th>
+                        <th className="px-4 lg:px-6 py-3 lg:py-4 text-right">建議叫貨量</th>
+                        <th className="px-4 lg:px-6 py-3 lg:py-4 text-center">緊急程度</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {orderSuggestions.map((item, idx) => (
+                        <tr key={item.name} className={`hover:bg-gray-50 ${idx < 3 ? 'bg-red-50/30' : ''}`}>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 font-medium text-gray-800">{item.name}</td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-gray-600">
+                            <span className="bg-gray-100 px-2 py-1 rounded text-xs">
+                              {item.category === 'bread' ? '麵包' : item.category === 'box' ? '紙箱' : '塑膠袋'}
+                            </span>
+                          </td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-right text-gray-800">
+                            {item.current_stock.toLocaleString()}
+                          </td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-right text-gray-600">
+                            {item.category === 'bag' ? '-' : (item.daily_sales_30d ?? 0).toLocaleString()}
+                          </td>
+                          <td className={`px-4 lg:px-6 py-3 lg:py-4 text-right font-bold ${
+                            item.category === 'bag' ? 'text-gray-500' :
+                            (item.days_of_stock ?? 0) < 10 ? 'text-red-600' : 'text-orange-500'
+                          }`}>
+                            {item.category === 'bag' ? '-' : `${item.days_of_stock ?? 0} 天`}
+                          </td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-right text-gray-500">
+                            {item.reorder_point.toLocaleString()}
+                          </td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-right font-bold text-[#EB5C20]">
+                            +{item.suggested_order.toLocaleString()} {item.unit}
+                          </td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-center">
+                            {item.category === 'bag' ? (
+                              item.current_stock < item.reorder_point ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                                  <XCircle className="w-3 h-3" />
+                                  緊急
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  注意
+                                </span>
+                              )
+                            ) : (
+                              (item.days_of_stock ?? 0) < 10 ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                                  <XCircle className="w-3 h-3" />
+                                  緊急
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  注意
+                                </span>
+                              )
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
@@ -1508,20 +1584,20 @@ export default function InventoryDashboard() {
 
         {/* Tab Content: Analysis */}
         {activeTab === 'analysis' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Controls */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-              <div className="flex flex-wrap items-center gap-4">
+            <div className="bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-gray-100">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 sm:gap-4">
                 {/* Mode selector: Sales vs Stock */}
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">分析類型:</span>
+                  <span className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">分析類型:</span>
                   <div className="flex gap-1">
                     <button
                       onClick={() => {
                         setAnalysisMode('sales');
                         if (salesTrendData.length === 0) fetchSalesTrend('bread');
                       }}
-                      className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                      className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-lg transition-colors ${
                         analysisMode === 'sales'
                           ? 'bg-[#EB5C20] text-white'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -1534,7 +1610,7 @@ export default function InventoryDashboard() {
                         setAnalysisMode('stock');
                         if (trendData.length === 0) fetchTrendData('bread');
                       }}
-                      className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                      className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-lg transition-colors ${
                         analysisMode === 'stock'
                           ? 'bg-[#EB5C20] text-white'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -1547,19 +1623,19 @@ export default function InventoryDashboard() {
 
                 {/* Days selector */}
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">時間範圍:</span>
+                  <span className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">時間範圍:</span>
                   <div className="flex gap-1">
                     {[7, 14, 30].map((days) => (
                       <button
                         key={days}
                         onClick={() => setTrendDays(days)}
-                        className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                        className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-lg transition-colors ${
                           trendDays === days
                             ? 'bg-[#EB5C20] text-white'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >
-                        {days} 天
+                        {days}天
                       </button>
                     ))}
                   </div>
@@ -1569,13 +1645,13 @@ export default function InventoryDashboard() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={analysisMode === 'sales' ? selectAllSalesItems : selectAllTrendItems}
-                    className="px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                    className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
                   >
                     全選
                   </button>
                   <button
                     onClick={analysisMode === 'sales' ? deselectAllSalesItems : deselectAllTrendItems}
-                    className="px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                    className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
                   >
                     取消全選
                   </button>
@@ -1584,67 +1660,67 @@ export default function InventoryDashboard() {
                 {/* Refresh button */}
                 <button
                   onClick={() => analysisMode === 'sales' ? fetchSalesTrend('bread') : fetchTrendData('bread')}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                  className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                  <RefreshCw className="w-4 h-4" />
-                  重新整理
+                  <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline">重新整理</span>
                 </button>
               </div>
 
               {/* Selected count */}
-              <div className="mt-3 text-sm text-gray-500">
+              <div className="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-500">
                 已選擇: {analysisMode === 'sales' ? selectedSalesItems.size : selectedTrendItems.size} / {analysisMode === 'sales' ? salesTrendData.length : trendData.length} 項
               </div>
             </div>
 
             {/* Sales Trend Chart - Multi-line */}
             {analysisMode === 'sales' && (
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-bold text-gray-800">
+              <div className="bg-white p-3 sm:p-6 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 sm:mb-6">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <h3 className="text-sm sm:text-lg font-bold text-gray-800">
                       銷量趨勢圖 (出庫量)
                     </h3>
                     {focusedItem && (
                       <button
                         onClick={() => setFocusedItem(null)}
-                        className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+                        className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
                       >
                         清除聚焦
                       </button>
                     )}
                   </div>
-                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  <span className="text-[10px] sm:text-xs text-gray-500 bg-gray-100 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded self-start sm:self-auto">
                     近 {trendDays} 天資料
                   </span>
                 </div>
 
                 {analysisLoading ? (
-                  <div className="h-96 flex items-center justify-center text-gray-400">
+                  <div className="h-64 sm:h-96 flex items-center justify-center text-gray-400">
                     <div className="text-center">
-                      <Loader2 className="w-12 h-12 mx-auto mb-2 animate-spin text-[#EB5C20]" />
-                      <p>載入銷量資料中...</p>
+                      <Loader2 className="w-8 h-8 sm:w-12 sm:h-12 mx-auto mb-2 animate-spin text-[#EB5C20]" />
+                      <p className="text-sm sm:text-base">載入銷量資料中...</p>
                     </div>
                   </div>
                 ) : salesTrendData.length === 0 ? (
-                  <div className="h-96 flex items-center justify-center text-gray-400">
+                  <div className="h-64 sm:h-96 flex items-center justify-center text-gray-400">
                     <div className="text-center">
-                      <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p>無銷量資料</p>
+                      <TrendingUp className="w-8 h-8 sm:w-12 sm:h-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm sm:text-base">無銷量資料</p>
                     </div>
                   </div>
                 ) : selectedSalesItems.size === 0 ? (
-                  <div className="h-96 flex items-center justify-center text-gray-400">
+                  <div className="h-64 sm:h-96 flex items-center justify-center text-gray-400">
                     <div className="text-center">
-                      <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p>請在下方表格選擇要顯示的品項</p>
+                      <TrendingUp className="w-8 h-8 sm:w-12 sm:h-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm sm:text-base">請在下方表格選擇要顯示的品項</p>
                     </div>
                   </div>
                 ) : (
-                  <div className="h-96 w-full relative">
-                    {/* Focused item info panel */}
+                  <div className="h-64 sm:h-96 w-full relative">
+                    {/* Focused item info panel - hidden on mobile, shown on desktop */}
                     {focusedItem && (
-                      <div className="absolute top-2 right-2 bg-white p-3 rounded-lg shadow-lg border border-gray-200 z-10 min-w-[200px]">
+                      <div className="hidden sm:block absolute top-2 right-2 bg-white p-3 rounded-lg shadow-lg border border-gray-200 z-10 min-w-[200px]">
                         <div className="flex items-center gap-2">
                           <span
                             className="w-4 h-4 rounded-full flex-shrink-0"
@@ -2043,13 +2119,13 @@ export default function InventoryDashboard() {
 
         {/* Tab Content: Restock Log */}
         {activeTab === 'restock' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Filters */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-              <div className="flex flex-wrap items-end gap-4">
+            <div className="bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-gray-100">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 sm:gap-4">
                 {/* Product filter */}
-                <div className="flex-1 min-w-[200px]">
-                  <label className="block text-sm text-gray-600 mb-1">品項搜尋</label>
+                <div className="flex-1 min-w-0 sm:min-w-[200px]">
+                  <label className="block text-xs sm:text-sm text-gray-600 mb-1">品項搜尋</label>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
@@ -2062,26 +2138,29 @@ export default function InventoryDashboard() {
                   </div>
                 </div>
 
-                {/* Date from */}
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">起始日期</label>
-                  <input
-                    type="date"
-                    value={restockDateFrom}
-                    onChange={(e) => setRestockDateFrom(e.target.value)}
-                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#EB5C20] focus:border-transparent"
-                  />
-                </div>
+                {/* Date filters - inline on mobile */}
+                <div className="flex gap-2 sm:gap-4">
+                  {/* Date from */}
+                  <div className="flex-1 sm:flex-none">
+                    <label className="block text-xs sm:text-sm text-gray-600 mb-1">起始日期</label>
+                    <input
+                      type="date"
+                      value={restockDateFrom}
+                      onChange={(e) => setRestockDateFrom(e.target.value)}
+                      className="w-full sm:w-auto px-2 sm:px-3 py-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#EB5C20] focus:border-transparent"
+                    />
+                  </div>
 
-                {/* Date to */}
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">結束日期</label>
-                  <input
-                    type="date"
-                    value={restockDateTo}
-                    onChange={(e) => setRestockDateTo(e.target.value)}
-                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#EB5C20] focus:border-transparent"
-                  />
+                  {/* Date to */}
+                  <div className="flex-1 sm:flex-none">
+                    <label className="block text-xs sm:text-sm text-gray-600 mb-1">結束日期</label>
+                    <input
+                      type="date"
+                      value={restockDateTo}
+                      onChange={(e) => setRestockDateTo(e.target.value)}
+                      className="w-full sm:w-auto px-2 sm:px-3 py-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#EB5C20] focus:border-transparent"
+                    />
+                  </div>
                 </div>
 
                 {/* Clear filters */}
@@ -2092,7 +2171,7 @@ export default function InventoryDashboard() {
                       setRestockDateFrom('');
                       setRestockDateTo('');
                     }}
-                    className="px-3 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    className="px-3 py-2 text-xs sm:text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors self-end"
                   >
                     清除篩選
                   </button>
@@ -2101,18 +2180,15 @@ export default function InventoryDashboard() {
               </div>
 
               {/* Filter summary */}
-              <div className="mt-3 text-sm text-gray-500">
+              <div className="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-500">
                 {(() => {
                   const filteredLogs = restockLogs.filter(log => {
-                    // Product name filter
                     if (restockProductFilter && !log.product_name.toLowerCase().includes(restockProductFilter.toLowerCase())) {
                       return false;
                     }
-                    // Date from filter
                     if (restockDateFrom && log.date && log.date < restockDateFrom) {
                       return false;
                     }
-                    // Date to filter
                     if (restockDateTo && log.date && log.date > restockDateTo) {
                       return false;
                     }
@@ -2124,67 +2200,109 @@ export default function InventoryDashboard() {
             </div>
 
             {restockLogs.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-                <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">尚無入庫紀錄</p>
-                <p className="text-sm text-gray-400 mt-1">當有進貨入庫時，紀錄會顯示在這裡</p>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 sm:p-12 text-center">
+                <ClipboardList className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-3 sm:mb-4" />
+                <p className="text-sm sm:text-base text-gray-500">尚無入庫紀錄</p>
+                <p className="text-xs sm:text-sm text-gray-400 mt-1">當有進貨入庫時，紀錄會顯示在這裡</p>
               </div>
             ) : (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-gray-50 text-gray-500 font-medium">
-                    <tr>
-                      <th className="px-6 py-3">資料日期</th>
-                      <th className="px-6 py-3">品項</th>
-                      <th className="px-6 py-3">分類</th>
-                      <th className="px-6 py-3 text-right">入庫數量</th>
-                      <th className="px-6 py-3 text-right">效期</th>
-                      <th className="px-6 py-3 text-right">入倉日期</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {restockLogs
-                      .filter(log => {
-                        // Product name filter
-                        if (restockProductFilter && !log.product_name.toLowerCase().includes(restockProductFilter.toLowerCase())) {
-                          return false;
-                        }
-                        // Date from filter
-                        if (restockDateFrom && log.date && log.date < restockDateFrom) {
-                          return false;
-                        }
-                        // Date to filter
-                        if (restockDateTo && log.date && log.date > restockDateTo) {
-                          return false;
-                        }
-                        return true;
-                      })
-                      .map((log, idx) => (
-                      <tr key={`${log.date}-${log.product_name}-${idx}`} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-gray-600 flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-gray-400" />
-                          {log.date ? new Date(log.date).toLocaleDateString('zh-TW') : '-'}
-                        </td>
-                        <td className="px-6 py-4 font-medium text-gray-800">{log.product_name}</td>
-                        <td className="px-6 py-4 text-gray-600">
-                          <span className="bg-gray-100 px-2 py-1 rounded text-xs">
-                            {log.category === 'bread' ? '麵包' : log.category === 'box' ? '紙箱' : '袋子'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right font-bold text-green-600">
-                          +{log.stock_in.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 text-right text-gray-500">
-                          {log.expiry_date || '-'}
-                        </td>
-                        <td className="px-6 py-4 text-right text-gray-500">
-                          {log.warehouse_date || '-'}
-                        </td>
+              <>
+                {/* Mobile: Card layout */}
+                <div className="sm:hidden space-y-3">
+                  {restockLogs
+                    .filter(log => {
+                      if (restockProductFilter && !log.product_name.toLowerCase().includes(restockProductFilter.toLowerCase())) {
+                        return false;
+                      }
+                      if (restockDateFrom && log.date && log.date < restockDateFrom) {
+                        return false;
+                      }
+                      if (restockDateTo && log.date && log.date > restockDateTo) {
+                        return false;
+                      }
+                      return true;
+                    })
+                    .map((log, idx) => (
+                    <div key={`${log.date}-${log.product_name}-${idx}`} className="bg-white rounded-lg shadow-sm border border-gray-100 p-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-gray-800 text-sm truncate">{log.product_name}</h3>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                              {log.category === 'bread' ? '麵包' : log.category === 'box' ? '紙箱' : '袋子'}
+                            </span>
+                            <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {log.date ? new Date(log.date).toLocaleDateString('zh-TW') : '-'}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="font-bold text-green-600 text-sm">+{log.stock_in.toLocaleString()}</span>
+                      </div>
+                      <div className="flex gap-4 text-[10px] text-gray-400">
+                        <span>效期: {log.expiry_date || '-'}</span>
+                        <span>入倉: {log.warehouse_date || '-'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop: Table layout */}
+                <div className="hidden sm:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-50 text-gray-500 font-medium">
+                      <tr>
+                        <th className="px-4 lg:px-6 py-3">資料日期</th>
+                        <th className="px-4 lg:px-6 py-3">品項</th>
+                        <th className="px-4 lg:px-6 py-3">分類</th>
+                        <th className="px-4 lg:px-6 py-3 text-right">入庫數量</th>
+                        <th className="px-4 lg:px-6 py-3 text-right">效期</th>
+                        <th className="px-4 lg:px-6 py-3 text-right">入倉日期</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {restockLogs
+                        .filter(log => {
+                          if (restockProductFilter && !log.product_name.toLowerCase().includes(restockProductFilter.toLowerCase())) {
+                            return false;
+                          }
+                          if (restockDateFrom && log.date && log.date < restockDateFrom) {
+                            return false;
+                          }
+                          if (restockDateTo && log.date && log.date > restockDateTo) {
+                            return false;
+                          }
+                          return true;
+                        })
+                        .map((log, idx) => (
+                        <tr key={`${log.date}-${log.product_name}-${idx}`} className="hover:bg-gray-50">
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-gray-600">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-4 h-4 text-gray-400" />
+                              {log.date ? new Date(log.date).toLocaleDateString('zh-TW') : '-'}
+                            </div>
+                          </td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 font-medium text-gray-800">{log.product_name}</td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-gray-600">
+                            <span className="bg-gray-100 px-2 py-1 rounded text-xs">
+                              {log.category === 'bread' ? '麵包' : log.category === 'box' ? '紙箱' : '袋子'}
+                            </span>
+                          </td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-right font-bold text-green-600">
+                            +{log.stock_in.toLocaleString()}
+                          </td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-right text-gray-500">
+                            {log.expiry_date || '-'}
+                          </td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-right text-gray-500">
+                            {log.warehouse_date || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
 
             <div className="bg-[#FFF6F2] border border-[#ffdecb] rounded-lg p-4 flex items-start gap-3">

@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: '減醣市集 - 訂單報告生成器',
+  title: '減醣市集 庫存系統',
   description: '快速整合多平台訂單，一鍵生成出貨報告',
 }
 
