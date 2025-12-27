@@ -510,17 +510,50 @@ class InventoryRepository(SupabaseRepository):
 
         try:
             from datetime import timedelta
-            start_date = datetime.now() - timedelta(days=days)
+            start_date = (datetime.now() - timedelta(days=days)).date().isoformat()
 
-            # Query raw items with stock_out data
-            query = self.client.table(self.TABLE_RAW_ITEMS) \
-                .select("product_name, stock_out, snapshot_id, inventory_snapshots(snapshot_date)") \
-                .gte("created_at", start_date.isoformat())
+            # First, get snapshot IDs within the date range
+            snapshots_result = self.client.table(self.TABLE_SNAPSHOTS) \
+                .select("id, snapshot_date") \
+                .gte("snapshot_date", start_date) \
+                .execute()
 
-            result = query.order("created_at").execute()
-
-            if not result.data:
+            if not snapshots_result.data:
                 return []
+
+            # Create a map of snapshot_id -> date
+            snapshot_date_map = {
+                s['id']: s['snapshot_date'][:10]
+                for s in snapshots_result.data
+            }
+            snapshot_ids = list(snapshot_date_map.keys())
+
+            # Query raw items for these snapshots (with pagination to get all records)
+            all_raw_items = []
+            page_size = 1000
+            offset = 0
+
+            while True:
+                result = self.client.table(self.TABLE_RAW_ITEMS) \
+                    .select("product_name, stock_out, snapshot_id") \
+                    .in_("snapshot_id", snapshot_ids) \
+                    .range(offset, offset + page_size - 1) \
+                    .execute()
+
+                if not result.data:
+                    break
+
+                all_raw_items.extend(result.data)
+
+                if len(result.data) < page_size:
+                    break
+
+                offset += page_size
+
+            if not all_raw_items:
+                return []
+
+            result_data = all_raw_items
 
             # Get category mapping from inventory_items
             category_map = {}
@@ -542,7 +575,7 @@ class InventoryRepository(SupabaseRepository):
 
             # Group by product name and date, sum stock_out
             items_data: Dict[str, Dict] = {}
-            for row in result.data:
+            for row in result_data:
                 name = row['product_name']
 
                 # Filter by category if specified
@@ -556,10 +589,10 @@ class InventoryRepository(SupabaseRepository):
                         'data': {}  # Use dict to aggregate by date
                     }
 
-                # Extract snapshot date
-                snapshot_info = row.get('inventory_snapshots')
-                if snapshot_info and snapshot_info.get('snapshot_date'):
-                    date_str = snapshot_info['snapshot_date'][:10]  # YYYY-MM-DD
+                # Get date from snapshot_id
+                snapshot_id = row.get('snapshot_id')
+                date_str = snapshot_date_map.get(snapshot_id)
+                if date_str:
                     stock_out = row.get('stock_out', 0) or 0
 
                     # Aggregate stock_out by date (same product may have multiple batches)

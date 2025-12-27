@@ -349,7 +349,7 @@ export default function InventoryDashboard() {
   // Restock filters
   const [restockProductFilter, setRestockProductFilter] = useState<string>('');
   const [restockDateFrom, setRestockDateFrom] = useState<string>('');
-  const [restockDateTo, setRestockDateTo] = useState<string>('');
+  const [restockDateTo, setRestockDateTo] = useState<string>(new Date().toISOString().slice(0, 10));
 
   // Fetch inventory from API
   const fetchInventory = useCallback(async () => {
@@ -2098,14 +2098,6 @@ export default function InventoryDashboard() {
                   </button>
                 )}
 
-                {/* Refresh button */}
-                <button
-                  onClick={fetchRestockLogs}
-                  className="bg-[#EB5C20] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#d44c15] transition-colors flex items-center gap-2"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  重新整理
-                </button>
               </div>
 
               {/* Filter summary */}
@@ -2126,8 +2118,7 @@ export default function InventoryDashboard() {
                     }
                     return true;
                   });
-                  const totalStockIn = filteredLogs.reduce((sum, log) => sum + log.stock_in, 0);
-                  return `顯示 ${filteredLogs.length} 筆紀錄，共入庫 ${totalStockIn.toLocaleString()} 個`;
+                  return `顯示 ${filteredLogs.length} 筆紀錄`;
                 })()}
               </div>
             </div>

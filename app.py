@@ -494,8 +494,10 @@ def get_inventory_analysis():
         sales_data = workflow.inventory_repo.get_sales_trend(category, 30)
         stock_data = workflow.inventory_repo.get_items_trend(category, 30)
 
-        # Calculate date boundaries
+        # Use today as the reference date
         today = datetime.now().date()
+
+        # Calculate cutoff dates based on today
         date_7 = (today - timedelta(days=7)).isoformat()
         date_14 = (today - timedelta(days=14)).isoformat()
         date_30 = (today - timedelta(days=30)).isoformat()
