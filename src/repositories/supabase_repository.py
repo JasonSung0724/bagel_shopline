@@ -768,29 +768,45 @@ class InventoryRepository(SupabaseRepository):
             start_date_30d = datetime.now() - timedelta(days=30)
             start_date_20d = datetime.now() - timedelta(days=20)
 
-            raw_items_result = (
-                self.client.table(self.TABLE_RAW_ITEMS)
-                .select("product_name, stock_out, created_at, inventory_snapshots(snapshot_date)")
-                .gte("created_at", start_date_30d.isoformat())
-                .execute()
-            )
+            # Query raw items with pagination to get all records (Supabase default limit is 1000)
+            all_raw_items = []
+            page_size = 1000
+            offset = 0
+
+            while True:
+                raw_items_result = (
+                    self.client.table(self.TABLE_RAW_ITEMS)
+                    .select("product_name, stock_out, created_at")
+                    .gte("created_at", start_date_30d.isoformat())
+                    .range(offset, offset + page_size - 1)
+                    .execute()
+                )
+
+                if not raw_items_result.data:
+                    break
+
+                all_raw_items.extend(raw_items_result.data)
+
+                if len(raw_items_result.data) < page_size:
+                    break
+
+                offset += page_size
 
             # Calculate sales totals per product
             sales_30d: Dict[str, int] = {}
             sales_20d: Dict[str, int] = {}
 
-            if raw_items_result.data:
-                for row in raw_items_result.data:
-                    name = row["product_name"]
-                    stock_out = int(row.get("stock_out", 0) or 0)
-                    created_at = row.get("created_at", "")
+            for row in all_raw_items:
+                name = row["product_name"]
+                stock_out = int(row.get("stock_out", 0) or 0)
+                created_at = row.get("created_at", "")
 
-                    # Add to 30-day total
-                    sales_30d[name] = sales_30d.get(name, 0) + stock_out
+                # Add to 30-day total
+                sales_30d[name] = sales_30d.get(name, 0) + stock_out
 
-                    # Add to 20-day total if within range
-                    if created_at and created_at >= start_date_20d.isoformat():
-                        sales_20d[name] = sales_20d.get(name, 0) + stock_out
+                # Add to 20-day total if within range
+                if created_at and created_at >= start_date_20d.isoformat():
+                    sales_20d[name] = sales_20d.get(name, 0) + stock_out
 
             # 3. Get product mappings (bread to bag)
             mappings = self.get_product_mappings()
