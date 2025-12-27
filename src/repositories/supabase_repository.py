@@ -795,11 +795,14 @@ class InventoryRepository(SupabaseRepository):
             # Calculate sales totals per product
             sales_30d: Dict[str, int] = {}
             sales_20d: Dict[str, int] = {}
+            # Track latest day's stock_out per product (for 日銷 display)
+            latest_sales: Dict[str, Dict] = {}  # {product_name: {"date": date_str, "stock_out": int}}
 
             for row in all_raw_items:
                 name = row["product_name"]
                 stock_out = int(row.get("stock_out", 0) or 0)
                 created_at = row.get("created_at", "")
+                date_str = created_at[:10] if created_at else ""
 
                 # Add to 30-day total
                 sales_30d[name] = sales_30d.get(name, 0) + stock_out
@@ -807,6 +810,17 @@ class InventoryRepository(SupabaseRepository):
                 # Add to 20-day total if within range
                 if created_at and created_at >= start_date_20d.isoformat():
                     sales_20d[name] = sales_20d.get(name, 0) + stock_out
+
+                # Track latest day's stock_out (accumulate if same day)
+                if date_str:
+                    if name not in latest_sales:
+                        latest_sales[name] = {"date": date_str, "stock_out": stock_out}
+                    elif date_str > latest_sales[name]["date"]:
+                        # New latest date, reset
+                        latest_sales[name] = {"date": date_str, "stock_out": stock_out}
+                    elif date_str == latest_sales[name]["date"]:
+                        # Same day, accumulate stock_out
+                        latest_sales[name]["stock_out"] += stock_out
 
             # 3. Get product mappings (bread to bag)
             mappings = self.get_product_mappings()
@@ -821,7 +835,6 @@ class InventoryRepository(SupabaseRepository):
                 name = item["name"]
                 current_stock = int(item.get("available_stock", 0) or item.get("current_stock", 0))
                 unit = item.get("unit", "個")
-                lead_time = LEAD_TIME.get(category, 20)
 
                 # Sales calculations
                 total_30d = sales_30d.get(name, 0)
@@ -829,17 +842,20 @@ class InventoryRepository(SupabaseRepository):
                 daily_30d = round(total_30d / 30) if total_30d > 0 else 0
                 daily_20d = round(total_20d / 20) if total_20d > 0 else 0
 
-                # Use 30-day average for main calculations
-                daily_sales = daily_30d
+                # Get latest day's stock_out for 日銷 display
+                latest_daily = latest_sales.get(name, {}).get("stock_out", 0)
 
-                # Stock metrics
-                if daily_sales > 0:
-                    days_of_stock = round(current_stock / daily_sales, 1)
-                    reorder_point = daily_sales * lead_time
+                # Stock metrics using new formulas:
+                # 正常水位 = 最近30日銷量總和
+                # 補貨點 = 30日均銷量 × 20
+                # 可售天數 = 目前庫存 / 30日均銷量
+                if daily_30d > 0:
+                    days_of_stock = round(current_stock / daily_30d, 1)
+                    reorder_point = daily_30d * 20  # 30日均銷量 × 20
                     target_stock = total_30d  # 30日銷量總量作為正常水位
 
                     # Health status
-                    if days_of_stock < lead_time:
+                    if current_stock < reorder_point:
                         health_status = "critical"
                     elif current_stock > total_30d:
                         health_status = "overstock"
@@ -860,14 +876,14 @@ class InventoryRepository(SupabaseRepository):
                     "category": category,
                     "current_stock": current_stock,
                     "unit": unit,
-                    "lead_time": lead_time,
-                    "daily_sales_30d": daily_30d,
+                    "daily_sales": latest_daily,  # 日銷：最新一天的出庫量
+                    "daily_sales_30d": daily_30d,  # 30日均銷量
                     "daily_sales_20d": daily_20d,
                     "total_sales_30d": total_30d,
                     "total_sales_20d": total_20d,
-                    "days_of_stock": days_of_stock,
-                    "reorder_point": round(reorder_point),
-                    "target_stock": round(target_stock),
+                    "days_of_stock": days_of_stock,  # 可售天數 = 目前庫存 / 30日均銷量
+                    "reorder_point": round(reorder_point),  # 補貨點 = 30日均銷量 × 20
+                    "target_stock": round(target_stock),  # 正常水位 = 30日銷量總和
                     "health_status": health_status,
                     "suggested_order": round(suggested_order),
                 }

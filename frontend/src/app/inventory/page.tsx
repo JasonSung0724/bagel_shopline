@@ -60,9 +60,10 @@ interface ItemDiagnosis {
   category: 'bread' | 'box' | 'bag';
   current_stock: number;
   unit: string;
-  lead_time: number;
-  daily_sales_30d?: number;  // 塑膠袋不需要
-  daily_sales_20d?: number;  // 塑膠袋不需要
+  lead_time?: number;
+  daily_sales?: number;       // 日銷：最新一天的出庫量
+  daily_sales_30d?: number;   // 30日均銷量
+  daily_sales_20d?: number;   // 塑膠袋不需要
   total_sales_30d?: number;  // 塑膠袋不需要
   total_sales_20d?: number;  // 塑膠袋不需要
   days_of_stock?: number;    // 塑膠袋不需要
@@ -981,7 +982,7 @@ export default function InventoryDashboard() {
                           </span>
                         </div>
                         <p className="text-xs text-gray-500 mb-2">
-                          日銷: {(bread.daily_sales_30d ?? 0).toLocaleString()} | 30日銷量: {(bread.total_sales_30d ?? 0).toLocaleString()}
+                          日銷: {(bread.daily_sales ?? 0).toLocaleString()} | 30日銷量: {(bread.total_sales_30d ?? 0).toLocaleString()}
                         </p>
                         <div className="flex items-baseline gap-2 mb-2">
                           <span className="text-2xl font-bold text-gray-800">{bread.current_stock.toLocaleString()}</span>
@@ -1132,7 +1133,7 @@ export default function InventoryDashboard() {
                         </div>
 
                         <p className="text-sm text-gray-500 mb-4">
-                          日銷: {(item.daily_sales_30d ?? 0).toLocaleString()} 個 | 30日銷量: {(item.total_sales_30d ?? 0).toLocaleString()} | 可售天數: <span className={`font-medium ${
+                          日銷: {(item.daily_sales ?? 0).toLocaleString()} 個 | 30日銷量: {(item.total_sales_30d ?? 0).toLocaleString()} | 可售天數: <span className={`font-medium ${
                             (item.days_of_stock ?? 0) < LEAD_TIME.box ? 'text-red-600' :
                             (item.days_of_stock ?? 0) > TARGET_DAYS ? 'text-orange-500' : 'text-green-600'
                           }`}>{item.days_of_stock ?? 0} 天</span>
@@ -1380,7 +1381,7 @@ export default function InventoryDashboard() {
                             {item.current_stock.toLocaleString()}
                           </td>
                           <td className="px-4 lg:px-6 py-3 lg:py-4 text-right text-gray-600">
-                            {item.category === 'bag' ? '-' : (item.daily_sales_30d ?? 0).toLocaleString()}
+                            {item.category === 'bag' ? '-' : (item.daily_sales ?? 0).toLocaleString()}
                           </td>
                           <td className={`px-4 lg:px-6 py-3 lg:py-4 text-right font-bold ${
                             item.category === 'bag' ? 'text-gray-500' :
