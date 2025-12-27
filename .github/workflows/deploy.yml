@@ -182,6 +182,8 @@ jobs:
           GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}
           LINE_ACCESS_TOKEN=${{ secrets.LINE_ACCESS_TOKEN }}
           LINE_GROUP_ID=${{ secrets.LINE_GROUP_ID }}
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}
           EOF
           "
 
