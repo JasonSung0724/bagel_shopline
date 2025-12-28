@@ -9,6 +9,7 @@ google-cloud-sdk/
 *.pyc
 test.py
 bagel_shopline.code-workspace
+report/
 
 # Environment variables (sensitive)
 .env
@@ -43,3 +44,4 @@ frontend/.vercel/
 
 # Google service account (keep tracked but be careful)
 # src/config/*.json
+report
