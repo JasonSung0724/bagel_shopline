@@ -1,5 +1,6 @@
 xlrd==2.0.1
 pandas
+openpyxl
 requests
 bs4
 loguru
