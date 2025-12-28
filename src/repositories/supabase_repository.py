@@ -1232,3 +1232,188 @@ class InventoryRepository(SupabaseRepository):
         except Exception as e:
             logger.error(f"Failed to auto-sync master data: {e}")
             return {"breads": 0, "bags": 0, "boxes": 0}
+
+    def get_product_codes_map(self) -> Dict[str, Dict]:
+        """
+        Get all product codes from product_codes table.
+
+        Returns:
+            Dict mapping code to info:
+            {
+                "bagel101": {"code": "bagel101", "name": "Basic Bagel", "qty": 14},
+                ...
+            }
+        """
+        if not self.is_connected:
+            return {}
+
+        try:
+            # Query all product codes (limit 1000 for now, implementation plan assumes simplified logic)
+            result = self.client.table("product_codes").select("*").execute()
+            
+            if not result.data:
+                return {}
+
+            return {item["code"]: item for item in result.data}
+
+        except Exception as e:
+            logger.error(f"Failed to get product codes map: {e}")
+            return {}
+
+    def get_product_alias_map(self) -> Dict[str, str]:
+        """
+        Get all product aliases from product_aliases table.
+
+        Returns:
+            Dict mapping alias to product_code:
+            {
+                "減醣貝果14天體驗組": "bagel101-14day",
+                ...
+            }
+        """
+        if not self.is_connected:
+            return {}
+
+        try:
+            # Query all aliases
+            # Note: If there are many aliases (>1000), need pagination. 
+            # For now assuming <1000 for simplicity as per current config size.
+            result = self.client.table("product_aliases").select("alias, product_code").execute()
+
+            if not result.data:
+                return {}
+
+            return {item["alias"]: item["product_code"] for item in result.data}
+
+        except Exception as e:
+            logger.error(f"Failed to get product alias map: {e}")
+            return {}
+
+    # =========================================================================
+    # Product Management Methods
+    # =========================================================================
+
+    def get_all_products_detailed(self) -> List[Dict]:
+        """
+        Get all products with aliases.
+        """
+        if not self.is_connected:
+            return []
+
+        try:
+            # Fetch products
+            products_res = self.client.table("product_codes").select("*").execute()
+            products = products_res.data if products_res.data else []
+            
+            # Fetch aliases
+            aliases_res = self.client.table("product_aliases").select("*").execute()
+            aliases = aliases_res.data if aliases_res.data else []
+
+            # Group aliases by product_code
+            alias_map: Dict[str, List[Dict]] = {}
+            for alias in aliases:
+                p_code = alias["product_code"]
+                if p_code not in alias_map:
+                    alias_map[p_code] = []
+                alias_map[p_code].append(alias)
+
+            # Combine
+            result = []
+            for p in products:
+                p["aliases"] = alias_map.get(p["code"], [])
+                result.append(p)
+            
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to get detailed products: {e}")
+            return []
+
+    def create_product(self, code: str, name: str, qty: int) -> Dict:
+        try:
+            data = {"code": code, "name": name, "qty": qty}
+            res = self.client.table("product_codes").insert(data).execute()
+            return res.data[0] if res.data else None
+        except Exception as e:
+            logger.error(f"Failed to create product: {e}")
+            raise e
+
+    def update_product_qty(self, code: str, qty: int) -> Dict:
+        try:
+            res = self.client.table("product_codes").update({"qty": qty}).eq("code", code).execute()
+            return res.data[0] if res.data else None
+        except Exception as e:
+            logger.error(f"Failed to update product qty: {e}")
+            raise e
+
+    def delete_product(self, code: str) -> bool:
+        try:
+            # Casacde delete aliases first? Supabase usually handles cascade if configured,
+            # but manually deleting is safer if not sure about schema FK cleanup.
+            self.client.table("product_aliases").delete().eq("product_code", code).execute()
+            self.client.table("product_codes").delete().eq("code", code).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete product: {e}")
+            return False
+
+    def add_product_alias(self, product_code: str, alias: str) -> Dict:
+        try:
+            data = {"product_code": product_code, "alias": alias}
+            res = self.client.table("product_aliases").insert(data).execute()
+            return res.data[0] if res.data else None
+        except Exception as e:
+            logger.error(f"Failed to add alias: {e}")
+            raise e
+
+    def delete_product_alias(self, alias_id: int) -> bool:
+        try:
+            self.client.table("product_aliases").delete().eq("id", alias_id).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete alias: {e}")
+            return False
+
+    # =========================================================================
+    # Platform Config Methods
+    # =========================================================================
+
+    def get_all_platform_configs(self) -> Dict[str, Dict]:
+        """
+        Get all platform column mappings.
+        Returns: { 'shopline': {...}, 'mixx': {...} }
+        """
+        if not self.is_connected:
+            return {}
+
+        try:
+            res = self.client.table("platform_configs").select("*").execute()
+            data = res.data if res.data else []
+            
+            result = {}
+            for row in data:
+                result[row["platform"]] = row["mapping"]
+            return result
+        except Exception as e:
+            logger.error(f"Failed to get platform configs: {e}")
+            return {}
+
+    def update_platform_config(self, platform: str, mapping: Dict) -> bool:
+        """
+        Update column mapping for a specific platform.
+        """
+        if not self.is_connected:
+            return False
+
+        try:
+            data = {
+                "platform": platform,
+                "mapping": mapping,
+                "updated_at": "now()"
+            }
+            # Upsert
+            self.client.table("platform_configs").upsert(data).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update platform config: {e}")
+            return False

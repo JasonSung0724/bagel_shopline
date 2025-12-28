@@ -7,12 +7,14 @@ Order processing is handled by scheduled workers (main_scripts.py, sub_scripts.p
 import os
 import hashlib
 import secrets
-from flask import Flask, jsonify, request, session
+from flask import Flask, jsonify, request, make_response, send_file, session
 from flask_cors import CORS
 
 from src.utils.logger import setup_logger
 from src.orchestrator.inventory_workflow import InventoryWorkflow
 from src.services.inventory_service import InventoryService
+from src.services.product_config_service import ProductConfigService
+from src.services.platform_config_service import PlatformConfigService
 
 # Setup logging
 setup_logger(log_file="logs/flask.log")
@@ -100,6 +102,41 @@ def verify_password():
 # ===========================================
 # Inventory API Endpoints
 # ===========================================
+
+@app.route("/api/inventory/init", methods=["GET"])
+def get_inventory_init():
+    """
+    Get all initial data needed for inventory dashboard in ONE request.
+    Combines inventory snapshot + diagnosis data for faster loading.
+
+    Returns:
+        JSON with both inventory and diagnosis data
+    """
+    try:
+        workflow = InventoryWorkflow()
+
+        # Get basic inventory data
+        inventory_data = workflow.get_latest_inventory()
+
+        # Get diagnosis data (includes all calculations)
+        diagnosis_data = None
+        if workflow.inventory_repo.is_connected:
+            diagnosis_data = workflow.inventory_repo.get_inventory_diagnosis()
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "inventory": inventory_data,
+                "diagnosis": diagnosis_data
+            }
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 
 @app.route("/api/inventory", methods=["GET"])
 def get_inventory():
@@ -772,6 +809,136 @@ def delete_product_mapping():
         }), 500
 
 
+@app.route("/api/report/generate", methods=["POST"])
+def generate_report():
+    """
+    Generate Excel report from uploaded file.
+    
+    Form-data:
+        file: Excel file
+        platform: Platform name (shopline, mixx, c2c, aoshi)
+    
+    Returns:
+        Excel file download or JSON error
+    """
+    try:
+        from flask import send_file
+        from src.services.report_service import ReportService
+        
+        if 'file' not in request.files:
+            return jsonify({"success": False, "error": "No file uploaded"}), 400
+            
+        file = request.files['file']
+        platform = request.form.get('platform')
+        
+        if not file.filename:
+            return jsonify({"success": False, "error": "No file selected"}), 400
+            
+        if not platform:
+            return jsonify({"success": False, "error": "Platform not specified"}), 400
+
+        service = ReportService()
+        
+        # Read file into bytes
+        file_content = file.read()
+        
+        # Generate report
+        output_buffer, summary = service.generate_report(file_content, file.filename, platform)
+        
+        # If we want to return JSON summary + File, it's tricky in one response.
+        # Usually we just return the file with headers. 
+        # Or we can return JSON if 'preview'=true, but here we want download.
+        # Format filename
+        input_name = file.filename.rsplit('.', 1)[0]
+        output_filename = f"{input_name}_output.xlsx"
+        
+        response = make_response(output_buffer.getvalue())
+        response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        from urllib.parse import quote
+        encoded_filename = quote(output_filename)
+        response.headers['Content-Disposition'] = f"attachment; filename*=UTF-8''{encoded_filename}"
+        
+        # Add custom headers for frontend stats
+        response.headers['X-Report-Total-Orders'] = str(summary['total_orders'])
+        response.headers['X-Report-Row-Count'] = str(summary['total_rows'])
+        response.headers['X-Report-Platform'] = summary['platform']
+        # For simple error count, we can pass it too
+        response.headers['X-Report-Error-Count'] = str(len(summary['errors']))
+        
+        return response
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+
+
+# ===========================================
+# Product Management Endpoints
+# ===========================================
+
+@app.route("/api/products", methods=["GET"])
+def get_products():
+    try:
+        svc = ProductConfigService()
+        return jsonify(svc.get_all_products()), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/products", methods=["POST"])
+def create_product():
+    try:
+        data = request.json
+        svc = ProductConfigService()
+        res = svc.create_product(data["code"], data.get("name", data["code"]), int(data.get("qty", 1)))
+        return jsonify(res), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/products/<code_id>", methods=["PUT"])
+def update_product(code_id):
+    try:
+        data = request.json
+        svc = ProductConfigService()
+        res = svc.update_product_qty(code_id, int(data["qty"]))
+        return jsonify(res), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/products/<code_id>", methods=["DELETE"])
+def delete_product(code_id):
+    try:
+        svc = ProductConfigService()
+        res = svc.delete_product(code_id)
+        return jsonify({"success": res}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/aliases", methods=["POST"])
+def add_alias():
+    try:
+        data = request.json
+        svc = ProductConfigService()
+        res = svc.add_alias(data["product_code"], data["alias"])
+        return jsonify(res), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/aliases/<int:alias_id>", methods=["DELETE"])
+def delete_alias(alias_id):
+    try:
+        svc = ProductConfigService()
+        res = svc.delete_alias(alias_id)
+        return jsonify({"success": res}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ===========================================
 # Master Data API Endpoints
 # ===========================================
@@ -885,6 +1052,62 @@ def get_master_boxes():
         }), 500
 
 
+
+# ===========================================
+# System Settings API (Platform Configs)
+# ===========================================
+
+@app.route("/api/settings/mappings", methods=["GET"])
+def get_platform_mappings():
+    """
+    Get all platform column mappings.
+    Returns: { "shopline": {...}, "mixx": {...} }
+    """
+    try:
+        service = PlatformConfigService()
+        mappings = service.get_all_mappings()
+        return jsonify({
+            "success": True,
+            "data": mappings
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route("/api/settings/mappings", methods=["POST"])
+def update_platform_mapping():
+    """
+    Update column mapping for a specific platform.
+    Body: { "platform": "shopline", "mapping": {...} }
+    """
+    try:
+        data = request.get_json()
+        platform = data.get("platform")
+        mapping = data.get("mapping")
+
+        if not platform or not mapping:
+            return jsonify({
+                "success": False,
+                "error": "Platform and mapping are required"
+            }), 400
+
+        service = PlatformConfigService()
+        success = service.update_mapping(platform, mapping)
+
+        if success:
+            return jsonify({"success": True, "message": "Settings updated"}), 200
+        else:
+            return jsonify({"success": False, "error": "Failed to update settings"}), 500
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=True)

@@ -1,20 +1,14 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { FileSpreadsheet, Loader2 } from 'lucide-react';
+import { FileSpreadsheet, Loader2, Settings } from 'lucide-react';
 import FileUploader from '@/components/FileUploader';
 import PlatformSelector from '@/components/PlatformSelector';
 import DataPreview from '@/components/DataPreview';
-import ConfigEditor from '@/components/ConfigEditor';
 import ProcessingResult from '@/components/ProcessingResult';
-import { useConfig } from '@/lib/hooks/useConfig';
+import SystemSettings from '@/components/SystemSettings';
 import { Platform, RawOrderData, ProcessingError } from '@/lib/types/order';
-import { readExcelFile, validateColumns, sortByOrderId, detectPlatform, getPlatformDisplayName, PlatformDetectionResult } from '@/lib/excel/ExcelReader';
-import { fieldConfig } from '@/config/fieldConfig';
-import { generateAndDownloadReport } from '@/lib/excel/ExcelWriter';
-import { createAdapter } from '@/lib/adapters';
-import { UnifiedOrderProcessor } from '@/lib/processors/UnifiedOrderProcessor';
-import { extractStoreNames, fetchStoreAddresses } from '@/lib/api/storeAddress';
+import { readExcelFile, detectPlatform, getPlatformDisplayName, PlatformDetectionResult } from '@/lib/excel/ExcelReader';
 
 export default function Home() {
   const [platform, setPlatform] = useState<Platform>('shopline');
@@ -24,6 +18,7 @@ export default function Home() {
   const [rawData, setRawData] = useState<RawOrderData[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [outputFileName, setOutputFileName] = useState('');
+  const [showConfig, setShowConfig] = useState(false);
   const [processingResult, setProcessingResult] = useState<{
     originalCount: number;
     finalCount: number;
@@ -49,16 +44,6 @@ export default function Home() {
       resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [processingResult]);
-
-  const {
-    productConfig,
-    isLoaded,
-    updateProduct,
-    deleteProduct,
-    resetConfig,
-    importConfig,
-    exportConfig,
-  } = useConfig();
 
   const handleFileSelect = useCallback(async (file: File) => {
     setSelectedFile(file);
@@ -100,67 +85,64 @@ export default function Home() {
   }, []);
 
   const handleProcess = useCallback(async () => {
-    if (rawData.length === 0) return;
+    if (!selectedFile) return;
 
     setIsProcessing(true);
     setError(null);
 
     try {
-      const validation = validateColumns(rawData, platform);
-      if (!validation.isValid) {
-        setError(`欄位驗證失敗。缺少必要欄位: ${validation.missingRequired.join(', ')}`);
-        setIsProcessing(false);
-        return;
-      }
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('platform', platform);
 
-      // 如果有缺少的可選欄位，只在 console 顯示警告
-      if (validation.missingOptional.length > 0) {
-        console.log(`注意: 缺少可選欄位: ${validation.missingOptional.join(', ')}`);
-      }
-
-      const sortedData = sortByOrderId(rawData, platform);
-
-      // SHOPLINE 需要查詢便利商店地址
-      let storeAddress = undefined;
-      if (platform === 'shopline') {
-        const { sevenStores, familyStores } = extractStoreNames(sortedData);
-        if (sevenStores.length > 0 || familyStores.length > 0) {
-          console.log(`查詢便利商店地址: 7-11 ${sevenStores.length} 間, 全家 ${familyStores.length} 間`);
-          storeAddress = await fetchStoreAddresses(sevenStores, familyStores);
-        }
-      }
-
-      // 新架構：Adapter 轉換 → UnifiedProcessor 處理
-      const adapter = createAdapter(platform, productConfig);
-      const { items, errors: adapterErrors } = adapter.convert(sortedData, storeAddress);
-
-      const processor = new UnifiedOrderProcessor(productConfig);
-      const rows = processor.process(items);
-      const processorErrors = processor.getErrors();
-
-      const errors = [...adapterErrors, ...processorErrors];
-
-      const orderIdField = fieldConfig[platform].order_id;
-      const uniqueOrderCount = new Set(sortedData.map(r => String(r[orderIdField]))).size;
-
-      console.log(`最終筆數: ${rows.length}\n`);
-      console.log(`總訂單數: ${uniqueOrderCount}\n`);
-
-      setProcessingResult({
-        originalCount: rawData.length,
-        finalCount: rows.length,
-        uniqueOrderCount,
-        errors,
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/report/generate`, {
+        method: 'POST',
+        body: formData,
       });
 
-      await generateAndDownloadReport(rows, outputFileName);
-    } catch (err) {
-      setError('處理過程發生錯誤');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || '處理失敗');
+      }
+
+      // 處理檔案下載
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safeFileName = outputFileName || `${selectedFile.name.replace(/\.(xlsx|xls)$/, '')}_output.xlsx`;
+      a.download = safeFileName.endsWith('.xlsx') ? safeFileName : `${safeFileName}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      // Read stats from headers
+      const totalOrders = parseInt(response.headers.get('X-Report-Total-Orders') || '0');
+      const totalRows = parseInt(response.headers.get('X-Report-Row-Count') || '0');
+      const errorCount = parseInt(response.headers.get('X-Report-Error-Count') || '0');
+
+      setProcessingResult({
+        originalCount: totalOrders,
+        finalCount: totalRows,
+        uniqueOrderCount: totalOrders,
+        errors: errorCount > 0 ? [{
+          orderId: "SYSTEM",
+          field: "General",
+          message: `共有 ${errorCount} 筆錯誤/警告，請檢查 Excel 或後端 Logs`,
+          severity: 'error'
+        }] : [],
+      });
+
+    } catch (err: any) {
+      setError(err.message || '處理過程發生錯誤');
       console.error(err);
     } finally {
       setIsProcessing(false);
     }
-  }, [rawData, platform, outputFileName, productConfig]);
+  }, [selectedFile, platform, outputFileName]);
+
+  const isLoaded = true; // No longer loading config
 
   if (!isLoaded) {
     return (
@@ -173,7 +155,18 @@ export default function Home() {
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="max-w-4xl mx-auto">
-        <header className="text-center mb-6 sm:mb-8">
+        <header className="relative text-center mb-6 sm:mb-8">
+          <div className="absolute right-0 top-0">
+            <button
+              onClick={() => setShowConfig(!showConfig)}
+              className={`p-2 rounded-full transition-colors flex items-center gap-2 text-sm font-medium ${showConfig ? 'bg-green-100 text-green-700' : 'text-gray-400 hover:bg-gray-100'
+                }`}
+              title={showConfig ? "返回報表生成" : "管理產品資料庫"}
+            >
+              <Settings className="w-5 h-5" />
+              <span className="hidden sm:inline">{showConfig ? '隱藏設定' : '產品設定'}</span>
+            </button>
+          </div>
           <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2">
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
               <FileSpreadsheet className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
@@ -187,137 +180,134 @@ export default function Home() {
           </p>
         </header>
 
-        <div className="space-y-6">
-          <section className="card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">
-                1. 選擇電商平台
-              </h2>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-sm text-gray-600">自動識別</span>
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={autoDetectEnabled}
-                    onChange={(e) => setAutoDetectEnabled(e.target.checked)}
-                    className="sr-only"
-                  />
-                  <div className={`w-10 h-5 rounded-full transition-colors ${autoDetectEnabled ? 'bg-green-500' : 'bg-gray-300'}`}>
-                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${autoDetectEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                  </div>
-                </div>
-              </label>
-            </div>
 
-            {/* 自動識別結果提示 */}
-            {detectionResult && autoDetectEnabled && (
-              <div className={`mb-4 p-3 rounded-lg border ${
-                detectionResult.detected
+        {showConfig ? (
+          <SystemSettings onClose={() => setShowConfig(false)} />
+        ) : (
+          <div className="space-y-6">
+            <section className="card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-800">
+                  1. 選擇電商平台
+                </h2>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-sm text-gray-600">自動識別</span>
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={autoDetectEnabled}
+                      onChange={(e) => setAutoDetectEnabled(e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div className={`w-10 h-5 rounded-full transition-colors ${autoDetectEnabled ? 'bg-green-500' : 'bg-gray-300'}`}>
+                      <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${autoDetectEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              {/* 自動識別結果提示 */}
+              {detectionResult && autoDetectEnabled && (
+                <div className={`mb-4 p-3 rounded-lg border ${detectionResult.detected
                   ? 'bg-green-50 border-green-200'
                   : 'bg-yellow-50 border-yellow-200'
-              }`}>
-                {detectionResult.detected ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-600 text-sm">✓ 自動識別為</span>
-                    <span className="font-semibold text-green-700">
-                      {getPlatformDisplayName(detectionResult.detected)}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-yellow-600 text-sm">⚠ 無法完全識別，已選擇最接近的平台:</span>
-                    <span className="font-semibold text-yellow-700">
-                      {getPlatformDisplayName(detectionResult.allPlatformScores[0]?.platform)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <PlatformSelector selected={platform} onChange={setPlatform} />
-          </section>
-
-          <section className="card p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">
-              2. 上傳訂單檔案
-            </h2>
-            <FileUploader
-              onFileSelect={handleFileSelect}
-              selectedFile={selectedFile}
-              onClear={handleClear}
-            />
-            {error && (
-              <div
-                ref={errorRef}
-                className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700"
-              >
-                {error}
-              </div>
-            )}
-          </section>
-
-          {rawData.length > 0 && (
-            <>
-              <DataPreview data={rawData} />
-
-              <section className="card p-6">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">
-                  3. 設定輸出檔名
-                </h2>
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    value={outputFileName}
-                    onChange={(e) => setOutputFileName(e.target.value)}
-                    placeholder="輸出檔案名稱"
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  />
-                  <span className="flex items-center text-gray-500">.xlsx</span>
-                </div>
-              </section>
-
-              <section className="card p-6">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">
-                  4. 生成報告
-                </h2>
-                <button
-                  onClick={handleProcess}
-                  disabled={isProcessing || !outputFileName.trim()}
-                  className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      處理中...
-                    </>
+                  }`}>
+                  {detectionResult.detected ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-600 text-sm">✓ 自動識別為</span>
+                      <span className="font-semibold text-green-700">
+                        {getPlatformDisplayName(detectionResult.detected)}
+                      </span>
+                    </div>
                   ) : (
-                    '生成並下載報告'
+                    <div className="flex items-center gap-2">
+                      <span className="text-yellow-600 text-sm">⚠ 無法完全識別，已選擇最接近的平台:</span>
+                      <span className="font-semibold text-yellow-700">
+                        {getPlatformDisplayName(detectionResult.allPlatformScores[0]?.platform)}
+                      </span>
+                    </div>
                   )}
-                </button>
+                </div>
+              )}
 
-                {processingResult && (
-                  <div ref={resultRef}>
-                    <ProcessingResult
-                      originalCount={processingResult.originalCount}
-                      finalCount={processingResult.finalCount}
-                      uniqueOrderCount={processingResult.uniqueOrderCount}
-                      errors={processingResult.errors}
+              <PlatformSelector selected={platform} onChange={setPlatform} />
+            </section>
+
+            <section className="card p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">
+                2. 上傳訂單檔案
+              </h2>
+              <FileUploader
+                onFileSelect={handleFileSelect}
+                selectedFile={selectedFile}
+                onClear={handleClear}
+              />
+              {error && (
+                <div
+                  ref={errorRef}
+                  className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700"
+                >
+                  {error}
+                </div>
+              )}
+            </section>
+
+            {rawData.length > 0 && (
+              <>
+                <DataPreview data={rawData} />
+
+                <section className="card p-6">
+                  <h2 className="text-lg font-semibold text-gray-800 mb-4">
+                    3. 設定輸出檔名
+                  </h2>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      value={outputFileName}
+                      onChange={(e) => setOutputFileName(e.target.value)}
+                      placeholder="輸出檔案名稱"
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                     />
+                    <span className="flex items-center text-gray-500">.xlsx</span>
                   </div>
-                )}
-              </section>
-            </>
-          )}
+                </section>
 
-          <ConfigEditor
-            productConfig={productConfig}
-            onUpdate={updateProduct}
-            onDelete={deleteProduct}
-            onReset={resetConfig}
-            onImport={importConfig}
-            onExport={exportConfig}
-          />
-        </div>
+                <section className="card p-6">
+                  <h2 className="text-lg font-semibold text-gray-800 mb-4">
+                    4. 生成報告
+                  </h2>
+                  <button
+                    onClick={handleProcess}
+                    disabled={isProcessing || !outputFileName.trim()}
+                    className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        處理中...
+                      </>
+                    ) : (
+                      '生成並下載報告'
+                    )}
+                  </button>
+
+                  {processingResult && (
+                    <div ref={resultRef}>
+                      <ProcessingResult
+                        originalCount={processingResult.originalCount}
+                        finalCount={processingResult.finalCount}
+                        uniqueOrderCount={processingResult.uniqueOrderCount}
+                        errors={processingResult.errors}
+                      />
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
+
+          </div>
+
+        )}
 
         <footer className="mt-12 text-center text-sm text-gray-400">
           <p>減醣市集 訂單報告生成器 v2.0</p>

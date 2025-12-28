@@ -391,10 +391,10 @@ export default function InventoryDashboard() {
       if (result.success) {
         sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
         // Start loading data immediately while updating auth state
-        // This saves a React render cycle
+        // Use combined API for faster initial load (single request instead of multiple)
         setLoading(true);
         setIsAuthenticated(true);
-        Promise.all([fetchInventory(), fetchDiagnosis()]).then(() => {
+        fetchInitialData().then(() => {
           setLoading(false);
         });
       } else {
@@ -542,6 +542,68 @@ export default function InventoryDashboard() {
     }
   }, []);
 
+  // Fetch all initial data in ONE request (faster than multiple parallel calls)
+  const fetchInitialData = useCallback(async () => {
+    try {
+      setError(null);
+      const response = await fetch(`${API_BASE_URL}/api/inventory/init`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        // Process inventory data
+        const inventoryData = result.data.inventory;
+        if (inventoryData) {
+          const {
+            bread_items,
+            box_items,
+            bag_items,
+            snapshot_date,
+            source_file,
+            source_email_date,
+            low_stock_count,
+            total_bread_stock,
+            total_box_stock,
+            total_bag_rolls,
+            raw_item_count,
+          } = inventoryData;
+
+          const allItems: InventoryItem[] = [
+            ...bread_items.map((item: ApiInventoryItem) => transformApiItem(item, 'bread')),
+            ...box_items.map((item: ApiInventoryItem) => transformApiItem(item, 'box')),
+            ...bag_items.map((item: ApiInventoryItem) => transformApiItem(item, 'bag')),
+          ];
+
+          setItems(allItems);
+
+          const snapshotDateObj = new Date(snapshot_date);
+          setSnapshotInfo({
+            snapshotDate: `${snapshotDateObj.getMonth() + 1}/${snapshotDateObj.getDate()}`,
+            snapshotTime: '',
+            sourceFile: source_file,
+            sourceEmailDate: new Date(source_email_date).toLocaleString('zh-TW'),
+            lowStockCount: low_stock_count,
+            totalBreadStock: total_bread_stock,
+            totalBoxStock: total_box_stock,
+            totalBagRolls: total_bag_rolls,
+            rawItemCount: raw_item_count,
+          });
+        } else {
+          setError('無庫存資料，請先同步');
+        }
+
+        // Process diagnosis data
+        if (result.data.diagnosis) {
+          setDiagnosisData(result.data.diagnosis);
+        }
+      } else {
+        setError(result.error || '無法載入資料');
+      }
+    } catch (err) {
+      console.error('Failed to fetch initial data:', err);
+      setError('無法連接伺服器，請確認後端已啟動');
+    }
+  }, []);
+
   // Toggle item selection
   const toggleTrendItem = (name: string) => {
     setSelectedTrendItems(prev => {
@@ -584,7 +646,7 @@ export default function InventoryDashboard() {
     setSelectedSalesItems(new Set());
   };
 
-  // Initialize: fetch inventory and diagnosis data on page reload (when already authenticated)
+  // Initialize: fetch all data on page reload (when already authenticated)
   useEffect(() => {
     // Only run on mount when already authenticated from session storage
     // (handleLogin handles fresh logins and starts loading there)
@@ -592,10 +654,8 @@ export default function InventoryDashboard() {
 
     const init = async () => {
       setLoading(true);
-      await Promise.all([
-        fetchInventory(),
-        fetchDiagnosis(),  // Fetch comprehensive diagnosis data from backend
-      ]);
+      // Use combined API for faster initial load (single request)
+      await fetchInitialData();
       setLoading(false);
     };
     init();
@@ -622,10 +682,12 @@ export default function InventoryDashboard() {
     switch (activeTab) {
       case 'diagnosis':
       case 'order':
-        // Both diagnosis and order tabs need diagnosis data from backend
-        await Promise.all([fetchInventory(), fetchDiagnosis()]);
+        // Both diagnosis and order tabs need both inventory + diagnosis data
+        // Use combined API for efficiency
+        await fetchInitialData();
         break;
       case 'inventory':
+        // Inventory tab only needs basic inventory data
         await fetchInventory();
         break;
       case 'analysis':
