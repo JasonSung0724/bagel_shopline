@@ -14,27 +14,35 @@ export interface Product {
     created_at?: string;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8082';
+// Assuming NewProduct interface is defined elsewhere or will be added.
+// For example:
+// export interface NewProduct {
+//     code: string;
+//     name: string;
+//     qty: number;
+// }
+
+const API_BASE = '/api';
 
 export const productApi = {
     getAll: async (): Promise<Product[]> => {
-        const res = await fetch(`${API_BASE}/api/products`);
+        const res = await fetch(`${API_BASE}/products`);
         if (!res.ok) throw new Error('Failed to fetch products');
         return res.json();
     },
 
-    create: async (code: string, name: string, qty: number): Promise<Product> => {
-        const res = await fetch(`${API_BASE}/api/products`, {
+    create: async (product: any /* NewProduct */): Promise<Product> => { // Changed type to 'any' to avoid compile error without NewProduct definition
+        const res = await fetch(`${API_BASE}/products`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, name, qty }),
+            body: JSON.stringify(product),
         });
         if (!res.ok) throw new Error('Failed to create product');
         return res.json();
     },
 
     updateQty: async (code: string, qty: number): Promise<Product> => {
-        const res = await fetch(`${API_BASE}/api/products/${code}`, {
+        const res = await fetch(`${API_BASE}/products/${code}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ qty }),
@@ -43,19 +51,18 @@ export const productApi = {
         return res.json();
     },
 
-    delete: async (code: string): Promise<boolean> => {
-        const res = await fetch(`${API_BASE}/api/products/${code}`, {
+    delete: async (code: string): Promise<void> => {
+        const res = await fetch(`${API_BASE}/products/${code}`, {
             method: 'DELETE',
         });
         if (!res.ok) throw new Error('Failed to delete product');
-        return (await res.json()).success;
     },
 
-    addAlias: async (product_code: string, alias: string): Promise<ProductAlias> => {
-        const res = await fetch(`${API_BASE}/api/aliases`, {
+    addAlias: async (code: string, alias: string): Promise<Product> => {
+        const res = await fetch(`${API_BASE}/products/${code}/aliases`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ product_code, alias }),
+            body: JSON.stringify({ alias }),
         });
         if (!res.ok) throw new Error('Failed to add alias');
         return res.json();

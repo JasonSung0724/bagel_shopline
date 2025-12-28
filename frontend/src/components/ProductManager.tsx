@@ -71,7 +71,11 @@ export default function ProductManager() {
     const handleCreateProduct = async () => {
         if (!newProduct.code) return;
         try {
-            await productApi.create(newProduct.code, newProduct.name || newProduct.code, newProduct.qty);
+            await productApi.create({
+                code: newProduct.code,
+                name: newProduct.name || newProduct.code,
+                qty: newProduct.qty
+            });
             setIsCreating(false);
             setNewProduct({ code: '', name: '', qty: 1 });
             loadProducts();

@@ -95,7 +95,7 @@ export default function Home() {
       formData.append('file', selectedFile);
       formData.append('platform', platform);
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/report/generate`, {
+      const response = await fetch('/api/report/generate', {
         method: 'POST',
         body: formData,
       });

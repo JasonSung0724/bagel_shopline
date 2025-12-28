@@ -35,7 +35,8 @@ import {
 } from 'lucide-react';
 
 // API Base URL - empty string means same origin (use Nginx proxy)
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+// API Base URL - use relative path to route through Next.js proxy
+const API_BASE_URL = '';
 
 // Brand colors
 const BRAND_ORANGE = '#EB5C20';
@@ -378,7 +379,7 @@ export default function InventoryDashboard() {
     setAuthError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
+      const response = await fetch('/api/auth/verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -978,10 +979,9 @@ export default function InventoryDashboard() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`
                     flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md transition-all whitespace-nowrap
-                    ${
-                      activeTab === tab.id
-                        ? 'bg-white text-[#EB5C20] shadow-sm'
-                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
+                    ${activeTab === tab.id
+                      ? 'bg-white text-[#EB5C20] shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'
                     }
                   `}
                 >
@@ -1131,13 +1131,12 @@ export default function InventoryDashboard() {
                       <div className="flex justify-between items-start mb-1">
                         <h3 className="font-bold text-gray-800 text-lg">{bread.name}</h3>
                         <span
-                          className={`text-xs px-3 py-1 rounded-lg font-medium flex items-center gap-1 ${
-                            bread.health_status === 'critical'
-                              ? 'bg-red-100 text-red-600'
-                              : bread.health_status === 'overstock'
+                          className={`text-xs px-3 py-1 rounded-lg font-medium flex items-center gap-1 ${bread.health_status === 'critical'
+                            ? 'bg-red-100 text-red-600'
+                            : bread.health_status === 'overstock'
                               ? 'bg-orange-100 text-orange-600'
                               : 'bg-green-100 text-green-600'
-                          }`}
+                            }`}
                         >
                           {bread.health_status === 'critical' && <AlertTriangle className="w-3 h-3" />}
                           {bread.health_status === 'overstock' && <Box className="w-3 h-3" />}
@@ -1152,10 +1151,9 @@ export default function InventoryDashboard() {
                           <ShoppingBag className="w-4 h-4 text-[#EB5C20]" />
                           <span className="text-sm font-medium text-gray-700">麵包</span>
                           <span
-                            className={`text-xs px-2 py-0.5 rounded ${
-                              bread.health_status === 'critical' ? 'bg-red-100 text-red-600' :
+                            className={`text-xs px-2 py-0.5 rounded ${bread.health_status === 'critical' ? 'bg-red-100 text-red-600' :
                               bread.health_status === 'overstock' ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'
-                            }`}
+                              }`}
                           >
                             {bread.days_of_stock} 天
                           </span>
@@ -1170,10 +1168,9 @@ export default function InventoryDashboard() {
                         {/* Bread Bar */}
                         <div className="relative h-2 bg-gray-100 rounded-full overflow-hidden">
                           <div
-                            className={`h-full rounded-full transition-all ${
-                              bread.health_status === 'critical' ? 'bg-red-400' :
+                            className={`h-full rounded-full transition-all ${bread.health_status === 'critical' ? 'bg-red-400' :
                               bread.health_status === 'overstock' ? 'bg-orange-400' : 'bg-green-400'
-                            }`}
+                              }`}
                             style={{ width: `${breadCurrentPercent}%` }}
                           />
                           {/* Markers */}
@@ -1196,10 +1193,9 @@ export default function InventoryDashboard() {
                               <span className="text-sm font-medium text-gray-700">塑膠袋</span>
                             </div>
                             <span
-                              className={`text-xs px-2 py-0.5 rounded ${
-                                bag.health_status === 'critical' ? 'bg-red-100 text-red-600' :
+                              className={`text-xs px-2 py-0.5 rounded ${bag.health_status === 'critical' ? 'bg-red-100 text-red-600' :
                                 bag.health_status === 'overstock' ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'
-                              }`}
+                                }`}
                             >
                               {bag.health_status === 'critical' ? '急需補貨' : bag.health_status === 'overstock' ? '庫存積壓' : '庫存充足'}
                             </span>
@@ -1211,10 +1207,9 @@ export default function InventoryDashboard() {
                           {/* Bag Bar */}
                           <div className="relative h-2 bg-gray-100 rounded-full overflow-hidden">
                             <div
-                              className={`h-full rounded-full transition-all ${
-                                bag.health_status === 'critical' ? 'bg-red-400' :
+                              className={`h-full rounded-full transition-all ${bag.health_status === 'critical' ? 'bg-red-400' :
                                 bag.health_status === 'overstock' ? 'bg-orange-400' : 'bg-green-400'
-                              }`}
+                                }`}
                               style={{ width: `${bagCurrentPercent}%` }}
                             />
                             {/* Markers */}
@@ -1296,13 +1291,12 @@ export default function InventoryDashboard() {
                         <div className="flex justify-between items-start mb-1">
                           <h3 className="font-bold text-gray-800 text-lg">{item.name}</h3>
                           <span
-                            className={`text-xs px-3 py-1 rounded-lg font-medium flex items-center gap-1 ${
-                              item.health_status === 'critical'
-                                ? 'bg-red-100 text-red-600'
-                                : item.health_status === 'overstock'
+                            className={`text-xs px-3 py-1 rounded-lg font-medium flex items-center gap-1 ${item.health_status === 'critical'
+                              ? 'bg-red-100 text-red-600'
+                              : item.health_status === 'overstock'
                                 ? 'bg-orange-100 text-orange-600'
                                 : 'bg-green-100 text-green-600'
-                            }`}
+                              }`}
                           >
                             {item.health_status === 'critical' && <AlertTriangle className="w-3 h-3" />}
                             {item.health_status === 'overstock' && <Box className="w-3 h-3" />}
@@ -1312,10 +1306,9 @@ export default function InventoryDashboard() {
                         </div>
 
                         <p className="text-sm text-gray-500 mb-4">
-                          日銷: {(item.daily_sales ?? 0).toLocaleString()} 個 | 30日銷量: {(item.total_sales_30d ?? 0).toLocaleString()} | 可售天數: <span className={`font-medium ${
-                            (item.days_of_stock ?? 0) < LEAD_TIME.box ? 'text-red-600' :
+                          日銷: {(item.daily_sales ?? 0).toLocaleString()} 個 | 30日銷量: {(item.total_sales_30d ?? 0).toLocaleString()} | 可售天數: <span className={`font-medium ${(item.days_of_stock ?? 0) < LEAD_TIME.box ? 'text-red-600' :
                             (item.days_of_stock ?? 0) > TARGET_DAYS ? 'text-orange-500' : 'text-green-600'
-                          }`}>{item.days_of_stock ?? 0} 天</span>
+                            }`}>{item.days_of_stock ?? 0} 天</span>
                         </p>
 
                         <div className="flex items-baseline gap-2 mb-3">
@@ -1326,10 +1319,9 @@ export default function InventoryDashboard() {
                         <div className="relative mb-2">
                           <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                             <div
-                              className={`h-full rounded-full transition-all ${
-                                item.health_status === 'critical' ? 'bg-red-400' :
+                              className={`h-full rounded-full transition-all ${item.health_status === 'critical' ? 'bg-red-400' :
                                 item.health_status === 'overstock' ? 'bg-orange-400' : 'bg-green-400'
-                              }`}
+                                }`}
                               style={{ width: `${currentPercent}%` }}
                             />
                           </div>
@@ -1395,13 +1387,12 @@ export default function InventoryDashboard() {
                         <div className="flex justify-between items-start mb-1">
                           <h3 className="font-bold text-gray-800 text-lg">{item.name}</h3>
                           <span
-                            className={`text-xs px-3 py-1 rounded-lg font-medium flex items-center gap-1 ${
-                              item.health_status === 'critical'
-                                ? 'bg-red-100 text-red-600'
-                                : item.health_status === 'overstock'
+                            className={`text-xs px-3 py-1 rounded-lg font-medium flex items-center gap-1 ${item.health_status === 'critical'
+                              ? 'bg-red-100 text-red-600'
+                              : item.health_status === 'overstock'
                                 ? 'bg-orange-100 text-orange-600'
                                 : 'bg-green-100 text-green-600'
-                            }`}
+                              }`}
                           >
                             {item.health_status === 'critical' && <AlertTriangle className="w-3 h-3" />}
                             {item.health_status === 'overstock' && <Box className="w-3 h-3" />}
@@ -1418,10 +1409,9 @@ export default function InventoryDashboard() {
                         <div className="relative mb-2">
                           <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                             <div
-                              className={`h-full rounded-full transition-all ${
-                                item.health_status === 'critical' ? 'bg-red-400' :
+                              className={`h-full rounded-full transition-all ${item.health_status === 'critical' ? 'bg-red-400' :
                                 item.health_status === 'overstock' ? 'bg-orange-400' : 'bg-green-400'
-                              }`}
+                                }`}
                               style={{ width: `${currentPercent}%` }}
                             />
                           </div>
@@ -1562,10 +1552,9 @@ export default function InventoryDashboard() {
                           <td className="px-4 lg:px-6 py-3 lg:py-4 text-right text-gray-600">
                             {item.category === 'bag' ? '-' : (item.daily_sales ?? 0).toLocaleString()}
                           </td>
-                          <td className={`px-4 lg:px-6 py-3 lg:py-4 text-right font-bold ${
-                            item.category === 'bag' ? 'text-gray-500' :
+                          <td className={`px-4 lg:px-6 py-3 lg:py-4 text-right font-bold ${item.category === 'bag' ? 'text-gray-500' :
                             (item.days_of_stock ?? 0) < 10 ? 'text-red-600' : 'text-orange-500'
-                          }`}>
+                            }`}>
                             {item.category === 'bag' ? '-' : `${item.days_of_stock ?? 0} 天`}
                           </td>
                           <td className="px-4 lg:px-6 py-3 lg:py-4 text-right text-gray-500">
@@ -1655,13 +1644,12 @@ export default function InventoryDashboard() {
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="font-semibold text-gray-800 text-sm">{item.name}</h3>
                       <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          item.stockStatus === 'low'
-                            ? 'bg-red-100 text-red-600'
-                            : item.stockStatus === 'medium'
+                        className={`text-xs px-2 py-0.5 rounded-full ${item.stockStatus === 'low'
+                          ? 'bg-red-100 text-red-600'
+                          : item.stockStatus === 'medium'
                             ? 'bg-yellow-100 text-yellow-600'
                             : 'bg-green-100 text-green-600'
-                        }`}
+                          }`}
                       >
                         {item.stockStatus === 'low' ? '低庫存' : item.stockStatus === 'medium' ? '正常' : '充足'}
                       </span>
@@ -1740,13 +1728,12 @@ export default function InventoryDashboard() {
                             </td>
                             <td className="px-6 py-3 text-right">
                               <span
-                                className={`text-xs px-2 py-0.5 rounded-full ${
-                                  bag.health_status === 'critical'
-                                    ? 'bg-red-100 text-red-600'
-                                    : bag.health_status === 'overstock'
+                                className={`text-xs px-2 py-0.5 rounded-full ${bag.health_status === 'critical'
+                                  ? 'bg-red-100 text-red-600'
+                                  : bag.health_status === 'overstock'
                                     ? 'bg-yellow-100 text-yellow-600'
                                     : 'bg-green-100 text-green-600'
-                                }`}
+                                  }`}
                               >
                                 {bag.health_status === 'critical' ? '急需補貨' : bag.health_status === 'overstock' ? '庫存積壓' : '庫存充足'}
                               </span>
@@ -1777,11 +1764,10 @@ export default function InventoryDashboard() {
                         setAnalysisMode('sales');
                         if (salesTrendData.length === 0) fetchSalesTrend('bread');
                       }}
-                      className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-lg transition-colors ${
-                        analysisMode === 'sales'
-                          ? 'bg-[#EB5C20] text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
+                      className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-lg transition-colors ${analysisMode === 'sales'
+                        ? 'bg-[#EB5C20] text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
                     >
                       銷量趨勢
                     </button>
@@ -1790,11 +1776,10 @@ export default function InventoryDashboard() {
                         setAnalysisMode('stock');
                         if (trendData.length === 0) fetchTrendData('bread');
                       }}
-                      className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-lg transition-colors ${
-                        analysisMode === 'stock'
-                          ? 'bg-[#EB5C20] text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
+                      className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-lg transition-colors ${analysisMode === 'stock'
+                        ? 'bg-[#EB5C20] text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
                     >
                       庫存趨勢
                     </button>
@@ -1809,11 +1794,10 @@ export default function InventoryDashboard() {
                       <button
                         key={days}
                         onClick={() => setTrendDays(days)}
-                        className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-lg transition-colors ${
-                          trendDays === days
-                            ? 'bg-[#EB5C20] text-white'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
+                        className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-lg transition-colors ${trendDays === days
+                          ? 'bg-[#EB5C20] text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
                       >
                         {days}天
                       </button>
@@ -2265,9 +2249,8 @@ export default function InventoryDashboard() {
                             <td className="px-4 py-3 text-right text-gray-500">
                               {oldestStock.toLocaleString()}
                             </td>
-                            <td className={`px-4 py-3 text-right font-bold ${
-                              change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-500'
-                            }`}>
+                            <td className={`px-4 py-3 text-right font-bold ${change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : 'text-gray-500'
+                              }`}>
                               {change > 0 ? '+' : ''}{change.toLocaleString()}
                               <span className="text-xs font-normal ml-1">({changePercent}%)</span>
                             </td>
@@ -2403,28 +2386,28 @@ export default function InventoryDashboard() {
                       return true;
                     })
                     .map((log, idx) => (
-                    <div key={`${log.date}-${log.product_name}-${idx}`} className="bg-white rounded-lg shadow-sm border border-gray-100 p-3">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-gray-800 text-sm truncate">{log.product_name}</h3>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                              {log.category === 'bread' ? '麵包' : log.category === 'box' ? '紙箱' : '袋子'}
-                            </span>
-                            <span className="text-[10px] text-gray-400 flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {log.date ? new Date(log.date).toLocaleDateString('zh-TW') : '-'}
-                            </span>
+                      <div key={`${log.date}-${log.product_name}-${idx}`} className="bg-white rounded-lg shadow-sm border border-gray-100 p-3">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-gray-800 text-sm truncate">{log.product_name}</h3>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                {log.category === 'bread' ? '麵包' : log.category === 'box' ? '紙箱' : '袋子'}
+                              </span>
+                              <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {log.date ? new Date(log.date).toLocaleDateString('zh-TW') : '-'}
+                              </span>
+                            </div>
                           </div>
+                          <span className="font-bold text-green-600 text-sm">+{log.stock_in.toLocaleString()}</span>
                         </div>
-                        <span className="font-bold text-green-600 text-sm">+{log.stock_in.toLocaleString()}</span>
+                        <div className="flex gap-4 text-[10px] text-gray-400">
+                          <span>效期: {log.expiry_date || '-'}</span>
+                          <span>入倉: {log.warehouse_date || '-'}</span>
+                        </div>
                       </div>
-                      <div className="flex gap-4 text-[10px] text-gray-400">
-                        <span>效期: {log.expiry_date || '-'}</span>
-                        <span>入倉: {log.warehouse_date || '-'}</span>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
 
                 {/* Desktop: Table layout */}
@@ -2455,30 +2438,30 @@ export default function InventoryDashboard() {
                           return true;
                         })
                         .map((log, idx) => (
-                        <tr key={`${log.date}-${log.product_name}-${idx}`} className="hover:bg-gray-50">
-                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-gray-600">
-                            <div className="flex items-center gap-2">
-                              <Calendar className="w-4 h-4 text-gray-400" />
-                              {log.date ? new Date(log.date).toLocaleDateString('zh-TW') : '-'}
-                            </div>
-                          </td>
-                          <td className="px-4 lg:px-6 py-3 lg:py-4 font-medium text-gray-800">{log.product_name}</td>
-                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-gray-600">
-                            <span className="bg-gray-100 px-2 py-1 rounded text-xs">
-                              {log.category === 'bread' ? '麵包' : log.category === 'box' ? '紙箱' : '袋子'}
-                            </span>
-                          </td>
-                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-right font-bold text-green-600">
-                            +{log.stock_in.toLocaleString()}
-                          </td>
-                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-right text-gray-500">
-                            {log.expiry_date || '-'}
-                          </td>
-                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-right text-gray-500">
-                            {log.warehouse_date || '-'}
-                          </td>
-                        </tr>
-                      ))}
+                          <tr key={`${log.date}-${log.product_name}-${idx}`} className="hover:bg-gray-50">
+                            <td className="px-4 lg:px-6 py-3 lg:py-4 text-gray-600">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="w-4 h-4 text-gray-400" />
+                                {log.date ? new Date(log.date).toLocaleDateString('zh-TW') : '-'}
+                              </div>
+                            </td>
+                            <td className="px-4 lg:px-6 py-3 lg:py-4 font-medium text-gray-800">{log.product_name}</td>
+                            <td className="px-4 lg:px-6 py-3 lg:py-4 text-gray-600">
+                              <span className="bg-gray-100 px-2 py-1 rounded text-xs">
+                                {log.category === 'bread' ? '麵包' : log.category === 'box' ? '紙箱' : '袋子'}
+                              </span>
+                            </td>
+                            <td className="px-4 lg:px-6 py-3 lg:py-4 text-right font-bold text-green-600">
+                              +{log.stock_in.toLocaleString()}
+                            </td>
+                            <td className="px-4 lg:px-6 py-3 lg:py-4 text-right text-gray-500">
+                              {log.expiry_date || '-'}
+                            </td>
+                            <td className="px-4 lg:px-6 py-3 lg:py-4 text-right text-gray-500">
+                              {log.warehouse_date || '-'}
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
