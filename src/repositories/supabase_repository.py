@@ -491,29 +491,37 @@ class InventoryRepository(SupabaseRepository):
             snapshot_date_map = {s["id"]: s["snapshot_date"][:10] for s in snapshots_result.data}
             snapshot_ids = list(snapshot_date_map.keys())
 
-            # Query raw items for these snapshots (with pagination to get all records)
+            # Query raw items for these snapshots
+            # Note: Supabase .in_() has URL length limits with many UUIDs,
+            # so we batch snapshot IDs (max 10 per batch) to avoid truncation
             all_raw_items = []
-            page_size = 1000
-            offset = 0
+            batch_size = 10
 
-            while True:
-                result = (
-                    self.client.table(self.TABLE_RAW_ITEMS)
-                    .select("product_name, stock_out, snapshot_id")
-                    .in_("snapshot_id", snapshot_ids)
-                    .range(offset, offset + page_size - 1)
-                    .execute()
-                )
+            for i in range(0, len(snapshot_ids), batch_size):
+                batch_ids = snapshot_ids[i:i + batch_size]
 
-                if not result.data:
-                    break
+                # Paginate within each batch
+                page_size = 1000
+                offset = 0
 
-                all_raw_items.extend(result.data)
+                while True:
+                    result = (
+                        self.client.table(self.TABLE_RAW_ITEMS)
+                        .select("product_name, stock_out, snapshot_id")
+                        .in_("snapshot_id", batch_ids)
+                        .range(offset, offset + page_size - 1)
+                        .execute()
+                    )
 
-                if len(result.data) < page_size:
-                    break
+                    if not result.data:
+                        break
 
-                offset += page_size
+                    all_raw_items.extend(result.data)
+
+                    if len(result.data) < page_size:
+                        break
+
+                    offset += page_size
 
             if not all_raw_items:
                 return []
