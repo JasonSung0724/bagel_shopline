@@ -22,4 +22,6 @@ RUN mkdir -p /app/logs
 EXPOSE 8080
 
 # Use gunicorn for production
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "app:app"]
+# Single worker to ensure background_tasks dict is shared across requests
+# Increased threads to handle concurrent requests
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "8", "app:app"]
