@@ -380,9 +380,9 @@ export default function InventoryDashboard() {
   const [syncStartDate, setSyncStartDate] = useState<string>('');
   const [syncEndDate, setSyncEndDate] = useState<string>('');
   const [syncLoading, setSyncLoading] = useState(false);
-  const [syncTaskId, setSyncTaskId] = useState<string | null>(null);
+  // syncTaskId removed - no longer tracking task status
   const [syncTaskStatus, setSyncTaskStatus] = useState<{
-    status: 'pending' | 'running' | 'completed' | 'failed';
+    status: 'pending' | 'running' | 'completed' | 'failed' | 'started';
     result?: {
       success: boolean;
       message: string;
@@ -755,11 +755,10 @@ export default function InventoryDashboard() {
 
       const result = await response.json();
 
-      if (result.success && result.task_id) {
-        // Task started, begin polling for status
-        setSyncTaskId(result.task_id);
-        setSyncTaskStatus({ status: 'running' });
-        pollTaskStatus(result.task_id);
+      if (result.success) {
+        // Task started successfully, show message and close
+        setSyncTaskStatus({ status: 'started' });
+        setSyncLoading(false);
       } else {
         setSyncTaskStatus({
           status: 'failed',
@@ -767,7 +766,7 @@ export default function InventoryDashboard() {
         });
         setSyncLoading(false);
       }
-    } catch (error) {
+    } catch {
       setSyncTaskStatus({
         status: 'failed',
         error: '連線錯誤，請稍後再試',
@@ -776,59 +775,10 @@ export default function InventoryDashboard() {
     }
   };
 
-  // Poll task status
-  const pollTaskStatus = async (taskId: string) => {
-    const poll = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/inventory/sync/status/${taskId}`);
-        const result = await response.json();
-
-        if (result.success && result.task) {
-          const task = result.task;
-
-          if (task.status === 'completed') {
-            setSyncTaskStatus({
-              status: 'completed',
-              result: task.result,
-            });
-            setSyncLoading(false);
-            // Refresh data after sync completes
-            handleRefresh();
-          } else if (task.status === 'failed') {
-            setSyncTaskStatus({
-              status: 'failed',
-              error: task.error || '同步任務失敗',
-            });
-            setSyncLoading(false);
-          } else {
-            // Still running, poll again in 2 seconds
-            setSyncTaskStatus({ status: task.status });
-            setTimeout(poll, 2000);
-          }
-        } else {
-          setSyncTaskStatus({
-            status: 'failed',
-            error: '無法取得任務狀態',
-          });
-          setSyncLoading(false);
-        }
-      } catch {
-        setSyncTaskStatus({
-          status: 'failed',
-          error: '連線錯誤',
-        });
-        setSyncLoading(false);
-      }
-    };
-
-    poll();
-  };
-
   // Reset sync tool state
   const resetSyncTool = () => {
     setSyncStartDate('');
     setSyncEndDate('');
-    setSyncTaskId(null);
     setSyncTaskStatus(null);
     setSyncLoading(false);
   };
@@ -2683,34 +2633,20 @@ export default function InventoryDashboard() {
               {/* Task Status */}
               {syncTaskStatus && (
                 <div className={`p-3 rounded-lg flex items-start gap-3 ${
-                  syncTaskStatus.status === 'completed'
+                  syncTaskStatus.status === 'started'
                     ? 'bg-green-50 border border-green-200'
                     : syncTaskStatus.status === 'failed'
                     ? 'bg-red-50 border border-red-200'
                     : 'bg-blue-50 border border-blue-200'
                 }`}>
-                  {syncTaskStatus.status === 'running' || syncTaskStatus.status === 'pending' ? (
-                    <>
-                      <Loader2 className="w-5 h-5 text-blue-500 animate-spin flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium text-blue-700">同步進行中...</p>
-                        <p className="text-xs text-blue-600 mt-1">
-                          任務正在背景執行，請稍候。您可以關閉此視窗繼續操作。
-                        </p>
-                      </div>
-                    </>
-                  ) : syncTaskStatus.status === 'completed' ? (
+                  {syncTaskStatus.status === 'started' ? (
                     <>
                       <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium text-green-700">同步完成</p>
-                        {syncTaskStatus.result && (
-                          <p className="text-xs text-green-600 mt-1">
-                            成功: {syncTaskStatus.result.synced_count || 0} 天 |
-                            跳過: {syncTaskStatus.result.skipped_count || 0} 天 |
-                            失敗: {syncTaskStatus.result.failed_count || 0} 天
-                          </p>
-                        )}
+                        <p className="text-sm font-medium text-green-700">同步任務已啟動</p>
+                        <p className="text-xs text-green-600 mt-1">
+                          任務正在背景執行中，請稍候數分鐘後重新整理頁面查看結果。
+                        </p>
                       </div>
                     </>
                   ) : (
@@ -2745,9 +2681,9 @@ export default function InventoryDashboard() {
                 }}
                 className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                {syncTaskStatus?.status === 'completed' ? '關閉' : '取消'}
+                {syncTaskStatus?.status === 'started' ? '關閉' : '取消'}
               </button>
-              {syncTaskStatus?.status !== 'completed' && (
+              {syncTaskStatus?.status !== 'started' && (
                 <button
                   onClick={handleDateRangeSync}
                   disabled={!syncStartDate || !syncEndDate || syncLoading}
