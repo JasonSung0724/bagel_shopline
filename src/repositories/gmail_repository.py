@@ -62,14 +62,16 @@ class GmailRepository:
         self,
         target_sender: str,
         since_date: datetime,
+        before_date: Optional[datetime] = None,
         attachment_filter: Optional[str] = None
     ) -> List[EmailData]:
         """
-        Fetch emails from a specific sender since a given date.
+        Fetch emails from a specific sender within a date range.
 
         Args:
             target_sender: Email address of the sender to filter
-            since_date: Only fetch emails since this date
+            since_date: Only fetch emails since this date (inclusive)
+            before_date: Only fetch emails before this date (exclusive, optional)
             attachment_filter: Optional string to filter attachment filenames
 
         Returns:
@@ -80,8 +82,9 @@ class GmailRepository:
                 return []
 
         try:
-            # Format date for IMAP search
-            date_str = since_date.strftime("%d-%b-%Y")
+            # Format dates for IMAP search
+            since_str = since_date.strftime("%d-%b-%Y")
+            before_str = before_date.strftime("%d-%b-%Y") if before_date else None
 
             # Build search criteria
             # For ASCII-only filters, use X-GM-RAW for server-side filtering
@@ -95,6 +98,8 @@ class GmailRepository:
                     f"filename:{attachment_filter}",
                     f"after:{since_date.strftime('%Y/%m/%d')}"
                 ]
+                if before_date:
+                    gmail_query_parts.append(f"before:{before_date.strftime('%Y/%m/%d')}")
                 if target_sender:
                     gmail_query_parts.append(f"from:{target_sender}")
 
@@ -104,7 +109,9 @@ class GmailRepository:
                 status, messages = self.mail.search(None, search_criteria)
             else:
                 # For Chinese filenames, search by date + sender, filter attachments client-side
-                search_parts = [f'SINCE "{date_str}"']
+                search_parts = [f'SINCE "{since_str}"']
+                if before_str:
+                    search_parts.append(f'BEFORE "{before_str}"')
                 if target_sender:
                     search_parts.append(f'FROM "{target_sender}"')
 

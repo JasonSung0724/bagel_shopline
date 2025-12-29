@@ -18,15 +18,15 @@ PATH=/usr/local/bin:/usr/bin:/bin
 PYTHONPATH=/app
 
 # sub_scripts.py schedules (UTC+8)
-30 13 * * * cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
-0 14 * * * cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
-30 20 * * * cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
-50 20 * * * cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
+30 13 * * * . /app/.env.sh && cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
+0 14 * * * . /app/.env.sh && cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
+30 20 * * * . /app/.env.sh && cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
+50 20 * * * . /app/.env.sh && cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
 
 # main_scripts.py schedule (UTC+8)
-0 21 * * * cd /app && /usr/local/bin/python main_scripts.py >> /app/logs/cron.log 2>&1
+0 21 * * * . /app/.env.sh && cd /app && /usr/local/bin/python main_scripts.py >> /app/logs/cron.log 2>&1
 
 # inventory_scripts.py schedule (UTC+8) - 21:05, after order processing
-5 21 * * * cd /app && /usr/local/bin/python inventory_scripts.py >> /app/logs/cron.log 2>&1
+5 21 * * * . /app/.env.sh && cd /app && /usr/local/bin/python inventory_scripts.py >> /app/logs/cron.log 2>&1
 
 # Empty line required at end of crontab

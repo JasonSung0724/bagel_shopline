@@ -32,6 +32,10 @@ import {
   Lock,
   Eye,
   EyeOff,
+  Download,
+  X,
+  Check,
+  Clock,
 } from 'lucide-react';
 
 // API Base URL - empty string means same origin (use Nginx proxy)
@@ -371,6 +375,25 @@ export default function InventoryDashboard() {
   const [restockDateFrom, setRestockDateFrom] = useState<string>('');
   const [restockDateTo, setRestockDateTo] = useState<string>(new Date().toISOString().slice(0, 10));
 
+  // Sync tool states
+  const [showSyncTool, setShowSyncTool] = useState(false);
+  const [syncStartDate, setSyncStartDate] = useState<string>('');
+  const [syncEndDate, setSyncEndDate] = useState<string>('');
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncTaskId, setSyncTaskId] = useState<string | null>(null);
+  const [syncTaskStatus, setSyncTaskStatus] = useState<{
+    status: 'pending' | 'running' | 'completed' | 'failed';
+    result?: {
+      success: boolean;
+      message: string;
+      synced_count?: number;
+      failed_count?: number;
+      skipped_count?: number;
+      details?: Array<{ date: string; success: boolean; message: string }>;
+    };
+    error?: string;
+  } | null>(null);
+
 
   // Handle password submission
   const handleLogin = async (e: React.FormEvent) => {
@@ -706,6 +729,110 @@ export default function InventoryDashboard() {
     setSyncing(false);
   };
 
+  // Handle date range sync (補同步)
+  const handleDateRangeSync = async () => {
+    if (!syncStartDate || !syncEndDate) {
+      return;
+    }
+
+    setSyncLoading(true);
+    setSyncTaskStatus(null);
+
+    try {
+      // Call API with async=true to run in background
+      const response = await fetch(`${API_BASE_URL}/api/inventory/sync`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          start_date: syncStartDate,
+          end_date: syncEndDate,
+          async: true,
+          notify: false,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.task_id) {
+        // Task started, begin polling for status
+        setSyncTaskId(result.task_id);
+        setSyncTaskStatus({ status: 'running' });
+        pollTaskStatus(result.task_id);
+      } else {
+        setSyncTaskStatus({
+          status: 'failed',
+          error: result.error || '啟動同步任務失敗',
+        });
+        setSyncLoading(false);
+      }
+    } catch (error) {
+      setSyncTaskStatus({
+        status: 'failed',
+        error: '連線錯誤，請稍後再試',
+      });
+      setSyncLoading(false);
+    }
+  };
+
+  // Poll task status
+  const pollTaskStatus = async (taskId: string) => {
+    const poll = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/inventory/sync/status/${taskId}`);
+        const result = await response.json();
+
+        if (result.success && result.task) {
+          const task = result.task;
+
+          if (task.status === 'completed') {
+            setSyncTaskStatus({
+              status: 'completed',
+              result: task.result,
+            });
+            setSyncLoading(false);
+            // Refresh data after sync completes
+            handleRefresh();
+          } else if (task.status === 'failed') {
+            setSyncTaskStatus({
+              status: 'failed',
+              error: task.error || '同步任務失敗',
+            });
+            setSyncLoading(false);
+          } else {
+            // Still running, poll again in 2 seconds
+            setSyncTaskStatus({ status: task.status });
+            setTimeout(poll, 2000);
+          }
+        } else {
+          setSyncTaskStatus({
+            status: 'failed',
+            error: '無法取得任務狀態',
+          });
+          setSyncLoading(false);
+        }
+      } catch {
+        setSyncTaskStatus({
+          status: 'failed',
+          error: '連線錯誤',
+        });
+        setSyncLoading(false);
+      }
+    };
+
+    poll();
+  };
+
+  // Reset sync tool state
+  const resetSyncTool = () => {
+    setSyncStartDate('');
+    setSyncEndDate('');
+    setSyncTaskId(null);
+    setSyncTaskStatus(null);
+    setSyncLoading(false);
+  };
+
   // Computed Totals
   const totals = useMemo(() => {
     return {
@@ -953,15 +1080,27 @@ export default function InventoryDashboard() {
               </div>
             </div>
 
-            {/* Refresh Button */}
-            <button
-              onClick={handleRefresh}
-              disabled={syncing}
-              className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex-shrink-0 ml-2"
-            >
-              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{syncing ? '載入中...' : '重新整理'}</span>
-            </button>
+            {/* Buttons */}
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 ml-2">
+              {/* Sync Tool Button */}
+              <button
+                onClick={() => setShowSyncTool(true)}
+                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-[#EB5C20] text-white rounded-lg hover:bg-[#d44c15] transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">補同步</span>
+              </button>
+
+              {/* Refresh Button */}
+              <button
+                onClick={handleRefresh}
+                disabled={syncing}
+                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{syncing ? '載入中...' : '重新整理'}</span>
+              </button>
+            </div>
           </div>
 
           {/* Tab Navigation - scrollable on mobile */}
@@ -2482,6 +2621,155 @@ export default function InventoryDashboard() {
           </div>
         )}
       </main>
+
+      {/* Sync Tool Modal */}
+      {showSyncTool && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Download className="w-5 h-5 text-[#EB5C20]" />
+                補同步庫存資料
+              </h3>
+              <button
+                onClick={() => {
+                  setShowSyncTool(false);
+                  resetSyncTool();
+                }}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-gray-600">
+                選擇日期範圍，系統將從郵件中補同步該期間的庫存資料。任務會在背景執行，您可以繼續操作其他功能。
+              </p>
+
+              {/* Date Range Inputs */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    開始日期
+                  </label>
+                  <input
+                    type="date"
+                    value={syncStartDate}
+                    onChange={(e) => setSyncStartDate(e.target.value)}
+                    max={syncEndDate || new Date().toISOString().slice(0, 10)}
+                    disabled={syncLoading}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#EB5C20] focus:border-[#EB5C20] outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    結束日期
+                  </label>
+                  <input
+                    type="date"
+                    value={syncEndDate}
+                    onChange={(e) => setSyncEndDate(e.target.value)}
+                    min={syncStartDate}
+                    max={new Date().toISOString().slice(0, 10)}
+                    disabled={syncLoading}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#EB5C20] focus:border-[#EB5C20] outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+              {/* Task Status */}
+              {syncTaskStatus && (
+                <div className={`p-3 rounded-lg flex items-start gap-3 ${
+                  syncTaskStatus.status === 'completed'
+                    ? 'bg-green-50 border border-green-200'
+                    : syncTaskStatus.status === 'failed'
+                    ? 'bg-red-50 border border-red-200'
+                    : 'bg-blue-50 border border-blue-200'
+                }`}>
+                  {syncTaskStatus.status === 'running' || syncTaskStatus.status === 'pending' ? (
+                    <>
+                      <Loader2 className="w-5 h-5 text-blue-500 animate-spin flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-blue-700">同步進行中...</p>
+                        <p className="text-xs text-blue-600 mt-1">
+                          任務正在背景執行，請稍候。您可以關閉此視窗繼續操作。
+                        </p>
+                      </div>
+                    </>
+                  ) : syncTaskStatus.status === 'completed' ? (
+                    <>
+                      <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-green-700">同步完成</p>
+                        {syncTaskStatus.result && (
+                          <p className="text-xs text-green-600 mt-1">
+                            成功: {syncTaskStatus.result.synced_count || 0} 天 |
+                            跳過: {syncTaskStatus.result.skipped_count || 0} 天 |
+                            失敗: {syncTaskStatus.result.failed_count || 0} 天
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-red-700">同步失敗</p>
+                        <p className="text-xs text-red-600 mt-1">
+                          {syncTaskStatus.error || '未知錯誤'}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Info Box */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-start gap-2">
+                <Clock className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-gray-500">
+                  提示：每天的庫存資料來自早上 8:30 左右發送的郵件。最多可同步 90 天的資料。
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  setShowSyncTool(false);
+                  resetSyncTool();
+                }}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                {syncTaskStatus?.status === 'completed' ? '關閉' : '取消'}
+              </button>
+              {syncTaskStatus?.status !== 'completed' && (
+                <button
+                  onClick={handleDateRangeSync}
+                  disabled={!syncStartDate || !syncEndDate || syncLoading}
+                  className="px-4 py-2 text-sm bg-[#EB5C20] text-white rounded-lg hover:bg-[#d44c15] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {syncLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      執行中...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      開始同步
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

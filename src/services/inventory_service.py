@@ -46,13 +46,15 @@ class InventoryService:
     def fetch_inventory_emails(
         self,
         since_date: datetime,
+        before_date: Optional[datetime] = None,
         target_sender: Optional[str] = None
     ) -> List[EmailData]:
         """
-        Fetch all inventory Excel emails since a given date.
+        Fetch all inventory Excel emails within a date range.
 
         Args:
-            since_date: Start date to search from
+            since_date: Start date to search from (inclusive)
+            before_date: End date to search to (exclusive, optional)
             target_sender: Optional sender filter (if None, searches all)
 
         Returns:
@@ -63,13 +65,18 @@ class InventoryService:
             emails = repo.fetch_emails_by_date(
                 target_sender=target_sender or "",  # 如果沒指定，搜尋所有
                 since_date=since_date,
+                before_date=before_date,
                 attachment_filter="A442庫存明細"
             )
 
+        date_range = since_date.strftime('%Y-%m-%d')
+        if before_date:
+            date_range += f" ~ {before_date.strftime('%Y-%m-%d')}"
+
         if emails:
-            logger.success(f"找到 {len(emails)} 封庫存明細郵件")
+            logger.success(f"找到 {len(emails)} 封庫存明細郵件 ({date_range})")
         else:
-            logger.info(f"沒有找到庫存明細郵件 (since {since_date.strftime('%Y-%m-%d')})")
+            logger.info(f"沒有找到庫存明細郵件 ({date_range})")
 
         return emails
 

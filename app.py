@@ -7,6 +7,9 @@ Order processing is handled by scheduled workers (main_scripts.py, sub_scripts.p
 import os
 import hashlib
 import secrets
+import threading
+import uuid
+from datetime import datetime
 from flask import Flask, jsonify, request, make_response, send_file, session
 from flask_cors import CORS
 
@@ -26,6 +29,10 @@ CORS(app, supports_credentials=True)  # Enable CORS for frontend with credential
 # Inventory page password (from environment variable, required)
 INVENTORY_PASSWORD = os.getenv("INVENTORY_PASSWORD")
 
+# Background task storage (in-memory, will be lost on restart)
+# For production, consider using Redis or database
+background_tasks = {}
+
 
 @app.route("/health", methods=["GET"])
 def health_check():
@@ -43,7 +50,7 @@ def index():
             "/health": "Health check",
             "/api/inventory": "Get latest inventory snapshot with items",
             "/api/inventory/diagnosis": "Get inventory diagnosis with all calculations (庫存診斷)",
-            "/api/inventory/sync": "Trigger inventory sync from email",
+            "/api/inventory/sync": "POST: Trigger today's sync, PATCH: Sync specific date",
             "/api/inventory/backfill": "Backfill historical data",
             "/api/inventory/history": "Get historical snapshots (for trends)",
             "/api/inventory/changes": "Get inventory changes (detected changes)",
@@ -192,6 +199,205 @@ def sync_inventory():
             "success": False,
             "error": str(e)
         }), 500
+
+
+def _run_sync_task(task_id: str, start_date: datetime, end_date: datetime, send_notification: bool):
+    """
+    Background task to run inventory sync.
+    Updates the task status in background_tasks dict.
+    """
+    try:
+        background_tasks[task_id]["status"] = "running"
+        background_tasks[task_id]["started_at"] = datetime.now().isoformat()
+
+        workflow = InventoryWorkflow()
+
+        if start_date == end_date:
+            # Single date mode
+            result = workflow.sync_specific_date(start_date, send_notification)
+        else:
+            # Date range mode
+            result = workflow.sync_date_range(start_date, end_date, send_notification)
+
+        background_tasks[task_id]["status"] = "completed"
+        background_tasks[task_id]["result"] = result
+        background_tasks[task_id]["completed_at"] = datetime.now().isoformat()
+
+    except Exception as e:
+        background_tasks[task_id]["status"] = "failed"
+        background_tasks[task_id]["error"] = str(e)
+        background_tasks[task_id]["completed_at"] = datetime.now().isoformat()
+
+
+@app.route("/api/inventory/sync", methods=["PATCH"])
+def patch_inventory_sync():
+    """
+    Sync inventory for a specific date or date range (補同步指定日期).
+
+    Body JSON:
+        Option 1 - Single date:
+            date: Target date in YYYY-MM-DD format
+            notify: Send LINE notification (optional, default: false)
+            async: Run in background (optional, default: false)
+
+        Option 2 - Date range:
+            start_date: Start date in YYYY-MM-DD format
+            end_date: End date in YYYY-MM-DD format
+            notify: Send LINE notification (optional, default: false)
+            async: Run in background (optional, default: false)
+
+    Returns:
+        If async=false: JSON with sync result details (blocking)
+        If async=true: JSON with task_id for status polling
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "Request body is required"
+            }), 400
+
+        send_notification = data.get("notify", False)
+        run_async = data.get("async", False)
+
+        # Parse dates
+        if data.get("start_date") and data.get("end_date"):
+            # Date range mode
+            try:
+                start_date = datetime.strptime(data["start_date"], "%Y-%m-%d")
+                end_date = datetime.strptime(data["end_date"], "%Y-%m-%d")
+            except ValueError:
+                return jsonify({
+                    "success": False,
+                    "error": "Invalid date format. Use YYYY-MM-DD"
+                }), 400
+
+            # Validate date range
+            if start_date > end_date:
+                return jsonify({
+                    "success": False,
+                    "error": "start_date must be before or equal to end_date"
+                }), 400
+
+            # Limit to max 90 days
+            days_diff = (end_date - start_date).days
+            if days_diff > 90:
+                return jsonify({
+                    "success": False,
+                    "error": f"Date range too large ({days_diff} days). Maximum is 90 days."
+                }), 400
+
+        elif data.get("date"):
+            # Single date mode
+            try:
+                start_date = datetime.strptime(data["date"], "%Y-%m-%d")
+                end_date = start_date
+            except ValueError:
+                return jsonify({
+                    "success": False,
+                    "error": "Invalid date format. Use YYYY-MM-DD"
+                }), 400
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Either 'date' or 'start_date'+'end_date' is required"
+            }), 400
+
+        # Async mode: run in background thread
+        if run_async:
+            task_id = str(uuid.uuid4())
+            background_tasks[task_id] = {
+                "id": task_id,
+                "type": "inventory_sync",
+                "status": "pending",
+                "start_date": start_date.strftime("%Y-%m-%d"),
+                "end_date": end_date.strftime("%Y-%m-%d"),
+                "created_at": datetime.now().isoformat(),
+                "started_at": None,
+                "completed_at": None,
+                "result": None,
+                "error": None,
+            }
+
+            # Start background thread
+            thread = threading.Thread(
+                target=_run_sync_task,
+                args=(task_id, start_date, end_date, send_notification),
+                daemon=True
+            )
+            thread.start()
+
+            return jsonify({
+                "success": True,
+                "async": True,
+                "task_id": task_id,
+                "message": f"同步任務已啟動，請使用 task_id 查詢進度",
+                "start_date": start_date.strftime("%Y-%m-%d"),
+                "end_date": end_date.strftime("%Y-%m-%d"),
+            }), 202  # 202 Accepted
+
+        # Sync mode: blocking execution (original behavior)
+        workflow = InventoryWorkflow()
+
+        if start_date == end_date:
+            result = workflow.sync_specific_date(start_date, send_notification)
+        else:
+            result = workflow.sync_date_range(start_date, end_date, send_notification)
+
+        status_code = 200 if result["success"] else 404
+        return jsonify(result), status_code
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/inventory/sync/status/<task_id>", methods=["GET"])
+def get_sync_task_status(task_id: str):
+    """
+    Get the status of a background sync task.
+
+    Returns:
+        JSON with task status and result (if completed)
+    """
+    task = background_tasks.get(task_id)
+
+    if not task:
+        return jsonify({
+            "success": False,
+            "error": "Task not found"
+        }), 404
+
+    return jsonify({
+        "success": True,
+        "task": task
+    }), 200
+
+
+@app.route("/api/inventory/sync/tasks", methods=["GET"])
+def list_sync_tasks():
+    """
+    List all sync tasks (for debugging/monitoring).
+
+    Returns:
+        JSON with list of all tasks
+    """
+    # Return tasks sorted by created_at descending
+    tasks = sorted(
+        background_tasks.values(),
+        key=lambda t: t.get("created_at", ""),
+        reverse=True
+    )
+
+    return jsonify({
+        "success": True,
+        "tasks": tasks[:20],  # Limit to 20 most recent
+        "total": len(background_tasks)
+    }), 200
 
 
 @app.route("/api/inventory/backfill", methods=["POST"])

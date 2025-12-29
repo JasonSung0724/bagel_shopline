@@ -94,6 +94,178 @@ class InventoryWorkflow:
             self.notification.send_and_clear()
             return False
 
+    def sync_specific_date(self, target_date: datetime, send_notification: bool = False) -> dict:
+        """
+        Sync inventory for a specific date (patch mode).
+        Searches for emails on that specific date and imports to database.
+
+        Args:
+            target_date: The specific date to sync
+            send_notification: Whether to send LINE notification
+
+        Returns:
+            dict with sync result details
+        """
+        result = {
+            "success": False,
+            "date": target_date.strftime("%Y-%m-%d"),
+            "message": "",
+            "snapshot_id": None,
+            "email_count": 0,
+            "snapshot_date": None,
+        }
+
+        try:
+            date_str = target_date.strftime("%Y-%m-%d")
+            logger.info(f"開始補同步指定日期 - 目標日期: {date_str}")
+
+            # Step 1: Fetch emails for that specific date
+            # IMAP SINCE is inclusive, BEFORE is exclusive
+            # To get emails for "2025-12-25", use SINCE 25-Dec-2025 BEFORE 26-Dec-2025
+            start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            next_day = start_of_day + timedelta(days=1)
+
+            emails = self.inventory_service.fetch_inventory_emails(
+                since_date=start_of_day,
+                before_date=next_day,
+                target_sender=self.target_sender
+            )
+
+            result["email_count"] = len(emails)
+
+            if not emails:
+                result["message"] = f"沒有找到 {date_str} 的庫存明細郵件"
+                logger.warning(result["message"])
+                return result
+
+            # Step 2: Get the latest email for that day
+            target_email = max(emails, key=lambda e: e.date)
+            logger.info(f"找到郵件: {target_email.date}")
+
+            # Step 3: Parse attachment
+            snapshot = self.inventory_service.process_email_attachment(target_email)
+
+            if not snapshot:
+                result["message"] = "解析郵件附件失敗"
+                logger.error(result["message"])
+                return result
+
+            result["snapshot_date"] = snapshot.snapshot_date.strftime("%Y-%m-%d %H:%M")
+
+            # Step 4: Save to database
+            if not self.inventory_repo.is_connected:
+                result["message"] = "資料庫未連接"
+                logger.error(result["message"])
+                return result
+
+            snapshot_id = self.inventory_repo.save_snapshot(snapshot)
+
+            if snapshot_id:
+                result["success"] = True
+                result["snapshot_id"] = snapshot_id
+                result["message"] = f"成功同步 {date_str} 的庫存資料"
+                logger.success(result["message"])
+
+                # Optional notification
+                if send_notification:
+                    self._send_sync_notification(snapshot)
+            else:
+                result["message"] = "保存到資料庫失敗"
+                logger.error(result["message"])
+
+            return result
+
+        except Exception as e:
+            result["message"] = f"同步失敗: {str(e)}"
+            logger.error(result["message"])
+            return result
+
+    def sync_date_range(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        send_notification: bool = False
+    ) -> dict:
+        """
+        Sync inventory for a date range (batch patch mode).
+        Processes each day in the range sequentially.
+
+        Args:
+            start_date: Start date (inclusive)
+            end_date: End date (inclusive)
+            send_notification: Whether to send LINE notification after all done
+
+        Returns:
+            dict with batch sync result details
+        """
+        result = {
+            "success": False,
+            "start_date": start_date.strftime("%Y-%m-%d"),
+            "end_date": end_date.strftime("%Y-%m-%d"),
+            "total_days": 0,
+            "synced_count": 0,
+            "failed_count": 0,
+            "skipped_count": 0,
+            "details": [],
+            "message": "",
+        }
+
+        try:
+            # Calculate date range
+            current_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+            dates_to_sync = []
+            while current_date <= end:
+                dates_to_sync.append(current_date)
+                current_date += timedelta(days=1)
+
+            result["total_days"] = len(dates_to_sync)
+            logger.info(f"開始批次同步 - {result['start_date']} ~ {result['end_date']} ({len(dates_to_sync)} 天)")
+
+            # Process each date
+            for target_date in dates_to_sync:
+                day_result = self.sync_specific_date(target_date, send_notification=False)
+
+                detail = {
+                    "date": day_result["date"],
+                    "success": day_result["success"],
+                    "message": day_result["message"],
+                    "snapshot_id": day_result.get("snapshot_id"),
+                }
+                result["details"].append(detail)
+
+                if day_result["success"]:
+                    result["synced_count"] += 1
+                elif day_result["email_count"] == 0:
+                    result["skipped_count"] += 1
+                else:
+                    result["failed_count"] += 1
+
+            # Overall success if at least one synced
+            result["success"] = result["synced_count"] > 0
+            result["message"] = (
+                f"批次同步完成: 成功 {result['synced_count']} 天, "
+                f"跳過 {result['skipped_count']} 天, "
+                f"失敗 {result['failed_count']} 天"
+            )
+
+            logger.success(result["message"])
+
+            # Optional notification
+            if send_notification and result["synced_count"] > 0:
+                self.notification.add_message("=== 批次庫存同步完成 ===")
+                self.notification.add_message(f"日期範圍: {result['start_date']} ~ {result['end_date']}")
+                self.notification.add_message(result["message"])
+                self.notification.send_and_clear()
+
+            return result
+
+        except Exception as e:
+            result["message"] = f"批次同步失敗: {str(e)}"
+            logger.error(result["message"])
+            return result
+
     def run_backfill(
         self,
         days_back: int = 365,

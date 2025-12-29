@@ -34,7 +34,7 @@ RUN crontab /etc/cron.d/bagel-cron
 # Create log file for cron
 RUN touch /var/log/cron.log
 
-# Create entrypoint script
+# Create entrypoint script that exports env vars to cron
 RUN echo '#!/bin/bash\n\
 echo "Starting Bagel Worker..."\n\
 echo "Timezone: $(date +%Z)"\n\
@@ -43,7 +43,17 @@ echo ""\n\
 echo "Scheduled jobs:"\n\
 echo "  - sub_scripts.py: 13:30, 14:00, 20:30, 20:50 (UTC+8)"\n\
 echo "  - main_scripts.py: 21:00 (UTC+8)"\n\
+echo "  - inventory_scripts.py: 21:05 (UTC+8)"\n\
 echo ""\n\
+\n\
+# Export all environment variables to a file for cron\n\
+printenv | grep -v "no_proxy" > /etc/environment\n\
+\n\
+# Also write env vars to cron environment\n\
+printenv | grep -E "^[A-Z_]+=" | sed "s/^/export /" > /app/.env.sh\n\
+\n\
+echo "Environment variables exported for cron"\n\
+\n\
 # Start cron in foreground\n\
 cron -f\n\
 ' > /entrypoint.sh && chmod +x /entrypoint.sh
