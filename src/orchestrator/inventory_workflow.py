@@ -51,9 +51,13 @@ class InventoryWorkflow:
             date_str = target_date.strftime("%Y-%m-%d")
             logger.info(f"開始庫存同步 - 目標日期: {date_str}")
 
-            # Step 1: Fetch inventory emails
+            # Step 1: Fetch inventory emails (only today)
+            start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            next_day = start_of_day + timedelta(days=1)
+
             emails = self.inventory_service.fetch_inventory_emails(
-                since_date=target_date - timedelta(days=1),  # 搜尋前一天開始
+                since_date=start_of_day,
+                before_date=next_day,
                 target_sender=self.target_sender
             )
 
@@ -377,7 +381,7 @@ class InventoryWorkflow:
             for item in low_items[:5]:  # 最多顯示 5 項
                 self.notification.add_message(f"  - {item.name}: {item.current_stock} {item.unit}")
 
-        self.notification.send_and_clear()
+        # self.notification.send_and_clear()
 
     def _print_backfill_summary(self, snapshots: List[InventorySnapshot]) -> None:
         """Print summary of backfill results."""

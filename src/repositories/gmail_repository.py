@@ -124,7 +124,7 @@ class GmailRepository:
 
             message_ids = messages[0].split()
             if not message_ids:
-                logger.info(f"沒有找到符合條件的郵件 (since {date_str})")
+                logger.info(f"沒有找到符合條件的郵件 (since {since_str})")
                 return []
 
             logger.info(f"找到 {len(message_ids)} 封郵件，開始過濾...")
