@@ -52,7 +52,7 @@ class OutstandingOrderWorkflow:
 
             # Send notification
             if self.send_line_notification:
-                # self.notification.send_and_clear()
+                self.notification.send_and_clear()
                 pass
 
             logger.success(f"待處理訂單更新完成，共更新 {update_count} 筆")
