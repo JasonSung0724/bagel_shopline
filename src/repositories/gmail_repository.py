@@ -63,7 +63,8 @@ class GmailRepository:
         target_sender: str,
         since_date: datetime,
         before_date: Optional[datetime] = None,
-        attachment_filter: Optional[str] = None
+        attachment_filter: Optional[str] = None,
+        strict_attachment_filter: Optional[str] = None
     ) -> List[EmailData]:
         """
         Fetch emails from a specific sender within a date range.
@@ -72,7 +73,8 @@ class GmailRepository:
             target_sender: Email address of the sender to filter
             since_date: Only fetch emails since this date (inclusive)
             before_date: Only fetch emails before this date (exclusive, optional)
-            attachment_filter: Optional string to filter attachment filenames
+            attachment_filter: Optional string for Gmail server-side filename search
+            strict_attachment_filter: Optional string for client-side filename filter (more precise)
 
         Returns:
             List of EmailData objects
@@ -134,8 +136,10 @@ class GmailRepository:
 
             results = []
             processed = 0
+            # Use strict_attachment_filter for client-side filtering if provided
+            client_filter = strict_attachment_filter or attachment_filter
             for msg_id in message_ids:
-                email_data = self._parse_email(msg_id, target_sender, attachment_filter)
+                email_data = self._parse_email(msg_id, target_sender, client_filter)
                 if email_data and email_data.has_attachments():
                     results.append(email_data)
 

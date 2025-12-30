@@ -1,6 +1,7 @@
 """
 Email service for fetching and processing emails.
 """
+
 import io
 import pandas as pd
 from typing import List, Dict, Optional, Tuple
@@ -34,9 +35,7 @@ class EmailService:
         """
         with self.gmail_repo as repo:
             emails = repo.fetch_emails_by_date(
-                target_sender=self.config.flowtide_sender_email,
-                since_date=target_date,
-                attachment_filter="A442_QC_"
+                target_sender=self.config.flowtide_sender_email, since_date=target_date, attachment_filter="A442", strict_attachment_filter="A442_QC_"
             )
 
         date_str = target_date.strftime("%d-%b-%Y")
@@ -47,11 +46,7 @@ class EmailService:
 
         return emails
 
-    def extract_orders_from_emails(
-        self,
-        emails: List[EmailData],
-        platform: str = "c2c"
-    ) -> Tuple[List[Dict], int]:
+    def extract_orders_from_emails(self, emails: List[EmailData], platform: str = "c2c") -> Tuple[List[Dict], int]:
         """
         Extract order information from email attachments.
 
@@ -69,11 +64,7 @@ class EmailService:
         for email_data in emails:
             for attachment in email_data.attachments:
                 try:
-                    excel_orders, count = self._process_excel_attachment(
-                        attachment.content,
-                        platform,
-                        processed_tcat_numbers
-                    )
+                    excel_orders, count = self._process_excel_attachment(attachment.content, platform, processed_tcat_numbers)
                     orders.extend(excel_orders)
                     total_count += count
                 except Exception as e:
@@ -82,12 +73,7 @@ class EmailService:
         logger.info(f"{platform.upper()} 訂單: 總計 {total_count} 筆, 黑貓單號 {len(processed_tcat_numbers)} 筆")
         return orders, total_count
 
-    def _process_excel_attachment(
-        self,
-        content: bytes,
-        platform: str,
-        processed_tcat_numbers: set
-    ) -> Tuple[List[Dict], int]:
+    def _process_excel_attachment(self, content: bytes, platform: str, processed_tcat_numbers: set) -> Tuple[List[Dict], int]:
         """
         Process a single Excel attachment.
 
@@ -117,11 +103,7 @@ class EmailService:
                 tcat_number = str(int(tcat_number))
                 if tcat_number not in processed_tcat_numbers:
                     processed_tcat_numbers.add(tcat_number)
-                    orders.append({
-                        "order_number": order_number,
-                        "tcat_number": tcat_number,
-                        "platform": platform
-                    })
+                    orders.append({"order_number": order_number, "tcat_number": tcat_number, "platform": platform})
 
         return orders, count
 
