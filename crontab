@@ -4,10 +4,10 @@
 # Format: minute hour day month weekday command
 #
 # sub_scripts.py - Update outstanding ShopLine orders
-# Runs at: 13:30, 14:00, 20:30, 20:50 (UTC+8)
+# Runs at: 13:30, 14:00 (UTC+8)
 #
 # main_scripts.py - Daily order processing
-# Runs at: 21:00 (UTC+8)
+# Runs at: 20:30, 20:50 (UTC+8)
 #
 # inventory_scripts.py - Daily inventory sync
 # Runs at: 21:05 (UTC+8) - after main_scripts
@@ -20,11 +20,10 @@ PYTHONPATH=/app
 # sub_scripts.py schedules (UTC+8)
 30 13 * * * . /app/.env.sh && cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
 0 14 * * * . /app/.env.sh && cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
-30 20 * * * . /app/.env.sh && cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
-50 20 * * * . /app/.env.sh && cd /app && /usr/local/bin/python sub_scripts.py >> /app/logs/cron.log 2>&1
 
-# main_scripts.py schedule (UTC+8)
-0 21 * * * . /app/.env.sh && cd /app && /usr/local/bin/python main_scripts.py >> /app/logs/cron.log 2>&1
+# main_scripts.py schedules (UTC+8)
+30 20 * * * . /app/.env.sh && cd /app && /usr/local/bin/python main_scripts.py >> /app/logs/cron.log 2>&1
+50 20 * * * . /app/.env.sh && cd /app && /usr/local/bin/python main_scripts.py >> /app/logs/cron.log 2>&1
 
 # inventory_scripts.py schedule (UTC+8) - 21:05, after order processing
 5 21 * * * . /app/.env.sh && cd /app && /usr/local/bin/python inventory_scripts.py >> /app/logs/cron.log 2>&1
