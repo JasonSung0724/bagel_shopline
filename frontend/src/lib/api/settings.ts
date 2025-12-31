@@ -11,7 +11,7 @@ export interface AllMappings {
 export const settingsApi = {
     // Get all mappings
     getAllMappings: async (): Promise<AllMappings> => {
-        const res = await fetch(`${API_URL}/api/settings/mappings`);
+        const res = await fetch(`${API_URL}/settings/mappings`);
         if (!res.ok) throw new Error('Failed to fetch mappings');
         const json = await res.json();
         return json.data;
@@ -19,7 +19,7 @@ export const settingsApi = {
 
     // Update mapping for a specific platform
     updateMapping: async (platform: string, mapping: PlatformMapping): Promise<void> => {
-        const res = await fetch(`${API_URL}/api/settings/mappings`, {
+        const res = await fetch(`${API_URL}/settings/mappings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ platform, mapping }),
