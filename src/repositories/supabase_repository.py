@@ -1383,45 +1383,66 @@ class InventoryRepository(SupabaseRepository):
             return False
 
     # =========================================================================
-    # Platform Config Methods
+    # Column Mapping Methods (Unified - No Platform Separation)
     # =========================================================================
 
-    def get_all_platform_configs(self) -> Dict[str, Dict]:
+    def get_column_mappings(self) -> Dict[str, List[str]]:
         """
-        Get all platform column mappings.
-        Returns: { 'shopline': {...}, 'mixx': {...} }
+        Get unified column mappings.
+        Returns: { 'order_id': ['訂單編號', 'Order ID', ...], ... }
         """
         if not self.is_connected:
             return {}
 
         try:
-            res = self.client.table("platform_configs").select("*").execute()
+            res = self.client.table("column_mappings").select("*").execute()
             data = res.data if res.data else []
-            
+
             result = {}
             for row in data:
-                result[row["platform"]] = row["mapping"]
+                result[row["field_name"]] = row["aliases"]
             return result
         except Exception as e:
-            logger.error(f"Failed to get platform configs: {e}")
+            logger.error(f"Failed to get column mappings: {e}")
             return {}
 
-    def update_platform_config(self, platform: str, mapping: Dict) -> bool:
+    def update_column_mappings(self, mappings: Dict[str, List[str]]) -> bool:
         """
-        Update column mapping for a specific platform.
+        Update all column mappings (full replacement).
+        """
+        if not self.is_connected:
+            return False
+
+        try:
+            # Upsert each field
+            for field_name, aliases in mappings.items():
+                data = {
+                    "field_name": field_name,
+                    "aliases": aliases,
+                    "updated_at": "now()"
+                }
+                self.client.table("column_mappings").upsert(data, on_conflict="field_name").execute()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update column mappings: {e}")
+            return False
+
+    def update_field_aliases(self, field_name: str, aliases: List[str]) -> bool:
+        """
+        Update aliases for a single field.
         """
         if not self.is_connected:
             return False
 
         try:
             data = {
-                "platform": platform,
-                "mapping": mapping,
+                "field_name": field_name,
+                "aliases": aliases,
                 "updated_at": "now()"
             }
-            # Upsert
-            self.client.table("platform_configs").upsert(data).execute()
+            self.client.table("column_mappings").upsert(data, on_conflict="field_name").execute()
             return True
         except Exception as e:
-            logger.error(f"Failed to update platform config: {e}")
+            logger.error(f"Failed to update field aliases: {e}")
             return False
+

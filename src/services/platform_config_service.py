@@ -3,86 +3,71 @@ from typing import Dict, Optional, List
 from src.repositories.supabase_repository import InventoryRepository
 from loguru import logger
 
-class PlatformConfigService:
+
+class ColumnMappingService:
     """
-    Service for managing platform column mappings (Shopline, Mixx, etc).
-    Handles loading, caching, and auto-detection scoring.
+    Service for managing unified column mappings.
+    All platforms share the same mapping - aliases are combined.
     """
-    
+
     def __init__(self, repository: InventoryRepository = None):
         self.repo = repository or InventoryRepository()
-        self._configs: Dict[str, Dict] = {}
+        self._mapping: Dict[str, List[str]] = {}
         self._loaded = False
 
     def load_config(self, force_refresh: bool = False):
-        """Load platform configs from Supabase."""
+        """Load column mappings from Supabase."""
         if self._loaded and not force_refresh:
             return
 
-        logger.info("Loading platform configs from Supabase...")
-        self._configs = self.repo.get_all_platform_configs()
+        logger.info("Loading unified column mappings from Supabase...")
+        self._mapping = self.repo.get_column_mappings()
         self._loaded = True
-        logger.info(f"Loaded configs for platforms: {list(self._configs.keys())}")
+        logger.info(f"Loaded mappings for fields: {list(self._mapping.keys())}")
 
-    def get_mapping(self, platform: str) -> Dict[str, List[str]]:
-        """Get column mapping for a specific platform."""
+    def get_mapping(self) -> Dict[str, List[str]]:
+        """Get the unified column mapping."""
         if not self._loaded:
             self.load_config()
-        return self._configs.get(platform.lower(), {})
+        return self._mapping
 
-    def get_all_mappings(self) -> Dict[str, Dict]:
-        """Get all mappings."""
+    def get_aliases(self, field_name: str) -> List[str]:
+        """Get aliases for a specific field."""
         if not self._loaded:
             self.load_config()
-        return self._configs
+        return self._mapping.get(field_name, [])
 
-    def update_mapping(self, platform: str, mapping: Dict) -> bool:
-        """Update mapping for a platform and refresh cache."""
-        success = self.repo.update_platform_config(platform.lower(), mapping)
+    def update_mapping(self, mapping: Dict[str, List[str]]) -> bool:
+        """Update all mappings and refresh cache."""
+        success = self.repo.update_column_mappings(mapping)
         if success:
             self.load_config(force_refresh=True)
         return success
-    
-    def auto_detect_platform(self, df_columns: List[str]) -> str:
+
+    def update_field(self, field_name: str, aliases: List[str]) -> bool:
+        """Update aliases for a single field."""
+        success = self.repo.update_field_aliases(field_name, aliases)
+        if success:
+            self.load_config(force_refresh=True)
+        return success
+
+    def validate_columns(self, df_columns: List[str]) -> Dict[str, bool]:
         """
-        Auto-detect platform by comparing DataFrame columns with config mappings.
-        Returns the platform name with the highest match score.
+        Validate which fields can be found in the given columns.
+        Returns: { 'order_id': True, 'receiver_name': False, ... }
         """
         if not self._loaded:
             self.load_config()
-            
-        best_platform = None
-        max_score = 0
-        
-        # Normalize df columns for comparison (strip whitespace)
+
         df_cols_set = set(str(c).strip() for c in df_columns)
-        
-        for platform, mapping in self._configs.items():
-            score = 0
-            required_count = 0
-            
-            # Simple scoring: +1 for every matched field (if any of its aliases exist)
-            for field, aliases in mapping.items():
-                # Check if ANY alias for this field exists in df
-                matched = False
-                for alias in aliases:
-                    if alias in df_cols_set:
-                        matched = True
-                        break
-                
-                if matched:
-                    score += 1
-                
-                # We could implement "weighting" here if needed (e.g. order_id is crucial)
-            
-            # Normalize score? Or just raw count. Use simple count for now.
-            logger.debug(f"Platform {platform} score: {score}")
-            
-            if score > max_score:
-                max_score = score
-                best_platform = platform
-                
-        # threshold? At least 2 matches?
-        if max_score >= 2:
-            return best_platform
-        return None
+        result = {}
+
+        for field, aliases in self._mapping.items():
+            found = any(alias in df_cols_set for alias in aliases)
+            result[field] = found
+
+        return result
+
+
+# Backward compatibility alias
+PlatformConfigService = ColumnMappingService

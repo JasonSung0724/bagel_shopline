@@ -7,7 +7,7 @@ from loguru import logger
 import math
 
 from src.services.product_config_service import ProductConfigService
-from src.services.platform_config_service import PlatformConfigService
+from src.services.platform_config_service import ColumnMappingService
 from src.services.store_address_service import StoreAddressService
 
 @dataclass
@@ -33,14 +33,14 @@ class ConversionResult:
         self.errors = errors
 
 class BaseAdapter(ABC):
-    def __init__(self, platform_name: str, product_service: ProductConfigService, config_service: PlatformConfigService):
+    def __init__(self, platform_name: str, product_service: ProductConfigService, config_service: ColumnMappingService):
         self.platform_name = platform_name
         self.product_service = product_service
         self.config_service = config_service
         self.errors = []
-        
-        # Load mapping for this platform
-        self.mapping = self.config_service.get_mapping(platform_name)
+
+        # Load unified mapping (no longer platform-specific)
+        self.mapping = self.config_service.get_mapping()
 
     def add_error(self, order_id: str, field: str, message: str, severity: str = "warning"):
         self.errors.append({

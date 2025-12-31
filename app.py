@@ -17,7 +17,7 @@ from src.utils.logger import setup_logger
 from src.orchestrator.inventory_workflow import InventoryWorkflow
 from src.services.inventory_service import InventoryService
 from src.services.product_config_service import ProductConfigService
-from src.services.platform_config_service import PlatformConfigService
+from src.services.platform_config_service import ColumnMappingService
 
 # Setup logging
 setup_logger(log_file="logs/flask.log")
@@ -1260,18 +1260,18 @@ def get_master_boxes():
 
 
 # ===========================================
-# System Settings API (Platform Configs)
+# System Settings API (Unified Column Mappings)
 # ===========================================
 
 @app.route("/api/settings/mappings", methods=["GET"])
-def get_platform_mappings():
+def get_column_mappings():
     """
-    Get all platform column mappings.
-    Returns: { "shopline": {...}, "mixx": {...} }
+    Get unified column mappings.
+    Returns: { "order_id": ["訂單編號", ...], "receiver_name": [...], ... }
     """
     try:
-        service = PlatformConfigService()
-        mappings = service.get_all_mappings()
+        service = ColumnMappingService()
+        mappings = service.get_mapping()
         return jsonify({
             "success": True,
             "data": mappings
@@ -1283,29 +1283,57 @@ def get_platform_mappings():
         }), 500
 
 @app.route("/api/settings/mappings", methods=["POST"])
-def update_platform_mapping():
+def update_column_mappings():
     """
-    Update column mapping for a specific platform.
-    Body: { "platform": "shopline", "mapping": {...} }
+    Update unified column mappings.
+    Body: { "order_id": ["訂單編號", ...], "receiver_name": [...], ... }
     """
     try:
         data = request.get_json()
-        platform = data.get("platform")
-        mapping = data.get("mapping")
 
-        if not platform or not mapping:
+        if not data:
             return jsonify({
                 "success": False,
-                "error": "Platform and mapping are required"
+                "error": "Mapping data is required"
             }), 400
 
-        service = PlatformConfigService()
-        success = service.update_mapping(platform, mapping)
+        service = ColumnMappingService()
+        success = service.update_mapping(data)
 
         if success:
             return jsonify({"success": True, "message": "Settings updated"}), 200
         else:
             return jsonify({"success": False, "error": "Failed to update settings"}), 500
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route("/api/settings/mappings/<field_name>", methods=["PUT"])
+def update_field_aliases(field_name: str):
+    """
+    Update aliases for a specific field.
+    Body: { "aliases": ["訂單編號", "Order ID", ...] }
+    """
+    try:
+        data = request.get_json()
+        aliases = data.get("aliases")
+
+        if not aliases or not isinstance(aliases, list):
+            return jsonify({
+                "success": False,
+                "error": "aliases (list) is required"
+            }), 400
+
+        service = ColumnMappingService()
+        success = service.update_field(field_name, aliases)
+
+        if success:
+            return jsonify({"success": True, "message": f"Field '{field_name}' updated"}), 200
+        else:
+            return jsonify({"success": False, "error": "Failed to update field"}), 500
 
     except Exception as e:
         return jsonify({

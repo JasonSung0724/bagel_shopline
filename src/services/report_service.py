@@ -8,10 +8,10 @@ import sys
 from loguru import logger
 
 from src.services.product_config_service import ProductConfigService
-from src.services.platform_config_service import PlatformConfigService
+from src.services.platform_config_service import ColumnMappingService
 from src.services.store_address_service import StoreAddressService
 from src.services.report_adapters import (
-    ShoplineAdapter, MixxAdapter, C2CAdapter, AoshiAdapter, 
+    ShoplineAdapter, MixxAdapter, C2CAdapter, AoshiAdapter,
     BaseAdapter, StandardOrderItem, ConversionResult
 )
 
@@ -98,11 +98,12 @@ class UnifiedOrderProcessor:
 class ReportService:
     def __init__(self):
         self.product_service = ProductConfigService()
-        self.config_service = PlatformConfigService()
+        self.config_service = ColumnMappingService()
         self.store_address_service = StoreAddressService()
         self.processor = UnifiedOrderProcessor(self.product_service)
 
     def _get_adapter(self, platform: str) -> BaseAdapter:
+        """Get adapter for specific platform processing logic."""
         platform = platform.lower()
         if platform == "shopline":
             return ShoplineAdapter(self.product_service, self.config_service)
@@ -113,11 +114,15 @@ class ReportService:
         elif platform == "aoshi":
             return AoshiAdapter(self.product_service, self.config_service)
         else:
-            raise ValueError(f"Unknown platform: {platform}")
+            # Default to Shopline adapter for general processing
+            logger.warning(f"Unknown platform '{platform}', using Shopline adapter")
+            return ShoplineAdapter(self.product_service, self.config_service)
 
-    def generate_report(self, file_content: bytes, filename: str, platform: str = None) -> Tuple[BytesIO, Dict]:
+    def generate_report(self, file_content: bytes, filename: str, platform: str = "shopline") -> Tuple[BytesIO, Dict]:
         """
         Generate Excel report from input file.
+        Platform parameter determines processing logic (date parsing, product lookup, etc.)
+        Column mapping is unified across all platforms.
         Returns (Excel Bytes, Summary Dict)
         """
         import time
@@ -135,21 +140,16 @@ class ReportService:
             t0 = time.time()
             df = pd.read_excel(BytesIO(file_content))
             logger.info(f"[Perf] Excel read in {time.time() - t0:.4f}s (Rows: {len(df)})")
-            # Basic validation could go here
         except Exception as e:
             raise ValueError(f"Failed to read Excel file: {e}")
 
-        # Auto-Detect Platform if not provided or "auto"
-        if not platform or platform.lower() == "auto":
-            # Pass column names to config service to perform scoring
-            detected = self.config_service.auto_detect_platform(list(df.columns))
-            if not detected:
-                # Fallback or error?
-                raise ValueError("Could not auto-detect platform from Excel columns. Please check your mapping settings.")
-            print(f"Auto-Detected Platform: {detected}")
-            platform = detected
+        # Validate that we can find required columns
+        validation = self.config_service.validate_columns(list(df.columns))
+        missing = [f for f, found in validation.items() if not found]
+        if missing:
+            logger.warning(f"Some fields not found in Excel: {missing}")
 
-        # Get adapter
+        # Get adapter (platform determines processing logic, not column mapping)
         adapter = self._get_adapter(platform)
         logger.info(f"[Perf] Using adapter: {platform}")
         
