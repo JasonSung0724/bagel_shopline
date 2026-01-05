@@ -42,15 +42,15 @@ class DailyWorkflow:
         Run the complete daily workflow.
 
         Args:
-            target_date: Date to process (default: yesterday)
+            target_date: Date to process (default: today)
 
         Returns:
             True if workflow completed successfully
         """
         try:
-            # Default to yesterday
+            # Default to today (逢泰在每天 ~20:00 寄出當天的出貨資料)
             if target_date is None:
-                target_date = datetime.now() - timedelta(days=1)
+                target_date = datetime.now()
 
             date_str = target_date.strftime("%Y-%m-%d")
             logger.info(f"開始執行每日更新 - 目標日期: {date_str}")
