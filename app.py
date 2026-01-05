@@ -1065,11 +1065,17 @@ def generate_report():
         response.headers['Content-Disposition'] = f"attachment; filename*=UTF-8''{encoded_filename}"
         
         # Add custom headers for frontend stats
+        response.headers['X-Report-Original-Rows'] = str(summary['original_rows'])
         response.headers['X-Report-Total-Orders'] = str(summary['total_orders'])
         response.headers['X-Report-Row-Count'] = str(summary['total_rows'])
         response.headers['X-Report-Platform'] = summary['platform']
-        # For simple error count, we can pass it too
+        response.headers['X-Report-Time-Taken'] = f"{summary.get('time_taken', 0):.2f}"
         response.headers['X-Report-Error-Count'] = str(len(summary['errors']))
+
+        # Encode errors as JSON in header (limit to first 20 for header size)
+        import json
+        errors_to_send = summary['errors'][:20]
+        response.headers['X-Report-Errors'] = json.dumps(errors_to_send, ensure_ascii=False)
         
         return response
 

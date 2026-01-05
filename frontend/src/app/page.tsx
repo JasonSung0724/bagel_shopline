@@ -24,6 +24,8 @@ export default function Home() {
     finalCount: number;
     uniqueOrderCount: number;
     errors: ProcessingError[];
+    timeTaken: number;
+    platformUsed: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -118,20 +120,36 @@ export default function Home() {
       document.body.removeChild(a);
 
       // Read stats from headers
+      const originalRows = parseInt(response.headers.get('X-Report-Original-Rows') || '0');
       const totalOrders = parseInt(response.headers.get('X-Report-Total-Orders') || '0');
       const totalRows = parseInt(response.headers.get('X-Report-Row-Count') || '0');
-      const errorCount = parseInt(response.headers.get('X-Report-Error-Count') || '0');
+      const timeTaken = parseFloat(response.headers.get('X-Report-Time-Taken') || '0');
+      const platformUsed = response.headers.get('X-Report-Platform') || platform;
+
+      // Parse detailed errors from header
+      let detailedErrors: ProcessingError[] = [];
+      try {
+        const errorsJson = response.headers.get('X-Report-Errors');
+        if (errorsJson) {
+          const parsed = JSON.parse(errorsJson);
+          detailedErrors = parsed.map((e: { order_id: string; field: string; message: string; severity: string }) => ({
+            orderId: e.order_id,
+            field: e.field,
+            message: e.message,
+            severity: e.severity as 'warning' | 'error'
+          }));
+        }
+      } catch (e) {
+        console.error('Failed to parse errors:', e);
+      }
 
       setProcessingResult({
-        originalCount: totalOrders,
+        originalCount: originalRows,
         finalCount: totalRows,
         uniqueOrderCount: totalOrders,
-        errors: errorCount > 0 ? [{
-          orderId: "SYSTEM",
-          field: "General",
-          message: `共有 ${errorCount} 筆錯誤/警告，請檢查 Excel 或後端 Logs`,
-          severity: 'error'
-        }] : [],
+        errors: detailedErrors,
+        timeTaken,
+        platformUsed,
       });
 
     } catch (err: any) {
@@ -298,6 +316,8 @@ export default function Home() {
                         finalCount={processingResult.finalCount}
                         uniqueOrderCount={processingResult.uniqueOrderCount}
                         errors={processingResult.errors}
+                        timeTaken={processingResult.timeTaken}
+                        platformUsed={processingResult.platformUsed}
                       />
                     </div>
                   )}

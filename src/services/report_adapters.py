@@ -7,7 +7,7 @@ from loguru import logger
 import math
 
 from src.services.product_config_service import ProductConfigService
-from src.services.platform_config_service import ColumnMappingService
+from src.services.platform_config_service import ColumnMappingService, PlatformConfigService
 from src.services.store_address_service import StoreAddressService
 
 @dataclass
@@ -143,7 +143,13 @@ class ShoplineAdapter(BaseAdapter):
 
     def _should_skip(self, row: pd.Series) -> bool:
         # Skip if no product code (parent bundle item)
-        return not self.get_col_val(row, "product_code")
+        product_code = self.get_col_val(row, "product_code")
+        if not product_code:
+            # Debug: log first skip to help diagnose mapping issues
+            if not hasattr(self, '_skip_logged'):
+                self._skip_logged = True
+                logger.debug(f"Skipping row - no product_code found. Aliases: {self.mapping.get('product_code', [])}. Columns: {list(row.index)[:5]}...")
+        return not product_code
 
     def _process_row(self, row: pd.Series) -> List[StandardOrderItem]:
         order_id = self.get_col_val(row, "order_id")

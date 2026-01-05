@@ -1999,6 +1999,7 @@ export default function InventoryDashboard() {
                           const cutoffStr = cutoffDate.toISOString().slice(0, 10);
 
                           // Merge all selected items data by date, filtered by trendDays
+                          // Use full date (YYYY-MM-DD) as key for correct cross-year sorting
                           const dateMap = new Map<string, Record<string, string | number>>();
                           salesTrendData
                             .filter(item => selectedSalesItems.has(item.name))
@@ -2006,14 +2007,18 @@ export default function InventoryDashboard() {
                               item.data
                                 .filter(d => d.date >= cutoffStr)
                                 .forEach(d => {
-                                  const dateKey = d.date.slice(5); // MM-DD
-                                  if (!dateMap.has(dateKey)) {
-                                    dateMap.set(dateKey, { date: dateKey });
+                                  const fullDate = d.date; // YYYY-MM-DD for sorting
+                                  const displayDate = d.date.slice(5); // MM-DD for display
+                                  if (!dateMap.has(fullDate)) {
+                                    dateMap.set(fullDate, { date: displayDate, _sortKey: fullDate });
                                   }
-                                  dateMap.get(dateKey)![item.name] = d.sales;
+                                  dateMap.get(fullDate)![item.name] = d.sales;
                                 });
                             });
-                          return Array.from(dateMap.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+                          // Sort by full date, then remove sort key
+                          return Array.from(dateMap.values())
+                            .sort((a, b) => String(a._sortKey).localeCompare(String(b._sortKey)))
+                            .map(({ _sortKey, ...rest }) => rest);
                         })()}
                         margin={{ top: 20, right: 20, left: 20, bottom: 5 }}
                       >
@@ -2123,6 +2128,7 @@ export default function InventoryDashboard() {
                           const cutoffStr = cutoffDate.toISOString().slice(0, 10);
 
                           // Merge all selected items data by date, filtered by trendDays
+                          // Use full date (YYYY-MM-DD) as key for correct cross-year sorting
                           const dateMap = new Map<string, Record<string, string | number>>();
                           trendData
                             .filter(item => selectedTrendItems.has(item.name))
@@ -2130,14 +2136,18 @@ export default function InventoryDashboard() {
                               item.data
                                 .filter(d => d.date >= cutoffStr)
                                 .forEach(d => {
-                                  const dateKey = d.date.slice(5); // MM-DD
-                                  if (!dateMap.has(dateKey)) {
-                                    dateMap.set(dateKey, { date: dateKey });
+                                  const fullDate = d.date; // YYYY-MM-DD for sorting
+                                  const displayDate = d.date.slice(5); // MM-DD for display
+                                  if (!dateMap.has(fullDate)) {
+                                    dateMap.set(fullDate, { date: displayDate, _sortKey: fullDate });
                                   }
-                                  dateMap.get(dateKey)![item.name] = d.stock;
+                                  dateMap.get(fullDate)![item.name] = d.stock;
                                 });
                             });
-                          return Array.from(dateMap.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+                          // Sort by full date, then remove sort key
+                          return Array.from(dateMap.values())
+                            .sort((a, b) => String(a._sortKey).localeCompare(String(b._sortKey)))
+                            .map(({ _sortKey, ...rest }) => rest);
                         })()}
                         margin={{ top: 20, right: 20, left: 20, bottom: 5 }}
                       >

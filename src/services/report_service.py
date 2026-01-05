@@ -172,17 +172,20 @@ class ReportService:
         logger.info(f"[Perf] Total execution time: {total_time:.4f}s")
 
         summary = {
+            "original_rows": len(df),  # Original input row count
             "total_orders": len(set(item.order_id for item in result.items)),
             "total_rows": len(final_rows),
             "errors": result.errors,
-            "platform": platform
+            "platform": platform,
+            "time_taken": total_time
         }
 
         # Print detailed stats to console for verification
         print("\n" + "="*50)
         print(f" Report Generation Summary ({platform})")
         print("="*50)
-        print(f" Total Orders Processed: {summary['total_orders']}")
+        print(f" Original Input Rows:    {summary['original_rows']}")
+        print(f" Unique Orders:          {summary['total_orders']}")
         print(f" Total Output Rows:      {summary['total_rows']}")
         print(f" Errors Found:           {len(summary['errors'])}")
         print(f" Time Taken:             {total_time:.2f}s")
