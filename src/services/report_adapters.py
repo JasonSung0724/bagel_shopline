@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Union
 from dataclasses import dataclass, field
 from datetime import datetime
 import pandas as pd
@@ -23,7 +23,7 @@ class StandardOrderItem:
     product_name: str
     quantity: int
     order_mark: str
-    arrival_time: str = ""
+    arrival_time: Union[int, str] = ""  # 1=上午(13點前), 2=下午(14~18), ""=不限時
     source_platform: str = ""
     original_row: Dict = field(default_factory=dict)
 
@@ -125,6 +125,10 @@ class BaseAdapter(ABC):
 # =============================================================================
 
 class ShoplineAdapter(BaseAdapter):
+    # Platform prefix for order remarks
+    ORDER_MARK_PREFIX = "減醣市集"
+    ORDER_MARK_SEPARATOR = "/"
+
     def __init__(self, product_service: ProductConfigService, config_service: PlatformConfigService):
         super().__init__("Shopline", product_service, config_service)
         self.addresses = {"SEVEN": {}, "FAMILY": {}}
@@ -198,11 +202,21 @@ class ShoplineAdapter(BaseAdapter):
             qty = int(float(self.get_col_val(row, "quantity") or 0))
         except: qty = 0
 
-        # Arrival
+        # Arrival time: 1 = 上午到貨 (13點前), 2 = 下午到貨 (14~18)
+        # Legacy logic: exact match required (not contains)
         arrival = ""
         raw_arrival = self.get_col_val(row, "arrival_time")
-        if "上午" in raw_arrival: arrival = "1"
-        elif "下午" in raw_arrival: arrival = "2"
+        if raw_arrival == "上午到貨":
+            arrival = 1
+        elif raw_arrival == "下午到貨":
+            arrival = 2
+
+        # Format order_mark with platform prefix (like legacy: "減醣市集/備註內容")
+        raw_mark = self.get_col_val(row, "order_mark")
+        if raw_mark and raw_mark.lower() != "nan":
+            formatted_mark = f"{self.ORDER_MARK_PREFIX}{self.ORDER_MARK_SEPARATOR}{raw_mark}"
+        else:
+            formatted_mark = self.ORDER_MARK_PREFIX
 
         return [self._create_item(
             order_id=order_id,
@@ -214,24 +228,35 @@ class ShoplineAdapter(BaseAdapter):
             product_code=product_code,
             product_name=final_product_name,
             quantity=qty,
-            order_mark=self.get_col_val(row, "order_mark"),
+            order_mark=formatted_mark,
             arrival_time=arrival,
             original_row=row.to_dict()
         )]
 
 class MixxAdapter(BaseAdapter):
+    # Platform prefix for order remarks
+    ORDER_MARK_PREFIX = "減醣市集"
+    ORDER_MARK_SEPARATOR = "/"
+
     def __init__(self, product_service: ProductConfigService, config_service: PlatformConfigService):
         super().__init__("Mixx", product_service, config_service)
 
     def _process_row(self, row: pd.Series) -> List[StandardOrderItem]:
         p_name_raw = self.get_col_val(row, "product_name")
         p_name_search = p_name_raw.split("｜")[1] if "｜" in p_name_raw else p_name_raw
-        
+
         product_code = self.product_service.search_product_code(p_name_search) or ""
-        
+
         try:
              qty = int(float(self.get_col_val(row, "quantity") or 0))
         except: qty = 0
+
+        # Format order_mark with platform prefix (like legacy: "減醣市集/備註內容")
+        raw_mark = self.get_col_val(row, "order_mark")
+        if raw_mark and raw_mark.lower() != "nan":
+            formatted_mark = f"{self.ORDER_MARK_PREFIX}{self.ORDER_MARK_SEPARATOR}{raw_mark}"
+        else:
+            formatted_mark = self.ORDER_MARK_PREFIX
 
         return [self._create_item(
             order_id=self.get_col_val(row, "order_id"),
@@ -243,18 +268,31 @@ class MixxAdapter(BaseAdapter):
             product_code=product_code,
             product_name=p_name_search,
             quantity=qty,
-            order_mark=self.get_col_val(row, "order_mark"),
+            order_mark=formatted_mark,
             original_row=row.to_dict()
         )]
 
 class C2CAdapter(BaseAdapter):
+    # Platform prefix for order remarks (C2C has different format)
+    ORDER_MARK_PREFIX = "減醣市集 X 快電商 C2C BUY"
+    ORDER_MARK_SEPARATOR = " | "
+
     def __init__(self, product_service: ProductConfigService, config_service: PlatformConfigService):
         super().__init__("C2C", product_service, config_service)
+
+    def _format_order_mark(self, raw_mark: str) -> str:
+        """Format order_mark with platform prefix (like legacy: "減醣市集 X 快電商 C2C BUY | 備註內容")"""
+        if raw_mark and raw_mark.lower() != "nan":
+            return f"{self.ORDER_MARK_PREFIX}{self.ORDER_MARK_SEPARATOR}{raw_mark}"
+        return self.ORDER_MARK_PREFIX
 
     def _process_row(self, row: pd.Series) -> List[StandardOrderItem]:
         raw_code = self.get_col_val(row, "product_code")
         style = self.get_col_val(row, "product_name")
-        
+
+        # Format order_mark once for all items in this row
+        formatted_mark = self._format_order_mark(self.get_col_val(row, "order_mark"))
+
         items = []
 
         # Special logic for Gift split (F2500000044)
@@ -263,7 +301,7 @@ class C2CAdapter(BaseAdapter):
             for i, sub_style in enumerate(styles):
                 if i >= 2: break
                 found_code = self.product_service.search_product_code(sub_style) or raw_code
-                
+
                 items.append(self._create_item(
                     order_id=self.get_col_val(row, "order_id"),
                     order_date=self._format_date(self.get_col_val(row, "order_date")),
@@ -274,7 +312,7 @@ class C2CAdapter(BaseAdapter):
                     product_code=found_code,
                     product_name=sub_style,
                     quantity=int(float(self.get_col_val(row, "quantity") or 0)),
-                    order_mark=self.get_col_val(row, "order_mark"),
+                    order_mark=formatted_mark,
                     original_row=row.to_dict()
                 ))
         else:
@@ -282,7 +320,7 @@ class C2CAdapter(BaseAdapter):
             found_code = None
             if style:
                 found_code = self.product_service.search_product_code(style)
-            
+
             if not found_code and raw_code:
                 found_code = self.product_service.search_product_code(raw_code)
 
@@ -296,19 +334,30 @@ class C2CAdapter(BaseAdapter):
                 product_code=found_code or raw_code,
                 product_name=style,
                 quantity=int(float(self.get_col_val(row, "quantity") or 0)),
-                order_mark=self.get_col_val(row, "order_mark"),
+                order_mark=formatted_mark,
                 original_row=row.to_dict()
             ))
-            
+
         return items
 
 class AoshiAdapter(BaseAdapter):
+    # Platform prefix for order remarks (Aoshi has different prefix)
+    ORDER_MARK_PREFIX = "減醣市集 X 奧世國際"
+    ORDER_MARK_SEPARATOR = "/"
+
     def __init__(self, product_service: ProductConfigService, config_service: PlatformConfigService):
         super().__init__("Aoshi", product_service, config_service)
 
     def _process_row(self, row: pd.Series) -> List[StandardOrderItem]:
         p_name = self.get_col_val(row, "product_name")
         found_code = self.product_service.search_product_code(p_name) or ""
+
+        # Format order_mark with platform prefix (like legacy: "減醣市集 X 奧世國際/備註內容")
+        raw_mark = self.get_col_val(row, "order_mark")
+        if raw_mark and raw_mark.lower() != "nan":
+            formatted_mark = f"{self.ORDER_MARK_PREFIX}{self.ORDER_MARK_SEPARATOR}{raw_mark}"
+        else:
+            formatted_mark = self.ORDER_MARK_PREFIX
 
         return [self._create_item(
             order_id=self.get_col_val(row, "order_id"),
@@ -320,6 +369,6 @@ class AoshiAdapter(BaseAdapter):
             product_code=found_code,
             product_name=p_name,
             quantity=int(float(self.get_col_val(row, "quantity") or 0)),
-            order_mark=self.get_col_val(row, "order_mark"),
+            order_mark=formatted_mark,
             original_row=row.to_dict()
         )]

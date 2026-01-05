@@ -73,7 +73,7 @@ export default function ProcessingResult({
         </div>
         <div className="text-center p-2 bg-white rounded border">
           <p className="text-lg font-bold text-purple-600">{uniqueOrderCount}</p>
-          <p className="text-xs text-gray-500">不重複訂單</p>
+          <p className="text-xs text-gray-500">訂單數量</p>
         </div>
         <div className="text-center p-2 bg-white rounded border">
           <p className="text-lg font-bold text-green-600">{finalCount}</p>

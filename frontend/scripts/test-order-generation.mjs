@@ -335,7 +335,7 @@ async function runTests() {
       totalOrders += uniqueOrders;
       totalErrors += errors.length;
 
-      console.log(`   處理結果: ${results.length} 筆 (${uniqueOrders} 個不重複訂單)`);
+      console.log(`   處理結果: ${results.length} 筆 (${uniqueOrders} 個訂單)`);
 
       // 5. 顯示範例資料
       if (results.length > 0) {
