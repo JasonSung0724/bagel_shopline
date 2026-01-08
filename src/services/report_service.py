@@ -150,16 +150,33 @@ class ReportService:
         logger.info(f"[Perf] Config loaded in {time.time() - t0:.4f}s")
 
         # Read input file
+        # First read to get columns, then re-read with proper dtype for order_id and quantity
         try:
             t0 = time.time()
-            df = pd.read_excel(BytesIO(file_content))
+            # Initial read to detect columns
+            df_temp = pd.read_excel(BytesIO(file_content), nrows=0)
+            columns = list(df_temp.columns)
+
+            # Find order_id and quantity columns to set as string dtype (legacy behavior)
+            order_id_col = self.config_service.find_column_name(columns, "order_id")
+            quantity_col = self.config_service.find_column_name(columns, "quantity")
+
+            # Build dtype dict (legacy reads order_id and quantity as string)
+            dtype_dict = {}
+            if order_id_col:
+                dtype_dict[order_id_col] = str
+            if quantity_col:
+                dtype_dict[quantity_col] = str
+
+            # Re-read with proper dtypes
+            df = pd.read_excel(BytesIO(file_content), dtype=dtype_dict if dtype_dict else None)
             logger.info(f"[Perf] Excel read in {time.time() - t0:.4f}s (Rows: {len(df)})")
         except Exception as e:
             raise ValueError(f"Failed to read Excel file: {e}")
 
         # Sort DataFrame by order_id ascending (legacy behavior from get_excel.py)
         # Must sort at DataFrame level BEFORE conversion to maintain same row order as legacy
-        order_id_col = self.config_service.find_column_name(list(df.columns), "order_id")
+        # order_id_col already found above during dtype detection
         if not order_id_col:
             raise ValueError(f"Cannot find order_id column in Excel. Available columns: {list(df.columns)[:10]}...")
 
