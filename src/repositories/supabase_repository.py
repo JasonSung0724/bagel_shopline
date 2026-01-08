@@ -774,81 +774,65 @@ class InventoryRepository(SupabaseRepository):
             if not items_result.data:
                 return {}
 
-            # 2. Get sales data (stock_out) for past 30 days
+            # 2. Get sales data from daily_sales table (實出量) for past 30 days
             start_date_30d = (datetime.now() - timedelta(days=30)).date().isoformat()
             start_date_20d = (datetime.now() - timedelta(days=20)).date().isoformat()
 
-            # First, get snapshot IDs and dates within the date range
-            snapshots_result = (
-                self.client.table(self.TABLE_SNAPSHOTS)
-                .select("id, snapshot_date")
-                .gte("snapshot_date", start_date_30d)
-                .execute()
-            )
+            # Query daily_sales table with pagination
+            all_sales_records = []
+            page_size = 1000
+            offset = 0
 
-            if not snapshots_result.data:
-                # No snapshots in range, skip sales calculation
-                sales_30d: Dict[str, int] = {}
-                sales_20d: Dict[str, int] = {}
-                latest_sales: Dict[str, Dict] = {}
-            else:
-                # Create a map of snapshot_id -> date
-                snapshot_date_map = {s["id"]: s["snapshot_date"][:10] for s in snapshots_result.data}
-                snapshot_ids = list(snapshot_date_map.keys())
+            while True:
+                sales_result = (
+                    self.client.table(self.TABLE_DAILY_SALES)
+                    .select("product_name, quantity, sale_date")
+                    .gte("sale_date", start_date_30d)
+                    .range(offset, offset + page_size - 1)
+                    .execute()
+                )
 
-                # Query raw items with pagination to get all records (Supabase default limit is 1000)
-                all_raw_items = []
-                page_size = 1000
-                offset = 0
+                if not sales_result.data:
+                    break
 
-                while True:
-                    raw_items_result = (
-                        self.client.table(self.TABLE_RAW_ITEMS)
-                        .select("product_name, stock_out, snapshot_id")
-                        .in_("snapshot_id", snapshot_ids)
-                        .range(offset, offset + page_size - 1)
-                        .execute()
-                    )
+                all_sales_records.extend(sales_result.data)
 
-                    if not raw_items_result.data:
-                        break
+                if len(sales_result.data) < page_size:
+                    break
 
-                    all_raw_items.extend(raw_items_result.data)
+                offset += page_size
 
-                    if len(raw_items_result.data) < page_size:
-                        break
+            # Calculate sales totals per product from daily_sales (實出量)
+            sales_30d: Dict[str, int] = {}
+            sales_20d: Dict[str, int] = {}
+            # Track latest day's sales per product (for 日銷 display)
+            latest_sales: Dict[str, Dict] = {}  # {product_name: {"date": date_str, "quantity": int}}
 
-                    offset += page_size
+            for row in all_sales_records:
+                name = row.get("product_name", "")
+                quantity = int(row.get("quantity", 0) or 0)
+                date_str = row.get("sale_date", "")[:10] if row.get("sale_date") else ""
 
-                # Calculate sales totals per product
-                sales_30d: Dict[str, int] = {}
-                sales_20d: Dict[str, int] = {}
-                # Track latest day's stock_out per product (for 日銷 display)
-                latest_sales: Dict[str, Dict] = {}  # {product_name: {"date": date_str, "stock_out": int}}
+                if not name:
+                    continue
 
-                for row in all_raw_items:
-                    name = row["product_name"]
-                    stock_out = int(row.get("stock_out", 0) or 0)
-                    snapshot_id = row.get("snapshot_id")
-                    date_str = snapshot_date_map.get(snapshot_id, "")
+                # Add to 30-day total
+                sales_30d[name] = sales_30d.get(name, 0) + quantity
 
-                    # Add to 30-day total
-                    sales_30d[name] = sales_30d.get(name, 0) + stock_out
+                # Add to 20-day total if within range
+                if date_str and date_str >= start_date_20d:
+                    sales_20d[name] = sales_20d.get(name, 0) + quantity
 
-                    # Add to 20-day total if within range
-                    if date_str and date_str >= start_date_20d:
-                        sales_20d[name] = sales_20d.get(name, 0) + stock_out
-
-                    # Track latest day's stock_out (accumulate if same day)
-                    if date_str:
-                        if name not in latest_sales:
-                            latest_sales[name] = {"date": date_str, "stock_out": stock_out}
-                        elif date_str > latest_sales[name]["date"]:
-                            # New latest date, reset
-                            latest_sales[name] = {"date": date_str, "stock_out": stock_out}
-                        elif date_str == latest_sales[name]["date"]:
-                            # Same day, accumulate stock_out
-                            latest_sales[name]["stock_out"] += stock_out
+                # Track latest day's sales (accumulate if same day)
+                if date_str:
+                    if name not in latest_sales:
+                        latest_sales[name] = {"date": date_str, "quantity": quantity}
+                    elif date_str > latest_sales[name]["date"]:
+                        # New latest date, reset
+                        latest_sales[name] = {"date": date_str, "quantity": quantity}
+                    elif date_str == latest_sales[name]["date"]:
+                        # Same day, accumulate quantity
+                        latest_sales[name]["quantity"] += quantity
 
             # 3. Get product mappings (bread to bag)
             mappings = self.get_product_mappings()
@@ -870,8 +854,8 @@ class InventoryRepository(SupabaseRepository):
                 daily_30d = round(total_30d / 30) if total_30d > 0 else 0
                 daily_20d = round(total_20d / 20) if total_20d > 0 else 0
 
-                # Get latest day's stock_out for 日銷 display
-                latest_daily = latest_sales.get(name, {}).get("stock_out", 0)
+                # Get latest day's sales for 日銷 display (from daily_sales table 實出量)
+                latest_daily = latest_sales.get(name, {}).get("quantity", 0)
 
                 # Stock metrics using new formulas:
                 # 正常水位 = 最近30日銷量總和
@@ -904,7 +888,7 @@ class InventoryRepository(SupabaseRepository):
                     "category": category,
                     "current_stock": current_stock,
                     "unit": unit,
-                    "daily_sales": latest_daily,  # 日銷：最新一天的出庫量
+                    "daily_sales": latest_daily,  # 日銷：最新一天的實出量
                     "daily_sales_30d": daily_30d,  # 30日均銷量
                     "daily_sales_20d": daily_20d,
                     "total_sales_30d": total_30d,

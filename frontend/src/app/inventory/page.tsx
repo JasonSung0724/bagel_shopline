@@ -800,13 +800,20 @@ export default function InventoryDashboard() {
         overstockCount: 0,
         healthyCount: 0,
         totalBagCapacity: 0,
+        totalDailySales: 0,
       };
     }
+    // Calculate total daily bread sales (sum of all bread items' daily_sales)
+    const totalDailySales = diagnosisData.bread_items.reduce(
+      (sum, item) => sum + (item.daily_sales ?? 0),
+      0
+    );
     return {
       criticalCount: diagnosisData.summary.critical_count,
       overstockCount: diagnosisData.summary.overstock_count,
       healthyCount: diagnosisData.summary.healthy_count,
       totalBagCapacity: diagnosisData.summary.total_bag_capacity,
+      totalDailySales,
     };
   }, [diagnosisData]);
 
@@ -1138,13 +1145,20 @@ export default function InventoryDashboard() {
         </div>
 
         {/* Secondary Stats - Original totals */}
-        <div className="grid grid-cols-3 md:grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-8">
           <div className="bg-gray-50 p-2 sm:p-4 rounded-lg border border-gray-200 flex items-center justify-between">
             <div>
               <p className="text-[10px] sm:text-xs text-gray-500">麵包總庫存</p>
               <p className="text-sm sm:text-xl font-bold text-gray-800">{totals.bread.toLocaleString()} <span className="text-[10px] sm:text-sm font-normal text-gray-400">個</span></p>
             </div>
             <ShoppingBag className="w-4 h-4 sm:w-6 sm:h-6 text-[#EB5C20]" />
+          </div>
+          <div className="bg-[#FFF7ED] p-2 sm:p-4 rounded-lg border border-[#FDBA74] flex items-center justify-between">
+            <div>
+              <p className="text-[10px] sm:text-xs text-[#C2410C]">今日總銷量</p>
+              <p className="text-sm sm:text-xl font-bold text-[#EA580C]">{diagnosisSummary.totalDailySales.toLocaleString()} <span className="text-[10px] sm:text-sm font-normal text-[#FB923C]">個</span></p>
+            </div>
+            <TrendingUp className="w-4 h-4 sm:w-6 sm:h-6 text-[#EA580C]" />
           </div>
           <div className="bg-gray-50 p-2 sm:p-4 rounded-lg border border-gray-200 flex items-center justify-between">
             <div>
