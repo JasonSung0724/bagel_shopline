@@ -22,40 +22,54 @@ class UnifiedOrderProcessor:
     def process(self, items: List[StandardOrderItem]) -> List[Dict]:
         """
         Process standard items into final shipping rows with box calculation.
+        Maintains original Excel order - box is added after each order's last item.
         """
-        # Group by order_id
-        orders: Dict[str, List[StandardOrderItem]] = {}
-        for item in items:
-            if item.order_id not in orders:
-                orders[item.order_id] = []
-            orders[item.order_id].append(item)
+        if not items:
+            return []
 
         final_rows = []
+        current_order_id = None
+        current_order_items: List[StandardOrderItem] = []
+        current_order_rows: List[Dict] = []
 
-        for order_id, order_items in orders.items():
-            # Create rows for items
-            current_order_rows = []
-            for item in order_items:
-                row = self._create_output_row(item)
-                current_order_rows.append(row)
-            
-            # Calculate box
-            box_info = self._calculate_box(order_items)
-            
-            # Create box row
-            if current_order_rows:
-                # Use first item as template for box row common fields
-                box_row = current_order_rows[0].copy()
-                box_row.update({
-                    "商品編號": box_info["code"],
-                    "商品名稱": box_info["name"],
-                    "訂購數量": "1",
-                    "品項備註": "箱子"
-                })
-                # Add box row to the end
-                current_order_rows.append(box_row)
-            
+        for item in items:
+            # When order_id changes, finalize the previous order
+            if current_order_id is not None and item.order_id != current_order_id:
+                # Add box for previous order
+                if current_order_rows:
+                    box_info = self._calculate_box(current_order_items)
+                    box_row = current_order_rows[0].copy()
+                    box_row.update({
+                        "商品編號": box_info["code"],
+                        "商品名稱": box_info["name"],
+                        "訂購數量": "1",
+                        "品項備註": "箱子"
+                    })
+                    final_rows.extend(current_order_rows)
+                    final_rows.append(box_row)
+
+                # Reset for new order
+                current_order_items = []
+                current_order_rows = []
+
+            # Process current item
+            current_order_id = item.order_id
+            current_order_items.append(item)
+            row = self._create_output_row(item)
+            current_order_rows.append(row)
+
+        # Don't forget the last order
+        if current_order_rows:
+            box_info = self._calculate_box(current_order_items)
+            box_row = current_order_rows[0].copy()
+            box_row.update({
+                "商品編號": box_info["code"],
+                "商品名稱": box_info["name"],
+                "訂購數量": "1",
+                "品項備註": "箱子"
+            })
             final_rows.extend(current_order_rows)
+            final_rows.append(box_row)
 
         return final_rows
 

@@ -212,8 +212,14 @@ class ShoplineAdapter(BaseAdapter):
             arrival = 2
 
         # Format order_mark with platform prefix (like legacy: "減醣市集/備註內容")
-        raw_mark = self.get_col_val(row, "order_mark")
-        if raw_mark and raw_mark.lower() != "nan":
+        # Shopline uses "出貨備註" field specifically (legacy compatibility)
+        raw_mark = ""
+        if "出貨備註" in row and pd.notna(row["出貨備註"]):
+            raw_mark = str(row["出貨備註"]).strip()
+            if raw_mark.lower() == "nan":
+                raw_mark = ""
+
+        if raw_mark:
             formatted_mark = f"{self.ORDER_MARK_PREFIX}{self.ORDER_MARK_SEPARATOR}{raw_mark}"
         else:
             formatted_mark = self.ORDER_MARK_PREFIX
@@ -252,8 +258,14 @@ class MixxAdapter(BaseAdapter):
         except: qty = 0
 
         # Format order_mark with platform prefix (like legacy: "減醣市集/備註內容")
-        raw_mark = self.get_col_val(row, "order_mark")
-        if raw_mark and raw_mark.lower() != "nan":
+        # Mixx uses "備註" field specifically (legacy compatibility)
+        raw_mark = ""
+        if "備註" in row and pd.notna(row["備註"]):
+            raw_mark = str(row["備註"]).strip()
+            if raw_mark.lower() == "nan":
+                raw_mark = ""
+
+        if raw_mark:
             formatted_mark = f"{self.ORDER_MARK_PREFIX}{self.ORDER_MARK_SEPARATOR}{raw_mark}"
         else:
             formatted_mark = self.ORDER_MARK_PREFIX
@@ -290,8 +302,13 @@ class C2CAdapter(BaseAdapter):
         raw_code = self.get_col_val(row, "product_code")
         style = self.get_col_val(row, "product_name")
 
-        # Format order_mark once for all items in this row
-        formatted_mark = self._format_order_mark(self.get_col_val(row, "order_mark"))
+        # C2C uses "出貨備註" field specifically (legacy compatibility)
+        raw_mark = ""
+        if "出貨備註" in row and pd.notna(row["出貨備註"]):
+            raw_mark = str(row["出貨備註"]).strip()
+            if raw_mark.lower() == "nan":
+                raw_mark = ""
+        formatted_mark = self._format_order_mark(raw_mark)
 
         items = []
 
@@ -353,8 +370,14 @@ class AoshiAdapter(BaseAdapter):
         found_code = self.product_service.search_product_code(p_name) or ""
 
         # Format order_mark with platform prefix (like legacy: "減醣市集 X 奧世國際/備註內容")
-        raw_mark = self.get_col_val(row, "order_mark")
-        if raw_mark and raw_mark.lower() != "nan":
+        # Aoshi uses "客戶備註" field specifically (legacy compatibility)
+        raw_mark = ""
+        if "客戶備註" in row and pd.notna(row["客戶備註"]):
+            raw_mark = str(row["客戶備註"]).strip()
+            if raw_mark.lower() == "nan":
+                raw_mark = ""
+
+        if raw_mark:
             formatted_mark = f"{self.ORDER_MARK_PREFIX}{self.ORDER_MARK_SEPARATOR}{raw_mark}"
         else:
             formatted_mark = self.ORDER_MARK_PREFIX

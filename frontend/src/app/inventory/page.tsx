@@ -375,6 +375,11 @@ export default function InventoryDashboard() {
   const [restockDateFrom, setRestockDateFrom] = useState<string>('');
   const [restockDateTo, setRestockDateTo] = useState<string>(new Date().toISOString().slice(0, 10));
 
+  // Bread diagnosis sort
+  type BreadSortKey = 'daily_sales' | 'total_sales_30d' | 'current_stock' | 'days_of_stock';
+  const [breadSortKey, setBreadSortKey] = useState<BreadSortKey>('daily_sales');
+  const [breadSortDesc, setBreadSortDesc] = useState<boolean>(true);
+
   // Sync tool states
   const [showSyncTool, setShowSyncTool] = useState(false);
   const [syncStartDate, setSyncStartDate] = useState<string>('');
@@ -864,16 +869,20 @@ export default function InventoryDashboard() {
     );
   }, [diagnosisData, searchTerm]);
 
-  // Pair bread items with their matching bags (matched_bag comes from backend)
+  // Pair bread items with their matching bags (matched_bag comes from backend) and apply sorting
   const pairedBreadDiagnoses = useMemo(() => {
-    return breadDiagnoses.map(bread => {
-      // matched_bag is already provided by backend via product_mappings table
-      return {
-        bread,
-        bag: bread.matched_bag || null,
-      };
+    const paired = breadDiagnoses.map(bread => ({
+      bread,
+      bag: bread.matched_bag || null,
+    }));
+
+    // Sort by selected key
+    return paired.sort((a, b) => {
+      const aVal = a.bread[breadSortKey] ?? 0;
+      const bVal = b.bread[breadSortKey] ?? 0;
+      return breadSortDesc ? bVal - aVal : aVal - bVal;
     });
-  }, [breadDiagnoses]);
+  }, [breadDiagnoses, breadSortKey, breadSortDesc]);
 
   // Bags that don't have a matching bread (standalone bags)
   const standaloneBags = useMemo(() => {
@@ -1206,9 +1215,32 @@ export default function InventoryDashboard() {
                   <span className="w-1 sm:w-1.5 h-5 sm:h-6 bg-[#EB5C20] rounded-full"></span>
                   麵包庫存診斷 ({pairedBreadDiagnoses.length})
                 </h2>
-                <span className="text-[10px] sm:text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                  麵包前置期: {LEAD_TIME.bread} 天 | 塑膠袋前置期: {LEAD_TIME.bag} 天
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Sort selector */}
+                  <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1">
+                    <span className="text-[10px] sm:text-xs text-gray-500">排序:</span>
+                    <select
+                      value={breadSortKey}
+                      onChange={(e) => setBreadSortKey(e.target.value as typeof breadSortKey)}
+                      className="text-[10px] sm:text-xs bg-transparent border-none outline-none text-gray-700 cursor-pointer"
+                    >
+                      <option value="daily_sales">日銷量</option>
+                      <option value="total_sales_30d">30日銷量</option>
+                      <option value="current_stock">庫存量</option>
+                      <option value="days_of_stock">可售天數</option>
+                    </select>
+                    <button
+                      onClick={() => setBreadSortDesc(!breadSortDesc)}
+                      className="text-gray-500 hover:text-gray-700 p-0.5"
+                      title={breadSortDesc ? '降序' : '升序'}
+                    >
+                      {breadSortDesc ? '↓' : '↑'}
+                    </button>
+                  </div>
+                  <span className="text-[10px] sm:text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    麵包前置期: {LEAD_TIME.bread} 天 | 塑膠袋前置期: {LEAD_TIME.bag} 天
+                  </span>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
