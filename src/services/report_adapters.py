@@ -347,6 +347,9 @@ class C2CAdapter(BaseAdapter):
             if not found_code and raw_code:
                 found_code = self.product_service.search_product_code(raw_code)
 
+            # Remove -F from product name (legacy behavior)
+            style_output = style.replace("-F", "")
+
             items.append(self._create_item(
                 order_id=self.get_col_val(row, "order_id"),
                 order_date=self._format_date(self.get_col_val(row, "order_date")),
@@ -355,7 +358,7 @@ class C2CAdapter(BaseAdapter):
                 receiver_address=self.get_col_val(row, "receiver_address"),
                 delivery_method="Tcat",
                 product_code=found_code or raw_code,
-                product_name=style,
+                product_name=style_output,
                 quantity=int(float(self.get_col_val(row, "quantity") or 0)),
                 order_mark=formatted_mark,
                 original_row=row.to_dict()
@@ -374,6 +377,8 @@ class AoshiAdapter(BaseAdapter):
     def _process_row(self, row: pd.Series) -> List[StandardOrderItem]:
         p_name = self.get_col_val(row, "product_name")
         found_code = self.product_service.search_product_code(p_name) or ""
+        # Remove -F from product name (legacy behavior)
+        p_name_output = p_name.replace("-F", "")
 
         # Format order_mark with platform prefix (like legacy: "減醣市集 X 奧世國際/備註內容")
         # Aoshi uses "客戶備註" field specifically (legacy compatibility)
@@ -396,7 +401,7 @@ class AoshiAdapter(BaseAdapter):
             receiver_address=self.get_col_val(row, "receiver_address"),
             delivery_method="Tcat",
             product_code=found_code,
-            product_name=p_name,
+            product_name=p_name_output,
             quantity=int(float(self.get_col_val(row, "quantity") or 0)),
             order_mark=formatted_mark,
             original_row=row.to_dict()
