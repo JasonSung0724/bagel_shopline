@@ -145,38 +145,12 @@ jobs:
           docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/frontend:latest
 
   # ===========================================
-  # Run Database Migrations
-  # ===========================================
-  migrate:
-    name: Run Database Migrations
-    runs-on: ubuntu-latest
-    needs: [changes, build-api, build-worker, build-frontend]
-    if: always() && !cancelled() && !failure()
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Run database migrations with Supabase CLI
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: |
-          npx supabase link --project-ref iopyjglbnsevpdrjbfxk --password "$SUPABASE_DB_PASSWORD"
-          npx supabase db push
-
-  # ===========================================
   # Deploy to GCP VM
   # ===========================================
   deploy:
     name: Deploy to GCP VM
     runs-on: ubuntu-latest
-    needs: [changes, build-api, build-worker, build-frontend, migrate]
+    needs: [changes, build-api, build-worker, build-frontend]
     if: always() && !cancelled() && !failure()
 
     permissions:
@@ -211,7 +185,40 @@ jobs:
           SUPABASE_URL=${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}
           INVENTORY_PASSWORD=${{ secrets.INVENTORY_PASSWORD }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
           EOF
+          "
+
+      - name: Copy migration files to VM
+        run: |
+          gcloud compute ssh ${{ env.GCE_INSTANCE }} --zone=${{ env.GCE_ZONE }} --command="mkdir -p /opt/bagel-shop/supabase/migrations"
+          gcloud compute scp --recurse supabase/migrations/* ${{ env.GCE_INSTANCE }}:/opt/bagel-shop/supabase/migrations/ --zone=${{ env.GCE_ZONE }}
+
+      - name: Run database migrations on VM
+        run: |
+          gcloud compute ssh ${{ env.GCE_INSTANCE }} --zone=${{ env.GCE_ZONE }} --command="
+            cd /opt/bagel-shop
+
+            # Install psql if not already installed
+            if ! command -v psql &> /dev/null; then
+              echo 'Installing PostgreSQL client...'
+              sudo apt-get update && sudo apt-get install -y postgresql-client
+            fi
+
+            # Source environment variables
+            set -a
+            source .env
+            set +a
+
+            # Run all migration files in order
+            for migration in supabase/migrations/*.sql; do
+              if [ -f \"\$migration\" ]; then
+                echo \"Running migration: \$migration\"
+                psql \"\$DATABASE_URL\" -f \"\$migration\"
+              fi
+            done
+
+            echo 'Migrations completed successfully'
           "
 
       - name: Deploy to VM
