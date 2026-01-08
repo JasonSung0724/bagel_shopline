@@ -157,20 +157,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.11'
+          node-version: '20'
 
-      - name: Install dependencies
-        run: |
-          pip install alembic sqlalchemy psycopg2-binary python-dotenv
-
-      - name: Run Migrations
+      - name: Link Supabase project
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          alembic upgrade head
+          npx supabase link --project-ref iopyjglbnsevpdrjbfxk --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Run database migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          npx supabase db push
 
   # ===========================================
   # Deploy to GCP VM

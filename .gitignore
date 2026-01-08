@@ -46,3 +46,8 @@ frontend/.vercel/
 # src/config/*.json
 report
 nul
+
+# Supabase
+supabase/.temp/
+supabase/.branches/
+# Keep migrations tracked: supabase/migrations/*.sql
