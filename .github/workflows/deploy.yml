@@ -164,7 +164,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install alembic sqlalchemy[asyncio] asyncpg python-dotenv
+          pip install alembic sqlalchemy psycopg2-binary python-dotenv
 
       - name: Run Migrations
         env:

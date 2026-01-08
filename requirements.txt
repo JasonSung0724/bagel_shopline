@@ -15,5 +15,4 @@ supabase
 python-dotenv
 psycopg2-binary
 alembic>=1.13.0
-sqlalchemy[asyncio]>=2.0.0
-asyncpg
+sqlalchemy>=2.0.0
