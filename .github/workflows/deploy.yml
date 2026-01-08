@@ -145,12 +145,40 @@ jobs:
           docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/frontend:latest
 
   # ===========================================
+  # Run Database Migrations
+  # ===========================================
+  migrate:
+    name: Run Database Migrations
+    runs-on: ubuntu-latest
+    needs: [changes, build-api, build-worker, build-frontend]
+    if: always() && !cancelled() && !failure()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install psycopg2-binary python-dotenv loguru
+
+      - name: Run Migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python run_migrations.py
+
+  # ===========================================
   # Deploy to GCP VM
   # ===========================================
   deploy:
     name: Deploy to GCP VM
     runs-on: ubuntu-latest
-    needs: [changes, build-api, build-worker, build-frontend]
+    needs: [changes, build-api, build-worker, build-frontend, migrate]
     if: always() && !cancelled() && !failure()
 
     permissions:

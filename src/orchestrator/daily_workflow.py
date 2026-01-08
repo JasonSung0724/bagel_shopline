@@ -11,6 +11,7 @@ from src.services.email_service import EmailService
 from src.services.c2c_service import C2CService
 from src.services.shopline_service import ShopLineService
 from src.services.notification_service import NotificationService
+from src.services.sales_service import SalesService
 
 
 class DailyWorkflow:
@@ -21,7 +22,8 @@ class DailyWorkflow:
     1. Fetch emails from Flowtide
     2. Process C2C orders -> Update Google Sheet
     3. Process ShopLine orders -> Update via API
-    4. Send LINE notification
+    4. Process Sales data -> Update daily_sales table
+    5. Send LINE notification
     """
 
     def __init__(self, notify_customers: bool = False):
@@ -34,6 +36,7 @@ class DailyWorkflow:
         self.email_service = EmailService()
         self.c2c_service = C2CService()
         self.shopline_service = ShopLineService()
+        self.sales_service = SalesService()
         self.notification = NotificationService()
         self.notify_customers = notify_customers
 
@@ -67,7 +70,10 @@ class DailyWorkflow:
             # Step 3: Process ShopLine orders
             self._step_process_shopline()
 
-            # Step 4: Send notification
+            # Step 4: Process Sales data
+            self._step_process_sales()
+
+            # Step 5: Send notification
             self._send_notification()
 
             logger.success("每日更新訂單資訊完成")
@@ -142,7 +148,26 @@ class DailyWorkflow:
 
         self.notification.add_message(f"ShopLine訂單-更新追蹤資訊 {tracking_count} 筆, 更新訂單狀態 {status_count} 筆")
 
+    def _step_process_sales(self) -> None:
+        """Step 4: Process Sales data and update daily_sales table."""
+        logger.info("Step 4: 處理銷量資料")
+
+        try:
+            # 從郵件中處理銷量資料
+            success_count, fail_count = self.sales_service.process_sales_from_emails(self._emails)
+
+            if success_count > 0:
+                self.notification.add_message(f"銷量資料-成功處理 {success_count} 個檔案")
+            if fail_count > 0:
+                self.notification.add_message(f"銷量資料-處理失敗 {fail_count} 個檔案")
+            if success_count == 0 and fail_count == 0:
+                self.notification.add_message("銷量資料-沒有找到 A442_QC Excel")
+
+        except Exception as e:
+            logger.error(f"處理銷量資料失敗: {e}")
+            self.notification.add_message(f"銷量資料處理失敗: {e}")
+
     def _send_notification(self) -> None:
         """Send LINE notification."""
-        logger.info("Step 4: 發送 LINE 通知")
+        logger.info("Step 5: 發送 LINE 通知")
         self.notification.send_and_clear()

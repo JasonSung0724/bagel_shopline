@@ -81,6 +81,8 @@ class InventoryRepository(SupabaseRepository):
     TABLE_MASTER_BREADS = "master_breads"
     TABLE_MASTER_BAGS = "master_bags"
     TABLE_MASTER_BOXES = "master_boxes"
+    TABLE_MASTER_SALES_PRODUCTS = "master_sales_products"
+    TABLE_DAILY_SALES = "daily_sales"
 
     def save_snapshot(self, snapshot: "InventorySnapshot") -> Optional[str]:
         """
@@ -1445,4 +1447,182 @@ class InventoryRepository(SupabaseRepository):
         except Exception as e:
             logger.error(f"Failed to update field aliases: {e}")
             return False
+
+    # ============================================================
+    # Sales Methods (銷量相關方法)
+    # ============================================================
+
+    def get_master_sales_products(self) -> List[Dict]:
+        """
+        取得所有銷量商品主檔
+
+        Returns:
+            商品列表
+        """
+        try:
+            result = self.client.table(self.TABLE_MASTER_SALES_PRODUCTS).select("*").order("product_name").execute()
+            return result.data
+        except Exception as e:
+            logger.error(f"Failed to get master sales products: {e}")
+            return []
+
+    def upsert_master_sales_products(self, products: List[Dict]) -> bool:
+        """
+        批次新增/更新銷量商品主檔
+
+        Args:
+            products: 商品列表，格式：
+                [
+                    {
+                        "product_name": "商品名稱",
+                        "category": "bread" or "box",
+                        "first_seen_date": "2026-01-08",
+                        "last_seen_date": "2026-01-08",
+                        "is_active": True
+                    }
+                ]
+
+        Returns:
+            True if successful
+        """
+        try:
+            # 使用 upsert，on_conflict 為 product_name
+            self.client.table(self.TABLE_MASTER_SALES_PRODUCTS).upsert(
+                products,
+                on_conflict="product_name"
+            ).execute()
+
+            logger.success(f"Upserted {len(products)} products to master_sales_products")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to upsert master sales products: {e}")
+            return False
+
+    def save_daily_sales_batch(self, records: List[Dict]) -> bool:
+        """
+        批次儲存每日銷量記錄
+
+        Args:
+            records: 銷量記錄列表，格式：
+                [
+                    {
+                        "sale_date": "2026-01-08",
+                        "product_name": "商品名稱",
+                        "category": "bread" or "box",
+                        "quantity": 100,
+                        "source": "flowtide_qc"
+                    }
+                ]
+
+        Returns:
+            True if successful
+        """
+        try:
+            # 使用 upsert，on_conflict 為 (sale_date, product_name)
+            # Supabase 會自動處理 UNIQUE constraint
+            self.client.table(self.TABLE_DAILY_SALES).upsert(
+                records,
+                on_conflict="sale_date,product_name"
+            ).execute()
+
+            logger.success(f"Saved {len(records)} daily sales records")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save daily sales: {e}")
+            return False
+
+    def get_daily_sales(self, start_date: str, end_date: str = None, category: str = None) -> List[Dict]:
+        """
+        查詢每日銷量記錄
+
+        Args:
+            start_date: 開始日期 (YYYY-MM-DD)
+            end_date: 結束日期 (YYYY-MM-DD)，不指定則查到最新
+            category: 分類過濾 ("bread" or "box")
+
+        Returns:
+            銷量記錄列表
+        """
+        try:
+            query = self.client.table(self.TABLE_DAILY_SALES).select("*").gte("sale_date", start_date)
+
+            if end_date:
+                query = query.lte("sale_date", end_date)
+
+            if category:
+                query = query.eq("category", category)
+
+            result = query.order("sale_date", desc=True).execute()
+            return result.data
+        except Exception as e:
+            logger.error(f"Failed to get daily sales: {e}")
+            return []
+
+    def get_sales_summary(self, days: int = 30) -> Dict:
+        """
+        取得銷量摘要統計
+
+        Args:
+            days: 統計天數
+
+        Returns:
+            摘要資料：
+            {
+                "total_sales": 總銷量,
+                "by_category": {"bread": xxx, "box": xxx},
+                "top_products": [...]
+            }
+        """
+        try:
+            from datetime import datetime, timedelta
+
+            # 計算日期範圍
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
+
+            # 查詢銷量資料
+            records = self.get_daily_sales(
+                start_date.strftime("%Y-%m-%d"),
+                end_date.strftime("%Y-%m-%d")
+            )
+
+            if not records:
+                return {"total_sales": 0, "by_category": {}, "top_products": []}
+
+            # 彙總統計
+            total_sales = 0
+            by_category = {}
+            by_product = {}
+
+            for record in records:
+                quantity = record.get("quantity", 0)
+                category = record.get("category", "unknown")
+                product_name = record.get("product_name", "")
+
+                total_sales += quantity
+
+                if category not in by_category:
+                    by_category[category] = 0
+                by_category[category] += quantity
+
+                if product_name not in by_product:
+                    by_product[product_name] = 0
+                by_product[product_name] += quantity
+
+            # 排序取前10名
+            top_products = sorted(
+                [{"product_name": k, "quantity": v} for k, v in by_product.items()],
+                key=lambda x: x["quantity"],
+                reverse=True
+            )[:10]
+
+            return {
+                "total_sales": total_sales,
+                "by_category": by_category,
+                "top_products": top_products
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get sales summary: {e}")
+            return {"total_sales": 0, "by_category": {}, "top_products": []}
 

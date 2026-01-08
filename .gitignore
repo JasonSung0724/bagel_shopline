@@ -45,3 +45,4 @@ frontend/.vercel/
 # Google service account (keep tracked but be careful)
 # src/config/*.json
 report
+nul
