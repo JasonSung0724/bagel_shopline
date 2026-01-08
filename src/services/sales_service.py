@@ -1,6 +1,6 @@
 """
 Sales Service
-處理銷售資料（來自逢泰 A442_QC Excel 的「訂單實出」欄位）
+處理銷售資料（來自逢泰 A442_QC Excel 的「實出量」欄位）
 """
 
 import io
@@ -20,7 +20,7 @@ class SalesService:
     EXCEL_COLUMN_MAPPING = {
         "出貨日": "sale_date",
         "品名": "product_name",
-        "訂單實出": "quantity",  # 實出量 = 銷量
+        "實出量": "quantity",  # 實出量 = 銷量
     }
 
     # 品項分類關鍵字（與 inventory_service 保持一致）
@@ -60,7 +60,7 @@ class SalesService:
             logger.info(f"總共 {len(df)} 列資料")
 
             # 檢查必要欄位
-            required_columns = ["出貨日", "品名", "訂單實出"]
+            required_columns = ["出貨日", "品名", "實出量"]
             missing_columns = [col for col in required_columns if col not in df.columns]
 
             if missing_columns:
@@ -154,8 +154,8 @@ class SalesService:
             if not product_name:
                 continue
 
-            # 取得訂單實出（銷量）
-            quantity = row.get('訂單實出', 0)
+            # 取得實出量（銷量）
+            quantity = row.get('實出量', 0)
             try:
                 quantity = float(quantity) if pd.notna(quantity) else 0
             except (ValueError, TypeError):
