@@ -164,13 +164,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install psycopg2-binary python-dotenv loguru
+          pip install alembic sqlalchemy[asyncio] asyncpg python-dotenv
 
       - name: Run Migrations
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          python run_migrations.py
+          alembic upgrade head
 
   # ===========================================
   # Deploy to GCP VM
