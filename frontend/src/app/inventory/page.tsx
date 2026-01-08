@@ -620,8 +620,8 @@ export default function InventoryDashboard() {
           setError('無庫存資料，請先同步');
         }
 
-        // Process diagnosis data
-        if (result.data.diagnosis) {
+        // Process diagnosis data (check for valid structure, not just truthy)
+        if (result.data.diagnosis && result.data.diagnosis.bread_items) {
           setDiagnosisData(result.data.diagnosis);
         }
       } else {
