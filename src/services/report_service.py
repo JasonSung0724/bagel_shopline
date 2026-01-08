@@ -157,6 +157,13 @@ class ReportService:
         except Exception as e:
             raise ValueError(f"Failed to read Excel file: {e}")
 
+        # Sort DataFrame by order_id ascending (legacy behavior from get_excel.py)
+        # Must sort at DataFrame level BEFORE conversion to maintain same row order as legacy
+        order_id_col = self.config_service.find_column_name(list(df.columns), "order_id")
+        if order_id_col:
+            df = df.sort_values(by=order_id_col, ascending=True)
+            logger.info(f"[Perf] Sorted DataFrame by '{order_id_col}'")
+
         # Validate that we can find required columns
         validation = self.config_service.validate_columns(list(df.columns))
         missing = [f for f, found in validation.items() if not found]
@@ -167,13 +174,10 @@ class ReportService:
         adapter = self._get_adapter(platform)
         logger.info(f"[Perf] Using adapter: {platform}")
         
-        # Convert to standard items
+        # Convert to standard items (DataFrame is already sorted by order_id)
         t0 = time.time()
         result = adapter.convert(df, self.store_address_service)
         logger.info(f"[Perf] Adapter conversion finished in {time.time() - t0:.4f}s")
-
-        # Sort by order_id ascending (legacy behavior from get_excel.py)
-        result.items.sort(key=lambda x: x.order_id)
         
         # Process items (Box calc, formatting)
         t0 = time.time()

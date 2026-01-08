@@ -68,6 +68,23 @@ class ColumnMappingService:
 
         return result
 
+    def find_column_name(self, df_columns: List[str], field_name: str) -> Optional[str]:
+        """
+        Find actual column name in DataFrame for a given field.
+        Returns the first matching alias found in df_columns, or None.
+        """
+        if not self._loaded:
+            self.load_config()
+
+        df_cols_set = set(str(c).strip() for c in df_columns)
+        aliases = self._mapping.get(field_name, [])
+
+        for alias in aliases:
+            if alias in df_cols_set:
+                return alias
+
+        return None
+
 
 # Backward compatibility alias
 PlatformConfigService = ColumnMappingService
