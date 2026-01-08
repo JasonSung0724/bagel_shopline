@@ -251,13 +251,17 @@ class MixxAdapter(BaseAdapter):
 
     def _process_row(self, row: pd.Series) -> List[StandardOrderItem]:
         p_name_raw = self.get_col_val(row, "product_name")
+        # Split for product code search only (legacy: search uses split value)
         p_name_search = p_name_raw.split("｜")[1] if "｜" in p_name_raw else p_name_raw
+        # Product name output uses original value with -F removed (legacy behavior)
+        p_name_output = p_name_raw.replace("-F", "")
 
         product_code = self.product_service.search_product_code(p_name_search) or ""
 
         try:
-             qty = int(float(self.get_col_val(row, "quantity") or 0))
-        except: qty = 0
+            qty = int(float(self.get_col_val(row, "quantity") or 0))
+        except:
+            qty = 0
 
         # Format order_mark with platform prefix (like legacy: "減醣市集/備註內容")
         # Mixx uses "備註" field specifically (legacy compatibility)
@@ -280,7 +284,7 @@ class MixxAdapter(BaseAdapter):
             receiver_address=self.get_col_val(row, "receiver_address"),
             delivery_method="Tcat",
             product_code=product_code,
-            product_name=p_name_search,
+            product_name=p_name_output,
             quantity=qty,
             order_mark=formatted_mark,
             original_row=row.to_dict()
