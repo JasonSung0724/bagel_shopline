@@ -774,124 +774,60 @@ class InventoryRepository(SupabaseRepository):
             if not items_result.data:
                 return {}
 
-            # 2. Get sales data for past 30 days
-            # Try daily_sales table first (實出量), fallback to inventory_raw_items (stock_out)
+            # 2. Get sales data from daily_sales table (實出量) for past 30 days
             start_date_30d = (datetime.now() - timedelta(days=30)).date().isoformat()
             start_date_20d = (datetime.now() - timedelta(days=20)).date().isoformat()
 
             sales_30d: Dict[str, int] = {}
             sales_20d: Dict[str, int] = {}
             latest_sales: Dict[str, Dict] = {}
-            use_daily_sales = False
 
-            # Try daily_sales table first
-            try:
-                all_sales_records = []
-                page_size = 1000
-                offset = 0
+            # Query daily_sales table with pagination
+            all_sales_records = []
+            page_size = 1000
+            offset = 0
 
-                while True:
-                    sales_result = (
-                        self.client.table(self.TABLE_DAILY_SALES)
-                        .select("product_name, quantity, sale_date")
-                        .gte("sale_date", start_date_30d)
-                        .range(offset, offset + page_size - 1)
-                        .execute()
-                    )
-
-                    if not sales_result.data:
-                        break
-
-                    all_sales_records.extend(sales_result.data)
-
-                    if len(sales_result.data) < page_size:
-                        break
-
-                    offset += page_size
-
-                if all_sales_records:
-                    use_daily_sales = True
-                    logger.info(f"Using daily_sales table: {len(all_sales_records)} records")
-
-                    for row in all_sales_records:
-                        name = row.get("product_name", "")
-                        quantity = int(row.get("quantity", 0) or 0)
-                        date_str = row.get("sale_date", "")[:10] if row.get("sale_date") else ""
-
-                        if not name:
-                            continue
-
-                        sales_30d[name] = sales_30d.get(name, 0) + quantity
-
-                        if date_str and date_str >= start_date_20d:
-                            sales_20d[name] = sales_20d.get(name, 0) + quantity
-
-                        if date_str:
-                            if name not in latest_sales:
-                                latest_sales[name] = {"date": date_str, "quantity": quantity}
-                            elif date_str > latest_sales[name]["date"]:
-                                latest_sales[name] = {"date": date_str, "quantity": quantity}
-                            elif date_str == latest_sales[name]["date"]:
-                                latest_sales[name]["quantity"] += quantity
-
-            except Exception as e:
-                logger.warning(f"daily_sales table not available, falling back to stock_out: {e}")
-
-            # Fallback to inventory_raw_items (stock_out) if daily_sales not available
-            if not use_daily_sales:
-                logger.info("Using inventory_raw_items.stock_out as fallback")
-                snapshots_result = (
-                    self.client.table(self.TABLE_SNAPSHOTS)
-                    .select("id, snapshot_date")
-                    .gte("snapshot_date", start_date_30d)
+            while True:
+                sales_result = (
+                    self.client.table(self.TABLE_DAILY_SALES)
+                    .select("product_name, quantity, sale_date")
+                    .gte("sale_date", start_date_30d)
+                    .range(offset, offset + page_size - 1)
                     .execute()
                 )
 
-                if snapshots_result.data:
-                    snapshot_date_map = {s["id"]: s["snapshot_date"][:10] for s in snapshots_result.data}
-                    snapshot_ids = list(snapshot_date_map.keys())
+                if not sales_result.data:
+                    break
 
-                    all_raw_items = []
-                    page_size = 1000
-                    offset = 0
+                all_sales_records.extend(sales_result.data)
 
-                    while True:
-                        raw_items_result = (
-                            self.client.table(self.TABLE_RAW_ITEMS)
-                            .select("product_name, stock_out, snapshot_id")
-                            .in_("snapshot_id", snapshot_ids)
-                            .range(offset, offset + page_size - 1)
-                            .execute()
-                        )
+                if len(sales_result.data) < page_size:
+                    break
 
-                        if not raw_items_result.data:
-                            break
+                offset += page_size
 
-                        all_raw_items.extend(raw_items_result.data)
+            logger.info(f"Loaded {len(all_sales_records)} records from daily_sales table")
 
-                        if len(raw_items_result.data) < page_size:
-                            break
+            for row in all_sales_records:
+                name = row.get("product_name", "")
+                quantity = int(row.get("quantity", 0) or 0)
+                date_str = row.get("sale_date", "")[:10] if row.get("sale_date") else ""
 
-                        offset += page_size
+                if not name:
+                    continue
 
-                    for row in all_raw_items:
-                        name = row["product_name"]
-                        stock_out = int(row.get("stock_out", 0) or 0)
-                        snapshot_id = row.get("snapshot_id")
-                        date_str = snapshot_date_map.get(snapshot_id, "")
+                sales_30d[name] = sales_30d.get(name, 0) + quantity
 
-                        sales_30d[name] = sales_30d.get(name, 0) + stock_out
+                if date_str and date_str >= start_date_20d:
+                    sales_20d[name] = sales_20d.get(name, 0) + quantity
 
-                        if date_str and date_str >= start_date_20d:
-                            sales_20d[name] = sales_20d.get(name, 0) + stock_out
-
-                        if date_str:
-                            if name not in latest_sales:
-                                latest_sales[name] = {"date": date_str, "quantity": stock_out}
-                            elif date_str > latest_sales[name]["date"]:
-                                latest_sales[name] = {"date": date_str, "quantity": stock_out}
-                            elif date_str == latest_sales[name]["date"]:
-                                latest_sales[name]["quantity"] += stock_out
+                if date_str:
+                    if name not in latest_sales:
+                        latest_sales[name] = {"date": date_str, "quantity": quantity}
+                    elif date_str > latest_sales[name]["date"]:
+                        latest_sales[name] = {"date": date_str, "quantity": quantity}
+                    elif date_str == latest_sales[name]["date"]:
+                        latest_sales[name]["quantity"] += quantity
 
             # 3. Get product mappings (bread to bag)
             mappings = self.get_product_mappings()
