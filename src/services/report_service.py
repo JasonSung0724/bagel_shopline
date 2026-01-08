@@ -160,9 +160,11 @@ class ReportService:
         # Sort DataFrame by order_id ascending (legacy behavior from get_excel.py)
         # Must sort at DataFrame level BEFORE conversion to maintain same row order as legacy
         order_id_col = self.config_service.find_column_name(list(df.columns), "order_id")
-        if order_id_col:
-            df = df.sort_values(by=order_id_col, ascending=True)
-            logger.info(f"[Perf] Sorted DataFrame by '{order_id_col}'")
+        if not order_id_col:
+            raise ValueError(f"Cannot find order_id column in Excel. Available columns: {list(df.columns)[:10]}...")
+
+        df = df.sort_values(by=order_id_col, ascending=True)
+        logger.info(f"[Perf] Sorted DataFrame by '{order_id_col}'")
 
         # Validate that we can find required columns
         validation = self.config_service.validate_columns(list(df.columns))

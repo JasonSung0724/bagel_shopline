@@ -24,7 +24,16 @@ setup_logger(log_file="logs/flask.log")
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", secrets.token_hex(32))
-CORS(app, supports_credentials=True)  # Enable CORS for frontend with credentials
+CORS(app, supports_credentials=True, expose_headers=[
+    'Content-Disposition',
+    'X-Report-Original-Rows',
+    'X-Report-Total-Orders',
+    'X-Report-Row-Count',
+    'X-Report-Platform',
+    'X-Report-Time-Taken',
+    'X-Report-Error-Count',
+    'X-Report-Errors'
+])  # Enable CORS for frontend with credentials and expose custom headers
 
 # Inventory page password (from environment variable, required)
 INVENTORY_PASSWORD = os.getenv("INVENTORY_PASSWORD")
