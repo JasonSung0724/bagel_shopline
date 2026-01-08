@@ -203,9 +203,11 @@ class ShoplineAdapter(BaseAdapter):
         except: qty = 0
 
         # Arrival time: 1 = 上午到貨 (13點前), 2 = 下午到貨 (14~18)
-        # Legacy logic: exact match required (not contains)
+        # Legacy logic: reads "到貨時間" column directly (column index 17 in old code)
         arrival = ""
-        raw_arrival = self.get_col_val(row, "arrival_time")
+        raw_arrival = ""
+        if "到貨時間" in row and pd.notna(row["到貨時間"]):
+            raw_arrival = str(row["到貨時間"]).strip()
         if raw_arrival == "上午到貨":
             arrival = 1
         elif raw_arrival == "下午到貨":

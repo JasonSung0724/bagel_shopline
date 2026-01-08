@@ -171,6 +171,9 @@ class ReportService:
         t0 = time.time()
         result = adapter.convert(df, self.store_address_service)
         logger.info(f"[Perf] Adapter conversion finished in {time.time() - t0:.4f}s")
+
+        # Sort by order_id ascending (legacy behavior from get_excel.py)
+        result.items.sort(key=lambda x: x.order_id)
         
         # Process items (Box calc, formatting)
         t0 = time.time()
