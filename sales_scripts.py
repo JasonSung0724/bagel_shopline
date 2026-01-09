@@ -1,17 +1,19 @@
 """
-Sales sync script (銷量同步腳本).
+Sales backfill script (銷量回填腳本).
 
-This script is a CLI wrapper for SalesService.
+This script is a CLI wrapper for SalesService.backfill().
 
 Usage:
-    # Daily sync (via main_scripts.py, not this script)
-    python main_scripts.py
+    # Backfill specific date range
+    python sales_scripts.py --start 2026-01-01 --end 2026-01-05
 
-    # Backfill historical data
-    python sales_scripts.py --backfill --days 30
+    # Backfill single day
+    python sales_scripts.py --start 2026-01-05 --end 2026-01-05
 
     # Dry run (don't save to database)
-    python sales_scripts.py --backfill --days 30 --dry-run
+    python sales_scripts.py --start 2026-01-01 --end 2026-01-05 --dry-run
+
+    # Daily sync is handled by main_scripts.py, not this script
 """
 # Load .env FIRST before any other imports
 from pathlib import Path
@@ -20,6 +22,7 @@ _project_root = Path(__file__).resolve().parent
 load_dotenv(_project_root / ".env")
 
 import argparse
+from datetime import datetime
 from loguru import logger
 
 from src.utils.logger import setup_logger
@@ -30,22 +33,16 @@ def main():
     """Run sales backfill."""
     parser = argparse.ArgumentParser(description="Sales backfill script (銷量回填腳本)")
     parser.add_argument(
-        "--backfill",
-        action="store_true",
-        help="Run backfill mode (required)"
+        "--start",
+        type=str,
+        required=True,
+        help="Start date in YYYY-MM-DD format (required)"
     )
     parser.add_argument(
-        "--days",
-        type=int,
-        default=30,
-        help="Number of days to look back (default: 30)"
-    )
-    parser.add_argument(
-        "--start-from",
-        type=int,
-        default=0,
-        help="Start backfill from N days ago (default: 0 = today). "
-             "Example: --start-from 30 --days 30 = backfill days 30~60"
+        "--end",
+        type=str,
+        required=True,
+        help="End date in YYYY-MM-DD format (required)"
     )
     parser.add_argument(
         "--dry-run",
@@ -55,13 +52,18 @@ def main():
 
     args = parser.parse_args()
 
-    # Require --backfill flag
-    if not args.backfill:
-        print("此腳本專門用於回填歷史資料。")
-        print("每日同步請使用 main_scripts.py\n")
-        print("用法:")
-        print("  python sales_scripts.py --backfill --days 30")
-        print("  python sales_scripts.py --backfill --days 30 --dry-run")
+    # Parse dates
+    try:
+        start_date = datetime.strptime(args.start, "%Y-%m-%d")
+        end_date = datetime.strptime(args.end, "%Y-%m-%d")
+    except ValueError:
+        print("錯誤: 日期格式必須是 YYYY-MM-DD")
+        print("例如: python sales_scripts.py --start 2026-01-01 --end 2026-01-05")
+        return
+
+    # Validate date range
+    if start_date > end_date:
+        print("錯誤: 開始日期不能晚於結束日期")
         return
 
     # Setup logging
@@ -70,11 +72,7 @@ def main():
     logger.info("=" * 50)
     logger.info("開始執行 sales_scripts.py (回填模式)")
     logger.info("=" * 50)
-
-    if args.start_from > 0:
-        logger.info(f"從 {args.start_from} 天前開始，回溯 {args.days} 天")
-    else:
-        logger.info(f"回溯 {args.days} 天")
+    logger.info(f"日期範圍: {args.start} ~ {args.end}")
 
     if args.dry_run:
         logger.info("[DRY RUN] 不會保存到資料庫")
@@ -82,8 +80,8 @@ def main():
     # Run backfill via SalesService
     sales_service = SalesService()
     success_count, fail_count = sales_service.backfill(
-        days_back=args.days,
-        start_days_ago=args.start_from,
+        start_date=start_date,
+        end_date=end_date,
         dry_run=args.dry_run
     )
 

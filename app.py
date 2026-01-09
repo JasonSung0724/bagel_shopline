@@ -381,12 +381,9 @@ def _run_sales_sync_task(task_id: str, start_date: datetime, end_date: datetime)
         background_tasks[task_id]["started_at"] = datetime.now().isoformat()
 
         sales_service = SalesService()
-        days_back = (end_date - start_date).days + 1
-        start_days_ago = (datetime.now() - end_date).days
-
         success_count, fail_count = sales_service.backfill(
-            days_back=days_back,
-            start_days_ago=start_days_ago,
+            start_date=start_date,
+            end_date=end_date,
             dry_run=False
         )
 
@@ -496,12 +493,9 @@ def patch_sales_sync():
 
         # Sync mode: blocking execution
         sales_service = SalesService()
-        days_back = (end_date - start_date).days + 1
-        start_days_ago = (datetime.now() - end_date).days
-
         success_count, fail_count = sales_service.backfill(
-            days_back=days_back,
-            start_days_ago=start_days_ago,
+            start_date=start_date,
+            end_date=end_date,
             dry_run=False
         )
 
