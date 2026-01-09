@@ -14,14 +14,6 @@ export interface Product {
     created_at?: string;
 }
 
-// Assuming NewProduct interface is defined elsewhere or will be added.
-// For example:
-// export interface NewProduct {
-//     code: string;
-//     name: string;
-//     qty: number;
-// }
-
 const API_BASE = '/api';
 
 export const productApi = {
@@ -31,7 +23,7 @@ export const productApi = {
         return res.json();
     },
 
-    create: async (product: any /* NewProduct */): Promise<Product> => { // Changed type to 'any' to avoid compile error without NewProduct definition
+    create: async (product: { code: string; name: string; qty: number }): Promise<Product> => {
         const res = await fetch(`${API_BASE}/products`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -59,17 +51,17 @@ export const productApi = {
     },
 
     addAlias: async (code: string, alias: string): Promise<Product> => {
-        const res = await fetch(`${API_BASE}/products/${code}/aliases`, {
+        const res = await fetch(`${API_BASE}/aliases`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ alias }),
+            body: JSON.stringify({ product_code: code, alias }),
         });
         if (!res.ok) throw new Error('Failed to add alias');
         return res.json();
     },
 
     deleteAlias: async (alias_id: number): Promise<boolean> => {
-        const res = await fetch(`${API_BASE}/api/aliases/${alias_id}`, {
+        const res = await fetch(`${API_BASE}/aliases/${alias_id}`, {
             method: 'DELETE',
         });
         if (!res.ok) throw new Error('Failed to delete alias');

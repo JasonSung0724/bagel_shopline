@@ -14,7 +14,7 @@ export default function ProductManager() {
     // Editing states
     const [editingCode, setEditingCode] = useState<string | null>(null);
     const [editQty, setEditQty] = useState<number>(0);
-    const [newAlias, setNewAlias] = useState('');
+    const [newAliasMap, setNewAliasMap] = useState<Record<string, string>>({});
 
     // Creating states
     const [isCreating, setIsCreating] = useState(false);
@@ -85,14 +85,23 @@ export default function ProductManager() {
     };
 
     const handleAddAlias = async (code: string) => {
-        if (!newAlias.trim()) return;
+        const aliasValue = newAliasMap[code]?.trim();
+        if (!aliasValue) return;
         try {
-            await productApi.addAlias(code, newAlias);
-            setNewAlias('');
+            await productApi.addAlias(code, aliasValue);
+            setNewAliasMap(prev => ({ ...prev, [code]: '' }));
             loadProducts();
         } catch (err) {
             alert('新增別名失敗');
         }
+    };
+
+    const expandAll = () => {
+        setExpandedRows(new Set(filteredProducts.map(p => p.code)));
+    };
+
+    const collapseAll = () => {
+        setExpandedRows(new Set());
     };
 
     const handleDeleteAlias = async (aliasId: number) => {
@@ -168,14 +177,26 @@ export default function ProductManager() {
             )}
 
             {/* Search */}
-            <div className="mb-4">
+            <div className="mb-4 flex gap-2">
                 <input
                     type="text"
                     placeholder="搜尋代碼、名稱或關鍵字..."
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
+                    className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
                 />
+                <button
+                    onClick={expandAll}
+                    className="px-3 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 flex items-center gap-1"
+                >
+                    <ChevronDown className="w-4 h-4" /> 全部展開
+                </button>
+                <button
+                    onClick={collapseAll}
+                    className="px-3 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 flex items-center gap-1"
+                >
+                    <ChevronUp className="w-4 h-4" /> 全部關閉
+                </button>
             </div>
 
             {/* List */}
@@ -250,8 +271,8 @@ export default function ProductManager() {
                                     <input
                                         type="text"
                                         placeholder="新增關鍵字 (例如: 巧克力貝果)"
-                                        value={newAlias}
-                                        onChange={e => setNewAlias(e.target.value)}
+                                        value={newAliasMap[product.code] || ''}
+                                        onChange={e => setNewAliasMap(prev => ({ ...prev, [product.code]: e.target.value }))}
                                         className="flex-1 px-2 py-1 border rounded text-sm focus:ring-1 focus:ring-green-500"
                                         onKeyDown={e => {
                                             if (e.key === 'Enter') handleAddAlias(product.code);
@@ -259,7 +280,7 @@ export default function ProductManager() {
                                     />
                                     <button
                                         onClick={() => handleAddAlias(product.code)}
-                                        disabled={!newAlias.trim()}
+                                        disabled={!(newAliasMap[product.code]?.trim())}
                                         className="px-3 py-1 bg-gray-100 text-gray-600 rounded text-xs hover:bg-gray-200 disabled:opacity-50"
                                     >
                                         新增
