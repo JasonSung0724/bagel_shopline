@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from loguru import logger
 
 from src.models.email_attachment import EmailData
-from src.repositories.supabase_repository import SupabaseRepository
+from src.repositories.supabase_repository import InventoryRepository
 
 
 class SalesService:
@@ -29,7 +29,7 @@ class SalesService:
 
     def __init__(self):
         """初始化 Sales Service"""
-        self.repo = SupabaseRepository()
+        self.repo = InventoryRepository()
 
     def parse_sales_excel(self, content: bytes, filename: str = "") -> Tuple[datetime, Dict[str, Dict]]:
         """
