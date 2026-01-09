@@ -5,8 +5,8 @@ Sales Service
 
 import io
 import pandas as pd
-from typing import List, Dict, Tuple
-from datetime import datetime
+from typing import List, Dict, Tuple, Optional
+from datetime import datetime, timedelta
 from loguru import logger
 
 from src.models.email_attachment import EmailData
@@ -337,3 +337,89 @@ class SalesService:
                     fail_count += 1
 
         return success_count, fail_count
+
+    def backfill(
+        self,
+        days_back: int = 30,
+        start_days_ago: int = 0,
+        dry_run: bool = False
+    ) -> Tuple[int, int]:
+        """
+        回填歷史銷量資料
+
+        Args:
+            days_back: 回溯天數
+            start_days_ago: 從 N 天前開始回溯
+            dry_run: True = 只解析不保存到資料庫
+
+        Returns:
+            (成功處理數, 失敗數)
+        """
+        from src.services.email_service import EmailService
+
+        email_service = EmailService()
+
+        # 計算日期範圍
+        end_date = datetime.now() - timedelta(days=start_days_ago)
+        start_date = end_date - timedelta(days=days_back)
+
+        logger.info(f"回填日期範圍: {start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}")
+        if dry_run:
+            logger.info("[DRY RUN] 不會保存到資料庫")
+
+        # 逐日抓取郵件
+        all_emails = []
+        current_date = start_date
+
+        while current_date <= end_date:
+            try:
+                emails = email_service.fetch_flowtide_emails(current_date)
+                if emails:
+                    all_emails.extend(emails)
+                    logger.info(f"{current_date.strftime('%Y-%m-%d')}: 找到 {len(emails)} 封郵件")
+            except Exception as e:
+                logger.warning(f"{current_date.strftime('%Y-%m-%d')}: 抓取郵件失敗 - {e}")
+
+            current_date += timedelta(days=1)
+
+        if not all_emails:
+            logger.warning("沒有找到符合條件的郵件")
+            return 0, 0
+
+        logger.info(f"總共找到 {len(all_emails)} 封郵件")
+
+        # 處理每封郵件
+        total_success = 0
+        total_fail = 0
+
+        for email in all_emails:
+            qc_attachments = email.get_flowtide_attachments()
+
+            for attachment in qc_attachments:
+                try:
+                    logger.info(f"處理附件: {attachment.filename}")
+
+                    # 解析 Excel
+                    sale_date, sales_data = self.parse_sales_excel(
+                        attachment.content,
+                        attachment.filename
+                    )
+
+                    if dry_run:
+                        logger.info(f"[DRY RUN] 解析成功: {sale_date.strftime('%Y-%m-%d')}, {len(sales_data)} 個品項")
+                        total_success += 1
+                    else:
+                        if self.save_daily_sales(sale_date, sales_data):
+                            total_success += 1
+                        else:
+                            total_fail += 1
+
+                except Exception as e:
+                    logger.error(f"處理附件失敗 {attachment.filename}: {e}")
+                    total_fail += 1
+
+        logger.info("=" * 50)
+        logger.info(f"回填完成: 成功 {total_success} 個, 失敗 {total_fail} 個")
+        logger.info("=" * 50)
+
+        return total_success, total_fail
