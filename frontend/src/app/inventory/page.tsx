@@ -382,9 +382,11 @@ export default function InventoryDashboard() {
 
   // Sync tool states
   const [showSyncTool, setShowSyncTool] = useState(false);
+  const [showSalesSyncTool, setShowSalesSyncTool] = useState(false);
   const [syncStartDate, setSyncStartDate] = useState<string>('');
   const [syncEndDate, setSyncEndDate] = useState<string>('');
   const [syncLoading, setSyncLoading] = useState(false);
+  const [salesSyncLoading, setSalesSyncLoading] = useState(false);
   // syncTaskId removed - no longer tracking task status
   const [syncTaskStatus, setSyncTaskStatus] = useState<{
     status: 'pending' | 'running' | 'completed' | 'failed' | 'started';
@@ -396,6 +398,10 @@ export default function InventoryDashboard() {
       skipped_count?: number;
       details?: Array<{ date: string; success: boolean; message: string }>;
     };
+    error?: string;
+  } | null>(null);
+  const [salesSyncTaskStatus, setSalesSyncTaskStatus] = useState<{
+    status: 'started' | 'failed';
     error?: string;
   } | null>(null);
 
@@ -788,6 +794,57 @@ export default function InventoryDashboard() {
     setSyncLoading(false);
   };
 
+  // Handle sales date range sync (補銷量)
+  const handleSalesDateRangeSync = async () => {
+    if (!syncStartDate || !syncEndDate) {
+      return;
+    }
+
+    setSalesSyncLoading(true);
+    setSalesSyncTaskStatus(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/sales/sync`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          start_date: syncStartDate,
+          end_date: syncEndDate,
+          async: true,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setSalesSyncTaskStatus({ status: 'started' });
+        setSalesSyncLoading(false);
+      } else {
+        setSalesSyncTaskStatus({
+          status: 'failed',
+          error: result.error || '啟動銷量同步任務失敗',
+        });
+        setSalesSyncLoading(false);
+      }
+    } catch {
+      setSalesSyncTaskStatus({
+        status: 'failed',
+        error: '連線錯誤，請稍後再試',
+      });
+      setSalesSyncLoading(false);
+    }
+  };
+
+  // Reset sales sync tool state
+  const resetSalesSyncTool = () => {
+    setSyncStartDate('');
+    setSyncEndDate('');
+    setSalesSyncTaskStatus(null);
+    setSalesSyncLoading(false);
+  };
+
   // Computed Totals
   const totals = useMemo(() => {
     return {
@@ -1048,13 +1105,22 @@ export default function InventoryDashboard() {
 
             {/* Buttons */}
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 ml-2">
-              {/* Sync Tool Button */}
+              {/* Sync Inventory Button */}
               <button
                 onClick={() => setShowSyncTool(true)}
                 className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-[#EB5C20] text-white rounded-lg hover:bg-[#d44c15] transition-colors"
               >
                 <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">補同步</span>
+                <span className="hidden sm:inline">補庫存</span>
+              </button>
+
+              {/* Sync Sales Button */}
+              <button
+                onClick={() => setShowSalesSyncTool(true)}
+                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                <TrendingUp className="w-4 h-4" />
+                <span className="hidden sm:inline">補銷量</span>
               </button>
 
               {/* Refresh Button */}
@@ -2753,6 +2819,139 @@ export default function InventoryDashboard() {
                   ) : (
                     <>
                       <Download className="w-4 h-4" />
+                      開始同步
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sales Sync Tool Modal */}
+      {showSalesSyncTool && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-blue-500" />
+                補同步銷量資料
+              </h3>
+              <button
+                onClick={() => {
+                  setShowSalesSyncTool(false);
+                  resetSalesSyncTool();
+                }}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-gray-600">
+                選擇日期範圍，系統將從郵件中補同步該期間的銷量資料（訂單實出）。任務會在背景執行，您可以繼續操作其他功能。
+              </p>
+
+              {/* Date Range Inputs */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    開始日期
+                  </label>
+                  <input
+                    type="date"
+                    value={syncStartDate}
+                    onChange={(e) => setSyncStartDate(e.target.value)}
+                    max={syncEndDate || new Date().toISOString().slice(0, 10)}
+                    disabled={salesSyncLoading}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    結束日期
+                  </label>
+                  <input
+                    type="date"
+                    value={syncEndDate}
+                    onChange={(e) => setSyncEndDate(e.target.value)}
+                    min={syncStartDate}
+                    max={new Date().toISOString().slice(0, 10)}
+                    disabled={salesSyncLoading}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+              {/* Task Status */}
+              {salesSyncTaskStatus && (
+                <div className={`p-3 rounded-lg flex items-start gap-3 ${
+                  salesSyncTaskStatus.status === 'started'
+                    ? 'bg-green-50 border border-green-200'
+                    : 'bg-red-50 border border-red-200'
+                }`}>
+                  {salesSyncTaskStatus.status === 'started' ? (
+                    <>
+                      <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-green-700">銷量同步任務已啟動</p>
+                        <p className="text-xs text-green-600 mt-1">
+                          任務正在背景執行中，請稍候數分鐘後重新整理頁面查看結果。
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-red-700">同步失敗</p>
+                        <p className="text-xs text-red-600 mt-1">
+                          {salesSyncTaskStatus.error || '未知錯誤'}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Info Box */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+                <Clock className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-600">
+                  提示：銷量資料來自逢泰 A442_QC Excel 的「訂單實出」欄位。最多可同步 90 天的資料。
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  setShowSalesSyncTool(false);
+                  resetSalesSyncTool();
+                }}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                {salesSyncTaskStatus?.status === 'started' ? '關閉' : '取消'}
+              </button>
+              {salesSyncTaskStatus?.status !== 'started' && (
+                <button
+                  onClick={handleSalesDateRangeSync}
+                  disabled={!syncStartDate || !syncEndDate || salesSyncLoading}
+                  className="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {salesSyncLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      執行中...
+                    </>
+                  ) : (
+                    <>
+                      <TrendingUp className="w-4 h-4" />
                       開始同步
                     </>
                   )}

@@ -16,6 +16,7 @@ from flask_cors import CORS
 from src.utils.logger import setup_logger
 from src.orchestrator.inventory_workflow import InventoryWorkflow
 from src.services.inventory_service import InventoryService
+from src.services.sales_service import SalesService
 from src.services.product_config_service import ProductConfigService
 from src.services.platform_config_service import ColumnMappingService
 
@@ -68,6 +69,7 @@ def index():
             "/api/inventory/trend": "Get stock trend (庫存趨勢)",
             "/api/inventory/sales-trend": "Get sales trend based on stock_out (銷量趨勢)",
             "/api/inventory/product-mappings": "Get/Add/Delete product mappings (麵包與塑膠袋對照)",
+            "/api/sales/sync": "PATCH: Sync sales data for specific date range (補銷量)",
             "/api/auth/verify": "Verify inventory page password",
         }
     }), 200
@@ -357,6 +359,158 @@ def patch_inventory_sync():
 
         status_code = 200 if result["success"] else 404
         return jsonify(result), status_code
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# ===========================================
+# Sales API Endpoints (銷量資料)
+# ===========================================
+
+def _run_sales_sync_task(task_id: str, start_date: datetime, end_date: datetime):
+    """
+    Background task to run sales sync.
+    Updates the task status in background_tasks dict.
+    """
+    try:
+        background_tasks[task_id]["status"] = "running"
+        background_tasks[task_id]["started_at"] = datetime.now().isoformat()
+
+        sales_service = SalesService()
+        days_back = (end_date - start_date).days + 1
+        start_days_ago = (datetime.now() - end_date).days
+
+        success_count, fail_count = sales_service.backfill(
+            days_back=days_back,
+            start_days_ago=start_days_ago,
+            dry_run=False
+        )
+
+        background_tasks[task_id]["status"] = "completed"
+        background_tasks[task_id]["result"] = {
+            "success": success_count > 0 or fail_count == 0,
+            "success_count": success_count,
+            "fail_count": fail_count,
+            "message": f"成功處理 {success_count} 個檔案，失敗 {fail_count} 個"
+        }
+        background_tasks[task_id]["completed_at"] = datetime.now().isoformat()
+
+    except Exception as e:
+        background_tasks[task_id]["status"] = "failed"
+        background_tasks[task_id]["error"] = str(e)
+        background_tasks[task_id]["completed_at"] = datetime.now().isoformat()
+
+
+@app.route("/api/sales/sync", methods=["PATCH"])
+def patch_sales_sync():
+    """
+    Sync sales data for a specific date range (補銷量).
+
+    Body JSON:
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format
+        async: Run in background (optional, default: true)
+
+    Returns:
+        If async=false: JSON with sync result details (blocking)
+        If async=true: JSON with task_id for status polling
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "Request body is required"
+            }), 400
+
+        run_async = data.get("async", True)
+
+        # Parse dates
+        if not data.get("start_date") or not data.get("end_date"):
+            return jsonify({
+                "success": False,
+                "error": "'start_date' and 'end_date' are required"
+            }), 400
+
+        try:
+            start_date = datetime.strptime(data["start_date"], "%Y-%m-%d")
+            end_date = datetime.strptime(data["end_date"], "%Y-%m-%d")
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "Invalid date format. Use YYYY-MM-DD"
+            }), 400
+
+        # Validate date range
+        if start_date > end_date:
+            return jsonify({
+                "success": False,
+                "error": "start_date must be before or equal to end_date"
+            }), 400
+
+        # Limit to max 90 days
+        days_diff = (end_date - start_date).days
+        if days_diff > 90:
+            return jsonify({
+                "success": False,
+                "error": f"Date range too large ({days_diff} days). Maximum is 90 days."
+            }), 400
+
+        # Async mode: run in background thread
+        if run_async:
+            task_id = str(uuid.uuid4())
+            background_tasks[task_id] = {
+                "id": task_id,
+                "type": "sales_sync",
+                "status": "pending",
+                "start_date": start_date.strftime("%Y-%m-%d"),
+                "end_date": end_date.strftime("%Y-%m-%d"),
+                "created_at": datetime.now().isoformat(),
+                "started_at": None,
+                "completed_at": None,
+                "result": None,
+                "error": None,
+            }
+
+            # Start background thread
+            thread = threading.Thread(
+                target=_run_sales_sync_task,
+                args=(task_id, start_date, end_date),
+                daemon=True
+            )
+            thread.start()
+
+            return jsonify({
+                "success": True,
+                "async": True,
+                "task_id": task_id,
+                "message": f"銷量同步任務已啟動，請使用 task_id 查詢進度",
+                "start_date": start_date.strftime("%Y-%m-%d"),
+                "end_date": end_date.strftime("%Y-%m-%d"),
+            }), 202  # 202 Accepted
+
+        # Sync mode: blocking execution
+        sales_service = SalesService()
+        days_back = (end_date - start_date).days + 1
+        start_days_ago = (datetime.now() - end_date).days
+
+        success_count, fail_count = sales_service.backfill(
+            days_back=days_back,
+            start_days_ago=start_days_ago,
+            dry_run=False
+        )
+
+        return jsonify({
+            "success": success_count > 0 or fail_count == 0,
+            "success_count": success_count,
+            "fail_count": fail_count,
+            "message": f"成功處理 {success_count} 個檔案，失敗 {fail_count} 個"
+        }), 200
 
     except Exception as e:
         return jsonify({
