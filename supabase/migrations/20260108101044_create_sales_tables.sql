@@ -51,5 +51,5 @@ CREATE POLICY "Allow all for service role" ON daily_sales
 
 -- Add comments for documentation
 COMMENT ON TABLE master_sales_products IS 'Master product list for sales tracking with auto-adaptive updates';
-COMMENT ON TABLE daily_sales IS 'Daily sales records from A442_QC Excel files, tracking 訂單實出 (actual shipment quantity)';
-COMMENT ON COLUMN daily_sales.quantity IS 'Actual shipment quantity from 訂單實出 field, supports zero-quantity records for historical products';
+COMMENT ON TABLE daily_sales IS 'Daily sales records from A442_QC Excel files, tracking 實出量 (actual shipment quantity)';
+COMMENT ON COLUMN daily_sales.quantity IS 'Actual shipment quantity from 實出量 field, supports zero-quantity records for historical products';
