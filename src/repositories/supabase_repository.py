@@ -500,7 +500,7 @@ class InventoryRepository(SupabaseRepository):
             batch_size = 10
 
             for i in range(0, len(snapshot_ids), batch_size):
-                batch_ids = snapshot_ids[i:i + batch_size]
+                batch_ids = snapshot_ids[i : i + batch_size]
 
                 # Paginate within each batch
                 page_size = 1000
@@ -1239,7 +1239,7 @@ class InventoryRepository(SupabaseRepository):
         try:
             # Query all product codes (limit 1000 for now, implementation plan assumes simplified logic)
             result = self.client.table("product_codes").select("*").execute()
-            
+
             if not result.data:
                 return {}
 
@@ -1265,7 +1265,7 @@ class InventoryRepository(SupabaseRepository):
 
         try:
             # Query all aliases
-            # Note: If there are many aliases (>1000), need pagination. 
+            # Note: If there are many aliases (>1000), need pagination.
             # For now assuming <1000 for simplicity as per current config size.
             result = self.client.table("product_aliases").select("alias, product_code").execute()
 
@@ -1293,7 +1293,7 @@ class InventoryRepository(SupabaseRepository):
             # Fetch products
             products_res = self.client.table("product_codes").select("*").execute()
             products = products_res.data if products_res.data else []
-            
+
             # Fetch aliases
             aliases_res = self.client.table("product_aliases").select("*").execute()
             aliases = aliases_res.data if aliases_res.data else []
@@ -1311,7 +1311,7 @@ class InventoryRepository(SupabaseRepository):
             for p in products:
                 p["aliases"] = alias_map.get(p["code"], [])
                 result.append(p)
-            
+
             return result
 
         except Exception as e:
@@ -1397,11 +1397,7 @@ class InventoryRepository(SupabaseRepository):
         try:
             # Upsert each field
             for field_name, aliases in mappings.items():
-                data = {
-                    "field_name": field_name,
-                    "aliases": aliases,
-                    "updated_at": "now()"
-                }
+                data = {"field_name": field_name, "aliases": aliases, "updated_at": "now()"}
                 self.client.table("column_mappings").upsert(data, on_conflict="field_name").execute()
             return True
         except Exception as e:
@@ -1416,11 +1412,7 @@ class InventoryRepository(SupabaseRepository):
             return False
 
         try:
-            data = {
-                "field_name": field_name,
-                "aliases": aliases,
-                "updated_at": "now()"
-            }
+            data = {"field_name": field_name, "aliases": aliases, "updated_at": "now()"}
             self.client.table("column_mappings").upsert(data, on_conflict="field_name").execute()
             return True
         except Exception as e:
@@ -1433,7 +1425,7 @@ class InventoryRepository(SupabaseRepository):
 
     def get_master_sales_products(self) -> List[Dict]:
         """
-        取得所有銷量商品主檔
+        取得所有銷量商品主檔ㄇ
 
         Returns:
             商品列表
@@ -1466,10 +1458,7 @@ class InventoryRepository(SupabaseRepository):
         """
         try:
             # 使用 upsert，on_conflict 為 product_name
-            self.client.table(self.TABLE_MASTER_SALES_PRODUCTS).upsert(
-                products,
-                on_conflict="product_name"
-            ).execute()
+            self.client.table(self.TABLE_MASTER_SALES_PRODUCTS).upsert(products, on_conflict="product_name").execute()
 
             logger.success(f"Upserted {len(products)} products to master_sales_products")
             return True
@@ -1499,10 +1488,7 @@ class InventoryRepository(SupabaseRepository):
         try:
             # 使用 upsert，on_conflict 為 (sale_date, product_name)
             # Supabase 會自動處理 UNIQUE constraint
-            self.client.table(self.TABLE_DAILY_SALES).upsert(
-                records,
-                on_conflict="sale_date,product_name"
-            ).execute()
+            self.client.table(self.TABLE_DAILY_SALES).upsert(records, on_conflict="sale_date,product_name").execute()
 
             logger.success(f"Saved {len(records)} daily sales records")
             return True
@@ -1560,10 +1546,7 @@ class InventoryRepository(SupabaseRepository):
             start_date = end_date - timedelta(days=days)
 
             # 查詢銷量資料
-            records = self.get_daily_sales(
-                start_date.strftime("%Y-%m-%d"),
-                end_date.strftime("%Y-%m-%d")
-            )
+            records = self.get_daily_sales(start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
 
             if not records:
                 return {"total_sales": 0, "by_category": {}, "top_products": []}
@@ -1589,19 +1572,10 @@ class InventoryRepository(SupabaseRepository):
                 by_product[product_name] += quantity
 
             # 排序取前10名
-            top_products = sorted(
-                [{"product_name": k, "quantity": v} for k, v in by_product.items()],
-                key=lambda x: x["quantity"],
-                reverse=True
-            )[:10]
+            top_products = sorted([{"product_name": k, "quantity": v} for k, v in by_product.items()], key=lambda x: x["quantity"], reverse=True)[:10]
 
-            return {
-                "total_sales": total_sales,
-                "by_category": by_category,
-                "top_products": top_products
-            }
+            return {"total_sales": total_sales, "by_category": by_category, "top_products": top_products}
 
         except Exception as e:
             logger.error(f"Failed to get sales summary: {e}")
             return {"total_sales": 0, "by_category": {}, "top_products": []}
-
