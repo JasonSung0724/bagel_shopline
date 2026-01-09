@@ -45,6 +45,8 @@ jobs:
               - 'crontab'
               - 'main_scripts.py'
               - 'sub_scripts.py'
+              - 'sales_scripts.py'
+              - 'inventory_scripts.py'
             frontend:
               - 'frontend/**'
 
