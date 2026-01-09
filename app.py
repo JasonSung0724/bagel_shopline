@@ -67,7 +67,7 @@ def index():
             "/api/inventory/restock": "Get restock records (入庫紀錄)",
             "/api/inventory/raw-items": "Get raw Excel items (with batch details)",
             "/api/inventory/trend": "Get stock trend (庫存趨勢)",
-            "/api/inventory/sales-trend": "Get sales trend based on stock_out (銷量趨勢)",
+            "/api/inventory/sales-trend": "Get sales trend based on 實出量 from daily_sales (銷量趨勢)",
             "/api/inventory/product-mappings": "Get/Add/Delete product mappings (麵包與塑膠袋對照)",
             "/api/sales/sync": "PATCH: Sync sales data for specific date range (補銷量)",
             "/api/auth/verify": "Verify inventory page password",

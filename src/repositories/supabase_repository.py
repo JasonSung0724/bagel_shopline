@@ -454,14 +454,14 @@ class InventoryRepository(SupabaseRepository):
 
     def get_sales_trend(self, category: Optional[str] = None, days: int = 30) -> List[Dict]:
         """
-        Get daily sales trend for items (based on stock_out from raw items).
+        Get daily sales trend for items (based on 實出量 from daily_sales table).
 
         Args:
             category: Filter by category ('bread', 'box', 'bag') - optional
             days: Number of days to look back
 
         Returns:
-            List of items with their daily sales (stock_out) values:
+            List of items with their daily sales (實出量) values:
             [
                 {
                     "name": "低糖原味貝果",
@@ -483,93 +483,66 @@ class InventoryRepository(SupabaseRepository):
 
             start_date = (datetime.now() - timedelta(days=days)).date().isoformat()
 
-            # First, get snapshot IDs within the date range
-            snapshots_result = self.client.table(self.TABLE_SNAPSHOTS).select("id, snapshot_date").gte("snapshot_date", start_date).execute()
+            # Query daily_sales table with pagination
+            all_sales_records = []
+            page_size = 1000
+            offset = 0
 
-            if not snapshots_result.data:
-                return []
-
-            # Create a map of snapshot_id -> date
-            snapshot_date_map = {s["id"]: s["snapshot_date"][:10] for s in snapshots_result.data}
-            snapshot_ids = list(snapshot_date_map.keys())
-
-            # Query raw items for these snapshots
-            # Note: Supabase .in_() has URL length limits with many UUIDs,
-            # so we batch snapshot IDs (max 10 per batch) to avoid truncation
-            all_raw_items = []
-            batch_size = 10
-
-            for i in range(0, len(snapshot_ids), batch_size):
-                batch_ids = snapshot_ids[i : i + batch_size]
-
-                # Paginate within each batch
-                page_size = 1000
-                offset = 0
-
-                while True:
-                    result = (
-                        self.client.table(self.TABLE_RAW_ITEMS)
-                        .select("product_name, stock_out, snapshot_id")
-                        .in_("snapshot_id", batch_ids)
-                        .range(offset, offset + page_size - 1)
-                        .execute()
-                    )
-
-                    if not result.data:
-                        break
-
-                    all_raw_items.extend(result.data)
-
-                    if len(result.data) < page_size:
-                        break
-
-                    offset += page_size
-
-            if not all_raw_items:
-                return []
-
-            result_data = all_raw_items
-
-            # Get category mapping from inventory_items
-            category_map = {}
-            if category:
-                # Filter by category - need to get items in that category first
-                items_result = self.client.table(self.TABLE_ITEMS).select("name, category").eq("category", category).execute()
-                if items_result.data:
-                    category_map = {item["name"]: item["category"] for item in items_result.data}
-            else:
-                # Get all category mappings
-                items_result = self.client.table(self.TABLE_ITEMS).select("name, category").execute()
-                if items_result.data:
-                    category_map = {item["name"]: item["category"] for item in items_result.data}
-
-            # Group by product name and date, sum stock_out
-            items_data: Dict[str, Dict] = {}
-            for row in result_data:
-                name = row["product_name"]
+            while True:
+                query = (
+                    self.client.table(self.TABLE_DAILY_SALES)
+                    .select("product_name, category, quantity, sale_date")
+                    .gte("sale_date", start_date)
+                )
 
                 # Filter by category if specified
-                if category and name not in category_map:
+                if category:
+                    query = query.eq("category", category)
+
+                result = query.range(offset, offset + page_size - 1).execute()
+
+                if not result.data:
+                    break
+
+                all_sales_records.extend(result.data)
+
+                if len(result.data) < page_size:
+                    break
+
+                offset += page_size
+
+            if not all_sales_records:
+                logger.info(f"No sales data found in daily_sales table since {start_date}")
+                return []
+
+            logger.info(f"Loaded {len(all_sales_records)} records from daily_sales for sales trend")
+
+            # Group by product name
+            items_data: Dict[str, Dict] = {}
+            for row in all_sales_records:
+                name = row.get("product_name", "")
+                if not name:
+                    continue
+
+                cat = row.get("category", "bread")
+                date_str = row.get("sale_date", "")[:10] if row.get("sale_date") else ""
+                quantity = int(row.get("quantity", 0) or 0)
+
+                if not date_str:
                     continue
 
                 if name not in items_data:
-                    items_data[name] = {"name": name, "category": category_map.get(name, "bread"), "data": {}}  # Use dict to aggregate by date
+                    items_data[name] = {"name": name, "category": cat, "data": {}}
 
-                # Get date from snapshot_id
-                snapshot_id = row.get("snapshot_id")
-                date_str = snapshot_date_map.get(snapshot_id)
-                if date_str:
-                    stock_out = row.get("stock_out", 0) or 0
-
-                    # Aggregate stock_out by date (same product may have multiple batches)
-                    if date_str not in items_data[name]["data"]:
-                        items_data[name]["data"][date_str] = 0
-                    items_data[name]["data"][date_str] += stock_out
+                # Aggregate by date (in case of duplicates)
+                if date_str not in items_data[name]["data"]:
+                    items_data[name]["data"][date_str] = 0
+                items_data[name]["data"][date_str] += quantity
 
             # Convert dict to list format
             result_list = []
             for name, item in items_data.items():
-                data_list = [{"date": date, "sales": int(sales)} for date, sales in sorted(item["data"].items())]
+                data_list = [{"date": date, "sales": sales} for date, sales in sorted(item["data"].items())]
                 if data_list:  # Only include items with data
                     result_list.append({"name": name, "category": item["category"], "data": data_list})
 
