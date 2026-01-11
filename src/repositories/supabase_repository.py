@@ -113,6 +113,9 @@ class InventoryRepository(SupabaseRepository):
                 "total_bread_stock": snapshot.total_bread_stock,
                 "total_box_stock": snapshot.total_box_stock,
                 "total_bag_rolls": snapshot.total_bag_rolls,
+                "total_bread_defective": snapshot.total_bread_defective,
+                "total_box_defective": snapshot.total_box_defective,
+                "total_bag_defective": snapshot.total_bag_defective,
                 "low_stock_count": snapshot.low_stock_count,
                 "raw_item_count": len(snapshot.raw_items) if snapshot.raw_items else 0,
             }
@@ -168,6 +171,9 @@ class InventoryRepository(SupabaseRepository):
                 "total_bread_stock": snapshot.total_bread_stock,
                 "total_box_stock": snapshot.total_box_stock,
                 "total_bag_rolls": snapshot.total_bag_rolls,
+                "total_bread_defective": snapshot.total_bread_defective,
+                "total_box_defective": snapshot.total_box_defective,
+                "total_bag_defective": snapshot.total_bag_defective,
                 "low_stock_count": snapshot.low_stock_count,
                 "updated_at": datetime.now().isoformat(),
             }
@@ -228,6 +234,7 @@ class InventoryRepository(SupabaseRepository):
                     "category": item.category.value,
                     "current_stock": item.current_stock,
                     "available_stock": item.available_stock,
+                    "defective_stock": item.defective_stock,
                     "unit": item.unit,
                     "min_stock": item.min_stock,
                     "items_per_roll": item.items_per_roll,

@@ -209,10 +209,20 @@ class InventoryService:
         # 預設為當前時間
         return datetime.now()
 
+    def _is_defective_warehouse(self, warehouse_code: str) -> bool:
+        """
+        Check if warehouse code indicates defective stock.
+        Defective warehouses have format: xx-xx_不良品
+        """
+        if not warehouse_code:
+            return False
+        return '不良品' in str(warehouse_code)
+
     def _aggregate_by_product(self, df: pd.DataFrame) -> Dict[str, Dict]:
         """
         Aggregate inventory by product name.
         Same product with multiple batches should be summed.
+        Separates normal stock from defective stock based on warehouse code (庫別).
         """
         aggregated = {}
 
@@ -224,16 +234,24 @@ class InventoryService:
             period_end = float(row.get('期末', 0) or 0)
             available = float(row.get('預計可用量', 0) or 0)
             unit = str(row.get('單位', '個')).strip()
+            warehouse_code = str(row.get('庫別', '')).strip()
+
+            # Check if this is defective stock
+            is_defective = self._is_defective_warehouse(warehouse_code)
 
             if name not in aggregated:
                 aggregated[name] = {
-                    'period_end': 0,
+                    'period_end': 0,      # 正常庫存
                     'available': 0,
+                    'defective': 0,       # 不良品庫存
                     'unit': unit,
                 }
 
-            aggregated[name]['period_end'] += period_end
-            aggregated[name]['available'] += available
+            if is_defective:
+                aggregated[name]['defective'] += period_end
+            else:
+                aggregated[name]['period_end'] += period_end
+                aggregated[name]['available'] += available
 
         return aggregated
 
@@ -266,6 +284,7 @@ class InventoryService:
         """Create InventoryItem from aggregated data."""
         current_stock = int(data['period_end'])
         available_stock = int(data['available'])
+        defective_stock = int(data.get('defective', 0))
         unit = data['unit']
 
         # 袋子特殊處理：設定每捲數量
@@ -283,6 +302,7 @@ class InventoryService:
             current_stock=current_stock,
             available_stock=available_stock,
             unit=unit,
+            defective_stock=defective_stock,
             items_per_roll=items_per_roll,
         )
 

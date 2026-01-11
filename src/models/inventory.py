@@ -211,10 +211,11 @@ class InventoryItem:
     """
     name: str                          # 品名
     category: InventoryCategory        # 分類
-    current_stock: int                 # 期末庫存 (加總)
+    current_stock: int                 # 期末庫存 (加總，不含不良品)
     available_stock: int               # 預計可用量 (加總)
     unit: str                          # 單位 (顆/個/捲)
     min_stock: int = 0                 # 最低庫存警戒值
+    defective_stock: int = 0           # 不良品庫存 (加總)
 
     # For bags (以捲計算)
     items_per_roll: Optional[int] = None  # 每捲數量
@@ -249,6 +250,7 @@ class InventoryItem:
             "available_stock": self.available_stock,
             "unit": self.unit,
             "min_stock": self.min_stock,
+            "defective_stock": self.defective_stock,
             "items_per_roll": self.items_per_roll,
             "stock_status": self.stock_status,
         }
@@ -294,6 +296,21 @@ class InventorySnapshot:
         all_items = self.bread_items + self.box_items + self.bag_items
         return sum(1 for item in all_items if item.stock_status == "low")
 
+    @property
+    def total_bread_defective(self) -> int:
+        """Total bread defective stock."""
+        return sum(item.defective_stock for item in self.bread_items)
+
+    @property
+    def total_box_defective(self) -> int:
+        """Total box defective stock."""
+        return sum(item.defective_stock for item in self.box_items)
+
+    @property
+    def total_bag_defective(self) -> int:
+        """Total bag defective stock (rolls)."""
+        return sum(item.defective_stock for item in self.bag_items)
+
     def to_dict(self) -> dict:
         """Convert to dictionary for API response."""
         return {
@@ -305,6 +322,9 @@ class InventorySnapshot:
                 "total_bread_stock": self.total_bread_stock,
                 "total_box_stock": self.total_box_stock,
                 "total_bag_rolls": self.total_bag_rolls,
+                "total_bread_defective": self.total_bread_defective,
+                "total_box_defective": self.total_box_defective,
+                "total_bag_defective": self.total_bag_defective,
                 "low_stock_count": self.low_stock_count,
             },
             "bread_items": [item.to_dict() for item in self.bread_items],

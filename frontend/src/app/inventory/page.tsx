@@ -219,6 +219,7 @@ interface ApiInventoryItem {
   category: string;
   current_stock: number;
   available_stock: number;
+  defective_stock: number;
   unit: string;
   min_stock: number;
   stock_status: string;
@@ -235,6 +236,9 @@ interface ApiInventoryResponse {
     total_bread_stock: number;
     total_box_stock: number;
     total_bag_rolls: number;
+    total_bread_defective: number;
+    total_box_defective: number;
+    total_bag_defective: number;
     low_stock_count: number;
     raw_item_count: number;
     bread_items: ApiInventoryItem[];
@@ -355,6 +359,9 @@ export default function InventoryDashboard() {
     totalBreadStock: number;
     totalBoxStock: number;
     totalBagRolls: number;
+    totalBreadDefective: number;
+    totalBoxDefective: number;
+    totalBagDefective: number;
     rawItemCount: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -461,6 +468,9 @@ export default function InventoryDashboard() {
           total_bread_stock,
           total_box_stock,
           total_bag_rolls,
+          total_bread_defective,
+          total_box_defective,
+          total_bag_defective,
           raw_item_count,
         } = result.data;
 
@@ -484,6 +494,9 @@ export default function InventoryDashboard() {
           totalBreadStock: total_bread_stock,
           totalBoxStock: total_box_stock,
           totalBagRolls: total_bag_rolls,
+          totalBreadDefective: total_bread_defective ?? 0,
+          totalBoxDefective: total_box_defective ?? 0,
+          totalBagDefective: total_bag_defective ?? 0,
           rawItemCount: raw_item_count,
         });
       } else {
@@ -599,6 +612,9 @@ export default function InventoryDashboard() {
             total_bread_stock,
             total_box_stock,
             total_bag_rolls,
+            total_bread_defective,
+            total_box_defective,
+            total_bag_defective,
             raw_item_count,
           } = inventoryData;
 
@@ -620,6 +636,9 @@ export default function InventoryDashboard() {
             totalBreadStock: total_bread_stock,
             totalBoxStock: total_box_stock,
             totalBagRolls: total_bag_rolls,
+            totalBreadDefective: total_bread_defective ?? 0,
+            totalBoxDefective: total_box_defective ?? 0,
+            totalBagDefective: total_bag_defective ?? 0,
             rawItemCount: raw_item_count,
           });
         } else {
@@ -1232,6 +1251,7 @@ export default function InventoryDashboard() {
             <div>
               <p className="text-[10px] sm:text-xs text-gray-500">麵包總庫存</p>
               <p className="text-sm sm:text-xl font-bold text-gray-800">{totals.bread.toLocaleString()} <span className="text-[10px] sm:text-sm font-normal text-gray-400">個</span></p>
+              <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">不良品: <span className="text-gray-500">{(snapshotInfo?.totalBreadDefective ?? 0).toLocaleString()}</span></p>
             </div>
             <Package className="w-4 h-4 sm:w-6 sm:h-6 text-[#EB5C20]" />
           </div>
@@ -1239,6 +1259,7 @@ export default function InventoryDashboard() {
             <div>
               <p className="text-[10px] sm:text-xs text-gray-500">紙箱總庫存</p>
               <p className="text-sm sm:text-xl font-bold text-gray-800">{totals.box.toLocaleString()} <span className="text-[10px] sm:text-sm font-normal text-gray-400">個</span></p>
+              <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">不良品: <span className="text-gray-500">{(snapshotInfo?.totalBoxDefective ?? 0).toLocaleString()}</span></p>
             </div>
             <Box className="w-4 h-4 sm:w-6 sm:h-6 text-gray-500" />
           </div>
@@ -1246,7 +1267,8 @@ export default function InventoryDashboard() {
             <div>
               <p className="text-[10px] sm:text-xs text-gray-500">塑膠袋總庫存</p>
               <p className="text-sm sm:text-xl font-bold text-gray-800">{Number(totals.bag.toFixed(1)).toLocaleString()} <span className="text-[10px] sm:text-sm font-normal text-gray-400">捲</span></p>
-              <p className="hidden sm:block text-xs text-gray-400 mt-1">可包裝約 {diagnosisSummary.totalBagCapacity.toLocaleString()} 個</p>
+              <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">不良品: <span className="text-gray-500">{(snapshotInfo?.totalBagDefective ?? 0).toLocaleString()}</span></p>
+              <p className="hidden sm:block text-xs text-gray-400 mt-0.5">可包裝約 {diagnosisSummary.totalBagCapacity.toLocaleString()} 個</p>
             </div>
             <Package className="w-4 h-4 sm:w-6 sm:h-6 text-blue-500" />
           </div>
