@@ -4,10 +4,18 @@ WORKDIR /app
 
 # Copy package files and install ALL dependencies (including devDependencies for build)
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy source and build
 COPY . .
+
+# 清理快取並重新構建
+RUN rm -rf .next .turbo
+
+# 設置環境變數避免快取問題
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
 RUN npm run build
 
 # Stage 2: Runner

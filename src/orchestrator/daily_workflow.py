@@ -51,7 +51,6 @@ class DailyWorkflow:
             True if workflow completed successfully
         """
         try:
-            # Default to today (逢泰在每天 ~20:00 寄出當天的出貨資料)
             if target_date is None:
                 target_date = datetime.now()
 
