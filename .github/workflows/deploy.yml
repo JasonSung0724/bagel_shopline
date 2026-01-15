@@ -191,6 +191,16 @@ jobs:
           EOF
           "
 
+      - name: Create Google Service Account file on VM
+        run: |
+          gcloud compute ssh ${{ env.GCE_INSTANCE }} --zone=${{ env.GCE_ZONE }} --command="
+            mkdir -p /opt/bagel-shop/secrets
+            cat > /opt/bagel-shop/secrets/google-sa.json << 'EOFSA'
+          ${{ secrets.GCP_SA_KEY }}
+          EOFSA
+            chmod 600 /opt/bagel-shop/secrets/google-sa.json
+          "
+
       - name: Copy migration files to VM
         run: |
           gcloud compute ssh ${{ env.GCE_INSTANCE }} --zone=${{ env.GCE_ZONE }} --command="mkdir -p /opt/bagel-shop/supabase/migrations"

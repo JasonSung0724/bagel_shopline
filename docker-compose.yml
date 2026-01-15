@@ -22,10 +22,12 @@ services:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - INVENTORY_PASSWORD=${INVENTORY_PASSWORD}
+      # Google Service Account file path
+      - GOOGLE_SERVICE_ACCOUNT_FILE=/app/secrets/google-sa.json
     volumes:
       - ./logs:/app/logs
-      # Mount service account file for easy updates without rebuild
-      - ./src/config/mybagel-458109-30f35338f350.json:/app/src/config/mybagel-458109-30f35338f350.json:ro
+      # Mount Google Service Account from secrets folder (created by CI/CD)
+      - ./secrets/google-sa.json:/app/secrets/google-sa.json:ro
     networks:
       - bagel-network
     healthcheck:
@@ -55,10 +57,12 @@ services:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - INVENTORY_PASSWORD=${INVENTORY_PASSWORD}
+      # Google Service Account file path
+      - GOOGLE_SERVICE_ACCOUNT_FILE=/app/secrets/google-sa.json
     volumes:
       - ./logs:/app/logs
-      # Mount service account file for easy updates without rebuild
-      - ./src/config/mybagel-458109-30f35338f350.json:/app/src/config/mybagel-458109-30f35338f350.json:ro
+      # Mount Google Service Account from secrets folder (created by CI/CD)
+      - ./secrets/google-sa.json:/app/secrets/google-sa.json:ro
     networks:
       - bagel-network
 
