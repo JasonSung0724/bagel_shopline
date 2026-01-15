@@ -1,7 +1,7 @@
 {
     "flowtide":{
         "sender_email":"service@flowtide.com.tw",
-        "sheet_name_format": "快電商XCHECK2CHECK",
+        "sheet_name_format": "快電商XCHECK2CHECK-拋單追蹤-2026減醣市集-貝果",
         "backup_sheet_name_format": "快電商BACKUP",
         "customer_order_number":"客戶訂單號碼",
         "tcat_number":"託運單號",
