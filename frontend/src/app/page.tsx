@@ -272,7 +272,7 @@ export default function Home() {
 
             {rawData.length > 0 && (
               <>
-                <DataPreview data={rawData} />
+                <DataPreview data={rawData} platform={platform} />
 
                 <section className="card p-6">
                   <h2 className="text-lg font-semibold text-gray-800 mb-4">
