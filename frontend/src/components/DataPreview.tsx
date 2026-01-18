@@ -33,11 +33,14 @@ function analyzeConvenienceStoreOrders(data: RawOrderData[]): ConvenienceStoreSt
     }
   });
 
+  const sevenNamesList = Array.from(sevenOrders.values());
+  const familyNamesList = Array.from(familyOrders.values());
+
   return {
     sevenCount: sevenOrders.size,
-    sevenNames: [...new Set(sevenOrders.values())],
+    sevenNames: sevenNamesList.filter((name, idx) => sevenNamesList.indexOf(name) === idx),
     familyCount: familyOrders.size,
-    familyNames: [...new Set(familyOrders.values())],
+    familyNames: familyNamesList.filter((name, idx) => familyNamesList.indexOf(name) === idx),
   };
 }
 
