@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>刮刮樂</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .lottery-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .lottery-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+        }
+
+        .lottery-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+
+        .lottery-desc {
+            color: #6b7280;
+            margin-bottom: 20px;
+        }
+
+        .lottery-attempts {
+            background: #fff7ed;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .lottery-attempts span {
+            font-weight: bold;
+            color: #ea580c;
+        }
+
+        .lottery-prizes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .lottery-prize-tag {
+            background: #f3f4f6;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #374151;
+        }
+
+        .lottery-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #f97316 0%, #ef4444 100%);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .lottery-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 30px rgba(249, 115, 22, 0.3);
+        }
+
+        .lottery-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .lottery-btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .lottery-btn-secondary:hover {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Scratch Card */
+        .scratch-area {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16/9;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .scratch-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        .scratch-result {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .scratch-result.revealed {
+            opacity: 1;
+        }
+
+        .scratch-result.lose {
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+        }
+
+        .result-icon {
+            width: 60px;
+            height: 60px;
+            margin-bottom: 10px;
+        }
+
+        .result-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .result-title.win {
+            color: #16a34a;
+        }
+
+        .result-title.lose {
+            color: #6b7280;
+        }
+
+        .result-prize {
+            font-size: 18px;
+            font-weight: 500;
+            color: #1f2937;
+        }
+
+        /* Redemption Code */
+        .redemption-box {
+            background: #dcfce7;
+            border: 1px solid #86efac;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .redemption-label {
+            font-size: 14px;
+            color: #166534;
+            margin-bottom: 8px;
+        }
+
+        .redemption-code {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .redemption-code code {
+            font-family: monospace;
+            font-size: 20px;
+            font-weight: bold;
+            color: #16a34a;
+            background: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+        }
+
+        .copy-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #16a34a;
+            padding: 5px;
+        }
+
+        .copy-btn:hover {
+            color: #15803d;
+        }
+
+        .redemption-note {
+            font-size: 12px;
+            color: #166534;
+            margin-top: 8px;
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            height: 4px;
+            background: #e5e7eb;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #f97316;
+            transition: width 0.1s;
+        }
+
+        .progress-text {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        /* Error/Info States */
+        .lottery-message {
+            padding: 20px;
+        }
+
+        .lottery-message-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 15px;
+        }
+
+        .lottery-message-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .lottery-message-text {
+            color: #6b7280;
+            margin-bottom: 20px;
+        }
+
+        /* Loading */
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e5e7eb;
+            border-top-color: #f97316;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="lottery-container">
+        <!-- Loading State -->
+        <div id="loading-state">
+            <div class="spinner"></div>
+            <p style="color: #6b7280;">載入中...</p>
+        </div>
+
+        <!-- Login Required State -->
+        <div id="login-state" class="hidden">
+            <svg class="lottery-message-icon" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/>
+            </svg>
+            <h2 class="lottery-message-title">請先登入</h2>
+            <p class="lottery-message-text">參加刮刮樂活動需要先登入會員</p>
+            <a href="/users/sign_in" class="lottery-btn" style="display: inline-block; text-decoration: none;">登入會員</a>
+        </div>
+
+        <!-- Not Eligible State -->
+        <div id="error-state" class="hidden">
+            <svg class="lottery-message-icon" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <h2 class="lottery-message-title">無法參加</h2>
+            <p id="error-message" class="lottery-message-text"></p>
+        </div>
+
+        <!-- Ready State -->
+        <div id="ready-state" class="hidden">
+            <svg class="lottery-icon" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2">
+                <path d="M20 12v10H4V12M22 7H2v5h20V7zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+            </svg>
+            <h1 id="campaign-title" class="lottery-title"></h1>
+            <p id="campaign-desc" class="lottery-desc"></p>
+            <div class="lottery-attempts">
+                您還有 <span id="attempts-remaining">0</span> 次刮獎機會
+            </div>
+            <div id="prizes-container" class="lottery-prizes"></div>
+            <button id="start-btn" class="lottery-btn" onclick="startScratch()">
+                ✨ 開始刮獎！
+            </button>
+        </div>
+
+        <!-- Scratch State -->
+        <div id="scratch-state" class="hidden">
+            <h2 id="scratch-title" class="lottery-title" style="margin-bottom: 15px;"></h2>
+            <div class="scratch-area">
+                <div id="scratch-result" class="scratch-result">
+                    <svg id="win-icon" class="result-icon hidden" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                    </svg>
+                    <svg id="lose-icon" class="result-icon hidden" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                    <h3 id="result-title" class="result-title"></h3>
+                    <p id="result-prize" class="result-prize"></p>
+                </div>
+                <canvas id="scratch-canvas" class="scratch-canvas"></canvas>
+            </div>
+            <div id="progress-container">
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill" style="width: 0%;"></div>
+                </div>
+                <p id="progress-text" class="progress-text">開始刮！</p>
+            </div>
+            <div id="redemption-container" class="hidden">
+                <div class="redemption-box">
+                    <p class="redemption-label">您的兌換碼：</p>
+                    <div class="redemption-code">
+                        <code id="redemption-code"></code>
+                        <button class="copy-btn" onclick="copyCode()">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <p class="redemption-note">請截圖保存此兌換碼，兌獎時出示</p>
+                </div>
+            </div>
+            <p id="result-message" class="lottery-desc"></p>
+            <button id="retry-btn" class="lottery-btn hidden" onclick="retryScratch()">
+                🔄 再刮一次
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - Replace with your actual values
+        const API_BASE_URL = 'http://34.69.106.98:3000'; // Your API server URL
+        const CAMPAIGN_ID = ''; // Will be set from URL or config
+
+        // State
+        let campaignId = CAMPAIGN_ID;
+        let customerId = null;
+        let customerEmail = null;
+        let customerName = null;
+        let eligibility = null;
+        let scratchResult = null;
+        let isRevealed = false;
+        let isDrawing = false;
+
+        // DOM Elements
+        const loadingState = document.getElementById('loading-state');
+        const loginState = document.getElementById('login-state');
+        const errorState = document.getElementById('error-state');
+        const readyState = document.getElementById('ready-state');
+        const scratchState = document.getElementById('scratch-state');
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Get campaign ID from URL or data attribute
+            const urlParams = new URLSearchParams(window.location.search);
+            campaignId = urlParams.get('campaign') || CAMPAIGN_ID;
+
+            // Get customer info from Shopline (set via Liquid)
+            if (window.shoplineCustomer) {
+                customerId = window.shoplineCustomer.id;
+                customerEmail = window.shoplineCustomer.email;
+                customerName = window.shoplineCustomer.name;
+            }
+
+            // Test params (for development)
+            if (urlParams.get('customer_id')) customerId = urlParams.get('customer_id');
+            if (urlParams.get('email')) customerEmail = urlParams.get('email');
+            if (urlParams.get('name')) customerName = urlParams.get('name');
+
+            if (!campaignId) {
+                showError('未指定活動 ID');
+                return;
+            }
+
+            checkEligibility();
+        });
+
+        // Check eligibility
+        async function checkEligibility() {
+            showState('loading');
+
+            try {
+                const params = new URLSearchParams();
+                if (customerId) params.set('customer_id', customerId);
+
+                const res = await fetch(`${API_BASE_URL}/api/lottery/campaigns/${campaignId}/check?${params}`);
+                eligibility = await res.json();
+
+                if (eligibility.eligible) {
+                    showReady();
+                } else if (eligibility.campaign?.require_login && !customerId) {
+                    showState('login');
+                } else {
+                    showError(eligibility.reason || '無法參加此活動');
+                }
+            } catch (error) {
+                console.error('Failed to check eligibility:', error);
+                showError('無法連線到伺服器');
+            }
+        }
+
+        // Show states
+        function showState(state) {
+            loadingState.classList.add('hidden');
+            loginState.classList.add('hidden');
+            errorState.classList.add('hidden');
+            readyState.classList.add('hidden');
+            scratchState.classList.add('hidden');
+
+            if (state === 'loading') loadingState.classList.remove('hidden');
+            if (state === 'login') loginState.classList.remove('hidden');
+            if (state === 'error') errorState.classList.remove('hidden');
+            if (state === 'ready') readyState.classList.remove('hidden');
+            if (state === 'scratch') scratchState.classList.remove('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('error-message').textContent = message;
+            showState('error');
+        }
+
+        function showReady() {
+            const campaign = eligibility.campaign;
+
+            document.getElementById('campaign-title').textContent = campaign.name;
+            document.getElementById('campaign-desc').textContent = campaign.description || '';
+            document.getElementById('attempts-remaining').textContent = eligibility.attempts_remaining;
+
+            // Show prizes
+            const prizesContainer = document.getElementById('prizes-container');
+            prizesContainer.innerHTML = '';
+            if (campaign.prizes && campaign.prizes.length > 0) {
+                campaign.prizes.forEach(prize => {
+                    const tag = document.createElement('span');
+                    tag.className = 'lottery-prize-tag';
+                    tag.textContent = prize.name;
+                    prizesContainer.appendChild(tag);
+                });
+            }
+
+            showState('ready');
+        }
+
+        // Start scratch
+        async function startScratch() {
+            const startBtn = document.getElementById('start-btn');
+            startBtn.disabled = true;
+            startBtn.innerHTML = '<span class="spinner" style="width:20px;height:20px;margin:0 10px 0 0;display:inline-block;vertical-align:middle;"></span> 準備中...';
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/lottery/campaigns/${campaignId}/scratch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        customer_id: customerId,
+                        customer_email: customerEmail,
+                        customer_name: customerName,
+                    }),
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    scratchResult = data.result;
+                    showScratchCard();
+                } else {
+                    showError(data.error || '刮獎失敗');
+                }
+            } catch (error) {
+                console.error('Failed to scratch:', error);
+                showError('無法連線到伺服器');
+            }
+        }
+
+        // Show scratch card
+        function showScratchCard() {
+            document.getElementById('scratch-title').textContent = eligibility.campaign.name;
+
+            // Setup result display
+            const resultEl = document.getElementById('scratch-result');
+            const winIcon = document.getElementById('win-icon');
+            const loseIcon = document.getElementById('lose-icon');
+            const resultTitle = document.getElementById('result-title');
+            const resultPrize = document.getElementById('result-prize');
+
+            if (scratchResult.is_winner) {
+                resultEl.classList.remove('lose');
+                winIcon.classList.remove('hidden');
+                loseIcon.classList.add('hidden');
+                resultTitle.textContent = '恭喜中獎！';
+                resultTitle.className = 'result-title win';
+                resultPrize.textContent = scratchResult.prize.name;
+            } else {
+                resultEl.classList.add('lose');
+                winIcon.classList.add('hidden');
+                loseIcon.classList.remove('hidden');
+                resultTitle.textContent = '再接再厲';
+                resultTitle.className = 'result-title lose';
+                resultPrize.textContent = '下次一定會更幸運';
+            }
+
+            showState('scratch');
+
+            // Reset state
+            isRevealed = false;
+            document.getElementById('progress-container').classList.remove('hidden');
+            document.getElementById('redemption-container').classList.add('hidden');
+            document.getElementById('retry-btn').classList.add('hidden');
+            document.getElementById('result-message').textContent = '';
+            resultEl.classList.remove('revealed');
+
+            // Initialize canvas
+            setTimeout(initCanvas, 100);
+        }
+
+        // Initialize scratch canvas
+        function initCanvas() {
+            const canvas = document.getElementById('scratch-canvas');
+            const ctx = canvas.getContext('2d');
+
+            // Set canvas size
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width * 2;
+            canvas.height = rect.height * 2;
+            ctx.scale(2, 2);
+
+            // Fill with scratch coating
+            ctx.fillStyle = '#C0C0C0';
+            ctx.fillRect(0, 0, rect.width, rect.height);
+
+            // Add shimmer
+            const gradient = ctx.createLinearGradient(0, 0, rect.width, rect.height);
+            gradient.addColorStop(0, 'rgba(255,255,255,0.3)');
+            gradient.addColorStop(0.5, 'rgba(255,255,255,0)');
+            gradient.addColorStop(1, 'rgba(255,255,255,0.3)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, rect.width, rect.height);
+
+            // Add text
+            ctx.fillStyle = '#888888';
+            ctx.font = 'bold 20px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('刮開此處', rect.width / 2, rect.height / 2 - 10);
+            ctx.font = '14px sans-serif';
+            ctx.fillText('SCRATCH HERE', rect.width / 2, rect.height / 2 + 15);
+
+            // Event listeners
+            canvas.addEventListener('mousedown', handleStart);
+            canvas.addEventListener('mousemove', handleMove);
+            canvas.addEventListener('mouseup', handleEnd);
+            canvas.addEventListener('mouseleave', handleEnd);
+            canvas.addEventListener('touchstart', handleStart, { passive: false });
+            canvas.addEventListener('touchmove', handleMove, { passive: false });
+            canvas.addEventListener('touchend', handleEnd);
+        }
+
+        function handleStart(e) {
+            if (isRevealed) return;
+            e.preventDefault();
+            isDrawing = true;
+            scratch(e);
+        }
+
+        function handleMove(e) {
+            if (!isDrawing || isRevealed) return;
+            e.preventDefault();
+            scratch(e);
+        }
+
+        function handleEnd() {
+            isDrawing = false;
+        }
+
+        function scratch(e) {
+            const canvas = document.getElementById('scratch-canvas');
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.getBoundingClientRect();
+
+            let x, y;
+            if (e.touches) {
+                x = e.touches[0].clientX - rect.left;
+                y = e.touches[0].clientY - rect.top;
+            } else {
+                x = e.clientX - rect.left;
+                y = e.clientY - rect.top;
+            }
+
+            const scaleX = canvas.width / rect.width / 2;
+            const scaleY = canvas.height / rect.height / 2;
+
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.beginPath();
+            ctx.arc(x * scaleX, y * scaleY, 25, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Calculate progress
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            let transparent = 0;
+            for (let i = 3; i < imageData.data.length; i += 4) {
+                if (imageData.data[i] === 0) transparent++;
+            }
+            const progress = transparent / (imageData.data.length / 4);
+
+            document.getElementById('progress-fill').style.width = `${Math.min(progress * 100, 100)}%`;
+            document.getElementById('progress-text').textContent = progress < 0.5 ? '繼續刮！' : '快刮完了...';
+
+            // Auto reveal
+            if (progress > 0.5 && !isRevealed) {
+                reveal();
+            }
+        }
+
+        function reveal() {
+            isRevealed = true;
+
+            // Hide canvas
+            document.getElementById('scratch-canvas').classList.add('hidden');
+            document.getElementById('progress-container').classList.add('hidden');
+
+            // Show result
+            document.getElementById('scratch-result').classList.add('revealed');
+
+            // Show redemption code if winner
+            if (scratchResult.is_winner && scratchResult.redemption_code) {
+                document.getElementById('redemption-code').textContent = scratchResult.redemption_code;
+                document.getElementById('redemption-container').classList.remove('hidden');
+            }
+
+            // Show message
+            document.getElementById('result-message').textContent = scratchResult.message;
+
+            // Show retry button if has remaining attempts
+            if (scratchResult.attempts_remaining > 0) {
+                const retryBtn = document.getElementById('retry-btn');
+                retryBtn.textContent = `🔄 再刮一次（剩餘 ${scratchResult.attempts_remaining} 次）`;
+                retryBtn.classList.remove('hidden');
+            }
+        }
+
+        function copyCode() {
+            const code = scratchResult.redemption_code;
+            if (code) {
+                navigator.clipboard.writeText(code).then(() => {
+                    alert('已複製兌換碼！');
+                });
+            }
+        }
+
+        function retryScratch() {
+            scratchResult = null;
+            isRevealed = false;
+            checkEligibility();
+        }
+    </script>
+</body>
+</html>

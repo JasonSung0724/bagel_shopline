@@ -19,6 +19,7 @@ from src.services.inventory_service import InventoryService
 from src.services.sales_service import SalesService
 from src.services.product_config_service import ProductConfigService
 from src.services.platform_config_service import ColumnMappingService
+from src.services.lottery_service import LotteryService
 
 # Setup logging
 setup_logger(log_file="logs/flask.log")
@@ -1503,6 +1504,514 @@ def update_field_aliases(field_name: str):
             "success": False,
             "error": str(e)
         }), 500
+
+
+# ===========================================
+# Lottery (Scratch Card) API Endpoints (刮刮樂)
+# ===========================================
+
+# Password for lottery admin (use same as inventory or separate)
+LOTTERY_ADMIN_PASSWORD = os.getenv("LOTTERY_ADMIN_PASSWORD", INVENTORY_PASSWORD)
+
+
+def verify_lottery_admin():
+    """Verify admin password for lottery management."""
+    auth_header = request.headers.get("X-Admin-Password")
+    if not auth_header or auth_header != LOTTERY_ADMIN_PASSWORD:
+        return False
+    return True
+
+
+# --- Public API (for Shopline frontend) ---
+
+@app.route("/api/lottery/campaigns/<campaign_id>/check", methods=["GET"])
+def check_lottery_eligibility(campaign_id):
+    """
+    Check if a user is eligible to participate in a lottery.
+
+    Query params:
+        customer_id: Shopline customer ID (required if campaign requires login)
+
+    Returns:
+        {
+            "eligible": true/false,
+            "reason": "..." (if not eligible),
+            "campaign": {...},
+            "attempts_used": 0,
+            "attempts_remaining": 1
+        }
+    """
+    try:
+        customer_id = request.args.get("customer_id")
+
+        service = LotteryService()
+        result = service.check_eligibility(campaign_id, customer_id)
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        return jsonify({
+            "eligible": False,
+            "reason": str(e)
+        }), 500
+
+
+@app.route("/api/lottery/campaigns/<campaign_id>/scratch", methods=["POST"])
+def scratch_lottery(campaign_id):
+    """
+    Process a scratch card attempt.
+
+    Body:
+        customer_id: Shopline customer ID (required)
+        customer_email: Customer email (optional)
+        customer_name: Customer name (optional)
+
+    Returns:
+        {
+            "success": true,
+            "result": {
+                "is_winner": true/false,
+                "prize": {...} or null,
+                "redemption_code": "XXXX-XXXX-XXXX" or null,
+                "message": "恭喜中獎!" or "很可惜，未中獎",
+                "attempts_remaining": 0
+            }
+        }
+    """
+    try:
+        data = request.get_json() or {}
+
+        customer_id = data.get("customer_id")
+        customer_email = data.get("customer_email")
+        customer_name = data.get("customer_name")
+
+        # Get client info for logging
+        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr)
+        user_agent = request.headers.get("User-Agent")
+
+        service = LotteryService()
+        result = service.scratch(
+            campaign_id=campaign_id,
+            shopline_customer_id=customer_id,
+            customer_email=customer_email,
+            customer_name=customer_name,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "error_code": "SYSTEM_ERROR"
+        }), 500
+
+
+@app.route("/api/lottery/campaigns/<campaign_id>/results", methods=["GET"])
+def get_user_lottery_results(campaign_id):
+    """
+    Get a user's lottery results for a campaign.
+
+    Query params:
+        customer_id: Shopline customer ID (required)
+
+    Returns:
+        List of user's scratch results
+    """
+    try:
+        customer_id = request.args.get("customer_id")
+
+        if not customer_id:
+            return jsonify({
+                "success": False,
+                "error": "customer_id is required"
+            }), 400
+
+        service = LotteryService()
+        results = service.get_user_results(campaign_id, customer_id)
+
+        return jsonify({
+            "success": True,
+            "data": results,
+            "count": len(results)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/lottery/redeem/verify", methods=["POST"])
+def verify_redemption_code():
+    """
+    Verify a redemption code (check if valid and not yet redeemed).
+
+    Body:
+        code: Redemption code (XXXX-XXXX-XXXX format)
+
+    Returns:
+        {
+            "valid": true/false,
+            "redeemed": true/false,
+            "result": {...}
+        }
+    """
+    try:
+        data = request.get_json() or {}
+        code = data.get("code", "").strip().upper()
+
+        if not code:
+            return jsonify({
+                "valid": False,
+                "error": "兌換碼不能為空"
+            }), 400
+
+        service = LotteryService()
+        result = service.verify_redemption_code(code)
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        return jsonify({
+            "valid": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/lottery/redeem", methods=["POST"])
+def redeem_lottery_prize():
+    """
+    Redeem a lottery prize (mark as redeemed).
+    Requires admin password.
+
+    Body:
+        code: Redemption code
+        redeemed_by: Staff name (optional)
+
+    Returns:
+        {"success": true, "result": {...}}
+    """
+    try:
+        if not verify_lottery_admin():
+            return jsonify({
+                "success": False,
+                "error": "管理員密碼錯誤"
+            }), 401
+
+        data = request.get_json() or {}
+        code = data.get("code", "").strip().upper()
+        redeemed_by = data.get("redeemed_by")
+
+        if not code:
+            return jsonify({
+                "success": False,
+                "error": "兌換碼不能為空"
+            }), 400
+
+        service = LotteryService()
+        result = service.redeem_prize(code, redeemed_by)
+
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# --- Admin API (for backend management) ---
+
+@app.route("/api/lottery/admin/campaigns", methods=["GET"])
+def list_lottery_campaigns():
+    """
+    List all lottery campaigns.
+    Requires admin password.
+
+    Query params:
+        status: Filter by status (draft/active/paused/ended)
+    """
+    try:
+        if not verify_lottery_admin():
+            return jsonify({"success": False, "error": "管理員密碼錯誤"}), 401
+
+        status = request.args.get("status")
+
+        service = LotteryService()
+        campaigns = service.list_campaigns(status)
+
+        return jsonify({
+            "success": True,
+            "data": campaigns,
+            "count": len(campaigns)
+        }), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/lottery/admin/campaigns", methods=["POST"])
+def create_lottery_campaign():
+    """
+    Create a new lottery campaign.
+    Requires admin password.
+
+    Body:
+        name: Campaign name (required)
+        description: Description
+        start_date: Start date ISO format (required)
+        end_date: End date ISO format (required)
+        max_attempts_per_user: Max attempts per user (default: 1)
+        require_login: Require Shopline login (default: true)
+    """
+    try:
+        if not verify_lottery_admin():
+            return jsonify({"success": False, "error": "管理員密碼錯誤"}), 401
+
+        data = request.get_json()
+
+        service = LotteryService()
+        result = service.create_campaign(data)
+
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/lottery/admin/campaigns/<campaign_id>", methods=["GET"])
+def get_lottery_campaign(campaign_id):
+    """
+    Get a specific campaign with prizes.
+    Requires admin password.
+    """
+    try:
+        if not verify_lottery_admin():
+            return jsonify({"success": False, "error": "管理員密碼錯誤"}), 401
+
+        service = LotteryService()
+        campaign = service.get_campaign(campaign_id)
+
+        if campaign:
+            return jsonify({"success": True, "data": campaign}), 200
+        else:
+            return jsonify({"success": False, "error": "Campaign not found"}), 404
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/lottery/admin/campaigns/<campaign_id>", methods=["PUT"])
+def update_lottery_campaign(campaign_id):
+    """
+    Update a campaign.
+    Requires admin password.
+
+    Body: Fields to update (name, description, start_date, end_date, status, etc.)
+    """
+    try:
+        if not verify_lottery_admin():
+            return jsonify({"success": False, "error": "管理員密碼錯誤"}), 401
+
+        data = request.get_json()
+
+        service = LotteryService()
+        result = service.update_campaign(campaign_id, data)
+
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/lottery/admin/campaigns/<campaign_id>", methods=["DELETE"])
+def delete_lottery_campaign(campaign_id):
+    """
+    Delete a campaign (only draft campaigns can be deleted).
+    Requires admin password.
+    """
+    try:
+        if not verify_lottery_admin():
+            return jsonify({"success": False, "error": "管理員密碼錯誤"}), 401
+
+        service = LotteryService()
+        result = service.delete_campaign(campaign_id)
+
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/lottery/admin/campaigns/<campaign_id>/prizes", methods=["GET"])
+def get_lottery_prizes(campaign_id):
+    """
+    Get all prizes for a campaign.
+    Requires admin password.
+    """
+    try:
+        if not verify_lottery_admin():
+            return jsonify({"success": False, "error": "管理員密碼錯誤"}), 401
+
+        service = LotteryService()
+        prizes = service.get_prizes(campaign_id)
+
+        return jsonify({
+            "success": True,
+            "data": prizes,
+            "count": len(prizes)
+        }), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/lottery/admin/campaigns/<campaign_id>/prizes", methods=["POST"])
+def add_lottery_prize(campaign_id):
+    """
+    Add a prize to a campaign.
+    Requires admin password.
+
+    Body:
+        name: Prize name (required)
+        description: Description
+        prize_type: Type (physical/coupon/points/free_shipping/discount/none)
+        prize_value: Value (e.g., coupon code, discount amount)
+        total_quantity: Total quantity (required)
+        probability: Win probability 0.0-1.0 (required)
+        display_order: Display order
+        image_url: Image URL
+    """
+    try:
+        if not verify_lottery_admin():
+            return jsonify({"success": False, "error": "管理員密碼錯誤"}), 401
+
+        data = request.get_json()
+
+        service = LotteryService()
+        result = service.add_prize(campaign_id, data)
+
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/lottery/admin/prizes/<prize_id>", methods=["PUT"])
+def update_lottery_prize(prize_id):
+    """
+    Update a prize.
+    Requires admin password.
+    """
+    try:
+        if not verify_lottery_admin():
+            return jsonify({"success": False, "error": "管理員密碼錯誤"}), 401
+
+        data = request.get_json()
+
+        service = LotteryService()
+        result = service.update_prize(prize_id, data)
+
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/lottery/admin/prizes/<prize_id>", methods=["DELETE"])
+def delete_lottery_prize(prize_id):
+    """
+    Delete a prize.
+    Requires admin password.
+    """
+    try:
+        if not verify_lottery_admin():
+            return jsonify({"success": False, "error": "管理員密碼錯誤"}), 401
+
+        service = LotteryService()
+        result = service.delete_prize(prize_id)
+
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/lottery/admin/campaigns/<campaign_id>/stats", methods=["GET"])
+def get_lottery_stats(campaign_id):
+    """
+    Get statistics for a campaign.
+    Requires admin password.
+
+    Returns:
+        {
+            "total_participants": 100,
+            "total_attempts": 150,
+            "total_winners": 30,
+            "total_redeemed": 20,
+            "prizes_stats": [
+                {"name": "獎品", "total": 50, "remaining": 20, "won": 30, "redeemed": 20}
+            ]
+        }
+    """
+    try:
+        if not verify_lottery_admin():
+            return jsonify({"success": False, "error": "管理員密碼錯誤"}), 401
+
+        service = LotteryService()
+        stats = service.get_campaign_stats(campaign_id)
+
+        return jsonify({
+            "success": True,
+            "data": stats
+        }), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/lottery/admin/campaigns/<campaign_id>/results", methods=["GET"])
+def get_lottery_results(campaign_id):
+    """
+    Get all results for a campaign.
+    Requires admin password.
+
+    Query params:
+        winners_only: Only show winners (default: false)
+        limit: Number of records (default: 100)
+        offset: Offset for pagination (default: 0)
+    """
+    try:
+        if not verify_lottery_admin():
+            return jsonify({"success": False, "error": "管理員密碼錯誤"}), 401
+
+        winners_only = request.args.get("winners_only", "false").lower() == "true"
+        limit = request.args.get("limit", 100, type=int)
+        offset = request.args.get("offset", 0, type=int)
+
+        service = LotteryService()
+        results = service.get_results(campaign_id, winners_only, limit, offset)
+
+        return jsonify({
+            "success": True,
+            "data": results,
+            "count": len(results)
+        }), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":
