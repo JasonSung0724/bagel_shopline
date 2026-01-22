@@ -22,6 +22,7 @@ services:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - INVENTORY_PASSWORD=${INVENTORY_PASSWORD}
+      - LOTTERY_ADMIN_PASSWORD=${LOTTERY_ADMIN_PASSWORD}
       # Google Service Account file path
       - GOOGLE_SERVICE_ACCOUNT_FILE=/app/secrets/google-sa.json
     volumes:
