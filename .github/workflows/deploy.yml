@@ -279,8 +279,8 @@ jobs:
               echo '⏭️ No image changes, skipping pull'
             fi
 
-            # Restart containers with new images (including nginx)
-            docker compose up -d --force-recreate api worker frontend nginx
+            # Restart containers with new images (including nginx and cloudflared)
+            docker compose up -d --force-recreate api worker frontend nginx cloudflared
 
             # Clean up old images
             docker image prune -f
