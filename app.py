@@ -26,7 +26,7 @@ setup_logger(log_file="logs/flask.log")
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", secrets.token_hex(32))
-CORS(app, supports_credentials=True, expose_headers=[
+CORS(app, origins="*", supports_credentials=False, expose_headers=[
     'Content-Disposition',
     'X-Report-Original-Rows',
     'X-Report-Total-Orders',
@@ -35,7 +35,7 @@ CORS(app, supports_credentials=True, expose_headers=[
     'X-Report-Time-Taken',
     'X-Report-Error-Count',
     'X-Report-Errors'
-])  # Enable CORS for frontend with credentials and expose custom headers
+])  # Enable CORS for all origins (required for Shopline integration)
 
 # Inventory page password (from environment variable, required)
 INVENTORY_PASSWORD = os.getenv("INVENTORY_PASSWORD")
