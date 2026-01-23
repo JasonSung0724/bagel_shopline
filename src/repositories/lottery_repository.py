@@ -521,6 +521,9 @@ class LotteryRepository:
             if is_winner and prize_id:
                 redemption_code = self._generate_redemption_code()
 
+            # Truncate ip_address to fit VARCHAR(45) limit
+            safe_ip = ip_address[:45] if ip_address else None
+
             result_data = {
                 "campaign_id": campaign_id,
                 "participant_id": participant_id,
@@ -530,7 +533,7 @@ class LotteryRepository:
                 "redemption_code": redemption_code,
                 "is_winner": is_winner,
                 "is_redeemed": False,
-                "ip_address": ip_address,
+                "ip_address": safe_ip,
                 "user_agent": user_agent,
                 "scratched_at": datetime.now().isoformat(),
             }
