@@ -131,6 +131,20 @@ services:
       - api
       - frontend
 
+  # ===========================================
+  # Cloudflare Quick Tunnel (Free HTTPS proxy)
+  # No account needed, generates random URL
+  # ===========================================
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: bagel-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://nginx:3000
+    networks:
+      - bagel-network
+    depends_on:
+      - nginx
+
 networks:
   bagel-network:
     driver: bridge
