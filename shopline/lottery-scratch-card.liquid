@@ -1448,7 +1448,7 @@
   // ============================================
   // 設定區 - 請修改以下設定
   // ============================================
-  const API_BASE_URL = 'https://simpson-ext-radio-disclaimers.trycloudflare.com';
+  const API_BASE_URL = 'https://warming-invision-msgstr-defeat.trycloudflare.com';
   const CAMPAIGN_ID = '5973d399-3f88-4dd6-bd6b-6ca8d53f07aa';
 
   // ============================================
@@ -1878,7 +1878,8 @@
     canvas.addEventListener('mousedown', handleStart);
     canvas.addEventListener('mousemove', handleMove);
     canvas.addEventListener('mouseup', handleEnd);
-    canvas.addEventListener('mouseleave', handleEnd);
+    // 滑出介面時不停止，重新進入時如果滑鼠按住就繼續刮
+    canvas.addEventListener('mouseenter', handleEnter);
     canvas.addEventListener('touchstart', handleStart, { passive: false });
     canvas.addEventListener('touchmove', handleMove, { passive: false });
     canvas.addEventListener('touchend', handleEnd);
@@ -1956,6 +1957,14 @@
     isDrawing = false;
   }
 
+  function handleEnter(e) {
+    // 滑鼠重新進入時，如果滑鼠左鍵是按住的狀態，自動繼續刮
+    if (e.buttons === 1 && !isRevealed) {
+      isDrawing = true;
+      scratch(e);
+    }
+  }
+
   function scratch(e) {
     const rect = canvas.getBoundingClientRect();
     let x, y;
@@ -1972,10 +1981,10 @@
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
-    // 刮除效果 - 使用小筆刷讓體驗更細緻
+    // 刮除效果 - 縮小筆刷半徑讓刮除更細緻
     ctx.globalCompositeOperation = 'destination-out';
     ctx.beginPath();
-    ctx.arc(x * scaleX, y * scaleY, 12, 0, Math.PI * 2);
+    ctx.arc(x * scaleX, y * scaleY, 8, 0, Math.PI * 2);
     ctx.fill();
 
     // 計算進度（採樣方式計算，避免效能問題）
@@ -2002,8 +2011,8 @@
       document.getElementById('progress-text').textContent = '即將揭曉...';
     }
 
-    // 自動揭曉（需要刮開 80% 才會揭曉）
-    if (progress > 0.80 && !isRevealed) {
+    // 自動揭曉（需要刮開 85% 才會揭曉）
+    if (progress > 0.85 && !isRevealed) {
       revealResult();
     }
   }
