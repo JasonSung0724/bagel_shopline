@@ -1949,6 +1949,57 @@ def delete_lottery_prize(prize_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route("/api/lottery/admin/upload", methods=["POST"])
+def upload_lottery_image():
+    """
+    Upload an image for lottery prizes.
+    Requires admin password.
+
+    Body: multipart/form-data with 'image' file
+
+    Returns:
+        {
+            "success": true,
+            "url": "https://..."
+        }
+    """
+    try:
+        if not verify_lottery_admin():
+            return jsonify({"success": False, "error": "管理員密碼錯誤"}), 401
+
+        if "image" not in request.files:
+            return jsonify({"success": False, "error": "請上傳圖片檔案"}), 400
+
+        file = request.files["image"]
+
+        if file.filename == "":
+            return jsonify({"success": False, "error": "請選擇檔案"}), 400
+
+        # Validate file type
+        allowed_types = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+        content_type = file.content_type
+
+        if content_type not in allowed_types:
+            return jsonify({"success": False, "error": "僅支援 JPG、PNG、GIF、WebP 格式"}), 400
+
+        # Validate file size (max 5MB)
+        file_data = file.read()
+        if len(file_data) > 5 * 1024 * 1024:
+            return jsonify({"success": False, "error": "檔案大小不得超過 5MB"}), 400
+
+        from src.repositories.lottery_repository import LotteryRepository
+        repo = LotteryRepository()
+        url = repo.upload_image(file_data, file.filename, content_type)
+
+        if url:
+            return jsonify({"success": True, "url": url}), 200
+        else:
+            return jsonify({"success": False, "error": "上傳失敗"}), 500
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route("/api/lottery/admin/campaigns/<campaign_id>/stats", methods=["GET"])
 def get_lottery_stats(campaign_id):
     """

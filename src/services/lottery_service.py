@@ -351,6 +351,11 @@ class LotteryService:
 
             # 9. Build response
             if won_prize:
+                # Use custom win_message if available, otherwise default message
+                win_message = won_prize.get("win_message")
+                if not win_message:
+                    win_message = f"恭喜您獲得 {won_prize['name']}！"
+
                 return {
                     "success": True,
                     "result": {
@@ -363,7 +368,7 @@ class LotteryService:
                             "image_url": won_prize.get("image_url"),
                         },
                         "redemption_code": result.get("redemption_code"),
-                        "message": f"恭喜您獲得 {won_prize['name']}！",
+                        "message": win_message,
                         "attempts_remaining": max_attempts - current_attempts - 1,
                     }
                 }
@@ -505,6 +510,7 @@ class LotteryService:
         sanitized = {k: campaign.get(k) for k in safe_fields}
 
         # Sanitize prizes (don't expose remaining quantities or probabilities)
+        # Only include prizes with show_on_frontend = True
         if "prizes" in campaign:
             sanitized["prizes"] = [
                 {
@@ -514,7 +520,7 @@ class LotteryService:
                     "image_url": p.get("image_url"),
                 }
                 for p in campaign.get("prizes", [])
-                if p.get("is_active") and p.get("prize_type") != "none"
+                if p.get("is_active") and p.get("prize_type") != "none" and p.get("show_on_frontend")
             ]
 
         return sanitized

@@ -1,6 +1,6 @@
 {% comment %}
   ============================================
-  刮刮樂 Shopline 嵌入代碼
+  刮刮樂 Shopline 嵌入代碼 - 馬年新春版
   ============================================
   使用方式：
   1. 在 Shopline 後台建立自訂頁面
@@ -11,9 +11,9 @@
 
 <style>
 /* ============================================
-   刮刮樂樣式
+   刮刮樂樣式 - 馬年新春喜氣版
    ============================================ */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Ma+Shan+Zheng&display=swap');
 
 * {
   box-sizing: border-box;
@@ -24,20 +24,37 @@
   max-width: 480px;
   margin: 0 auto;
   padding: 20px;
+  padding-bottom: 120px;
   perspective: 1000px;
+  position: relative;
+  z-index: 10;
 }
 
-/* 背景動畫 */
+/* 新年紅色背景 */
 .lottery-bg {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  background: linear-gradient(135deg, #8B0000 0%, #DC143C 30%, #B22222 60%, #8B0000 100%);
   background-size: 400% 400%;
   animation: gradientBG 15s ease infinite;
-  z-index: -1;
+  z-index: -2;
+}
+
+.lottery-bg::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 215, 0, 0.15) 0%, transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(255, 215, 0, 0.15) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(255, 215, 0, 0.1) 0%, transparent 60%);
+  pointer-events: none;
 }
 
 @keyframes gradientBG {
@@ -46,7 +63,7 @@
   100% { background-position: 0% 50%; }
 }
 
-/* 浮動粒子 */
+/* 浮動金幣與燈籠 */
 .particles {
   position: fixed;
   top: 0;
@@ -60,11 +77,53 @@
 
 .particle {
   position: absolute;
-  width: 10px;
-  height: 10px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
   animation: float 20s infinite;
+}
+
+.particle.coin {
+  width: 30px;
+  height: 30px;
+  background: radial-gradient(circle at 30% 30%, #FFD700, #DAA520);
+  border-radius: 50%;
+  box-shadow: inset -3px -3px 8px rgba(0,0,0,0.3), 0 0 10px rgba(255, 215, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #8B0000;
+  font-weight: bold;
+}
+
+.particle.lantern {
+  width: 20px;
+  height: 28px;
+  background: linear-gradient(180deg, #FF4500 0%, #DC143C 50%, #8B0000 100%);
+  border-radius: 50% 50% 45% 45%;
+  box-shadow: 0 0 15px rgba(255, 69, 0, 0.6);
+  position: relative;
+}
+
+.particle.lantern::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 5px;
+  background: #FFD700;
+  border-radius: 2px;
+}
+
+.particle.lantern::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 8px;
+  background: #FFD700;
 }
 
 @keyframes float {
@@ -74,14 +133,164 @@
   100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
 }
 
+/* 奔馬動畫容器 */
+.horse-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 120px;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 5;
+}
+
+.running-horse {
+  position: absolute;
+  bottom: 10px;
+  animation: horseRun 10s linear infinite;
+  filter: drop-shadow(0 5px 15px rgba(0,0,0,0.3));
+}
+
+@keyframes horseRun {
+  0% { left: -200px; transform: scaleX(1); }
+  49.9% { left: calc(100% + 200px); transform: scaleX(1); }
+  50% { left: calc(100% + 200px); transform: scaleX(-1); }
+  99.9% { left: -200px; transform: scaleX(-1); }
+  100% { left: -200px; transform: scaleX(1); }
+}
+
+.running-horse.horse-2 {
+  animation-delay: -5s;
+  bottom: 50px;
+  opacity: 0.6;
+}
+
+.running-horse.horse-2 svg {
+  width: 100px;
+  height: 70px;
+}
+
+/* 炮竹容器 */
+.firecracker-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.firecracker-string {
+  position: absolute;
+  top: -10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.firecracker-string.left {
+  left: 10px;
+  animation: swingLeft 2s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+.firecracker-string.right {
+  right: 10px;
+  animation: swingRight 2s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+@keyframes swingLeft {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+
+@keyframes swingRight {
+  0%, 100% { transform: rotate(3deg); }
+  50% { transform: rotate(-3deg); }
+}
+
+.firecracker-rope {
+  width: 3px;
+  height: 12px;
+  background: linear-gradient(180deg, #8B4513, #A0522D);
+}
+
+.firecracker {
+  width: 18px;
+  height: 28px;
+  background: linear-gradient(90deg, #DC143C 0%, #FF6347 30%, #FF4500 50%, #FF6347 70%, #DC143C 100%);
+  border-radius: 4px;
+  position: relative;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 2px rgba(255,255,255,0.3);
+  margin: 1px 0;
+}
+
+.firecracker::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 8px;
+  background: linear-gradient(180deg, #FFD700, #8B4513);
+}
+
+.firecracker::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 2px;
+  background: #FFD700;
+  box-shadow: 0 4px 0 #FFD700, 0 -4px 0 #FFD700;
+}
+
+/* 炮竹火花動畫 */
+.firecracker-spark {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #FFD700;
+  border-radius: 50%;
+  animation: sparkle 0.5s ease-out infinite;
+  box-shadow: 0 0 6px #FFD700, 0 0 10px #FF4500;
+}
+
+@keyframes sparkle {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0); }
+}
+
 /* 主卡片容器 */
 .lottery-card {
-  background: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(135deg, #FFF8DC 0%, #FFFAF0 50%, #FFF8DC 100%);
   border-radius: 24px;
-  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 25px 80px rgba(139, 0, 0, 0.4),
+    0 0 0 4px #FFD700,
+    0 0 0 8px #DC143C,
+    inset 0 0 30px rgba(255, 215, 0, 0.1);
   overflow: hidden;
   transform-style: preserve-3d;
   transition: transform 0.6s ease;
+  position: relative;
+}
+
+.lottery-card::before {
+  content: '福';
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 40px;
+  color: rgba(220, 20, 60, 0.1);
+  font-family: 'Ma Shan Zheng', cursive;
+  z-index: 0;
 }
 
 .lottery-card:hover {
@@ -90,7 +299,7 @@
 
 /* 頭部區域 */
 .lottery-header {
-  background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 50%, #feca57 100%);
+  background: linear-gradient(135deg, #DC143C 0%, #B22222 50%, #8B0000 100%);
   padding: 30px 20px;
   text-align: center;
   position: relative;
@@ -104,8 +313,37 @@
   left: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 60%);
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, transparent 60%);
   animation: shimmer 3s ease-in-out infinite;
+}
+
+.lottery-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 8px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    #FFD700 10%,
+    #FFD700 20%,
+    transparent 30%,
+    transparent 40%,
+    #FFD700 50%,
+    #FFD700 60%,
+    transparent 70%,
+    transparent 80%,
+    #FFD700 90%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: borderShine 3s linear infinite;
+}
+
+@keyframes borderShine {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 @keyframes shimmer {
@@ -118,7 +356,7 @@
   height: 80px;
   margin: 0 auto 15px;
   animation: bounce 2s ease infinite;
-  filter: drop-shadow(0 10px 20px rgba(0,0,0,0.2));
+  filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
 }
 
 @keyframes bounce {
@@ -127,108 +365,218 @@
 }
 
 .lottery-title {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 900;
-  color: white;
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+  color: #FFD700;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.5), 0 0 20px rgba(255, 215, 0, 0.5);
   margin: 0 0 10px;
   position: relative;
   z-index: 1;
+  font-family: 'Noto Sans TC', sans-serif;
 }
 
 .lottery-subtitle {
   font-size: 16px;
-  color: rgba(255,255,255,0.9);
+  color: rgba(255, 248, 220, 0.95);
   margin: 0;
   position: relative;
   z-index: 1;
+}
+
+/* 新年祝福語裝飾 */
+.cny-blessing {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 15px;
+  position: relative;
+  z-index: 1;
+}
+
+.blessing-char {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: bold;
+  color: #8B0000;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+  transform: rotate(-5deg);
+  animation: blessingPop 0.5s ease backwards;
+}
+
+.blessing-char:nth-child(2) { animation-delay: 0.1s; transform: rotate(3deg); }
+.blessing-char:nth-child(3) { animation-delay: 0.2s; transform: rotate(-2deg); }
+.blessing-char:nth-child(4) { animation-delay: 0.3s; transform: rotate(4deg); }
+
+@keyframes blessingPop {
+  0% { transform: scale(0) rotate(0deg); }
+  100% { transform: scale(1) rotate(var(--rotate, -5deg)); }
 }
 
 /* 內容區域 */
 .lottery-content {
   padding: 30px 25px;
+  background: linear-gradient(180deg, rgba(255, 248, 220, 0) 0%, rgba(255, 215, 0, 0.05) 100%);
 }
 
 /* 次數提示 */
 .lottery-attempts-box {
-  background: linear-gradient(135deg, #fff5f5 0%, #fff0e6 100%);
-  border: 2px solid #ffccd5;
+  background: linear-gradient(135deg, #FFF5F5 0%, #FFE4E1 100%);
+  border: 3px solid #DC143C;
   border-radius: 16px;
   padding: 15px 20px;
   margin-bottom: 25px;
   text-align: center;
   animation: pulse 2s ease infinite;
+  position: relative;
+  overflow: hidden;
+}
+
+.lottery-attempts-box::before {
+  content: '🧧';
+  position: absolute;
+  top: 5px;
+  left: 10px;
+  font-size: 24px;
+  opacity: 0.3;
+}
+
+.lottery-attempts-box::after {
+  content: '🧧';
+  position: absolute;
+  bottom: 5px;
+  right: 10px;
+  font-size: 24px;
+  opacity: 0.3;
 }
 
 @keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.4); }
-  50% { box-shadow: 0 0 0 10px rgba(255, 107, 107, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 20, 60, 0.4); }
+  50% { box-shadow: 0 0 0 10px rgba(220, 20, 60, 0); }
 }
 
 .lottery-attempts-text {
   font-size: 16px;
-  color: #666;
+  color: #8B0000;
   margin: 0;
 }
 
 .lottery-attempts-count {
-  font-size: 32px;
+  font-size: 36px;
   font-weight: 900;
-  color: #ff6b6b;
+  color: #DC143C;
   display: block;
   margin-top: 5px;
+  text-shadow: 0 2px 4px rgba(220, 20, 60, 0.3);
 }
 
 /* 獎品展示 */
+.lottery-prizes-section {
+  margin-bottom: 25px;
+}
+
 .lottery-prizes-title {
   font-size: 14px;
-  color: #999;
+  color: #8B0000;
   text-align: center;
   margin-bottom: 15px;
-  text-transform: uppercase;
   letter-spacing: 2px;
 }
 
 .lottery-prizes-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
   justify-content: center;
   margin-bottom: 25px;
 }
 
+/* 獎品卡片樣式 */
+.lottery-prize-card {
+  background: linear-gradient(135deg, #FFF8DC 0%, #FFFAF0 100%);
+  border: 2px solid #FFD700;
+  border-radius: 12px;
+  padding: 10px;
+  text-align: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 3px 10px rgba(218, 165, 32, 0.2);
+}
+
+.lottery-prize-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 5px 20px rgba(218, 165, 32, 0.4);
+}
+
+.lottery-prize-card img {
+  width: 70px;
+  height: 70px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  border: 1px solid #DAA520;
+}
+
+.lottery-prize-card .prize-placeholder {
+  width: 70px;
+  height: 70px;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  border-radius: 8px;
+  margin: 0 auto 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+}
+
+.lottery-prize-card span {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8B0000;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+/* 舊版 chip 樣式（備用） */
 .lottery-prize-chip {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border: 1px solid #dee2e6;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  border: 2px solid #DAA520;
   border-radius: 50px;
   padding: 8px 16px;
   font-size: 14px;
-  color: #495057;
+  color: #8B0000;
+  font-weight: 600;
   transition: all 0.3s ease;
+  box-shadow: 0 3px 10px rgba(218, 165, 32, 0.3);
 }
 
 .lottery-prize-chip:hover {
-  background: linear-gradient(135deg, #fff5f5 0%, #ffe5ec 100%);
-  border-color: #ff6b6b;
-  transform: scale(1.05);
+  transform: scale(1.1) rotate(-2deg);
+  box-shadow: 0 5px 20px rgba(218, 165, 32, 0.5);
 }
 
 /* 開始按鈕 */
 .lottery-start-btn {
   width: 100%;
   padding: 20px 40px;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
-  color: white;
-  background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 50%, #feca57 100%);
+  color: #8B0000;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FFD700 100%);
   background-size: 200% 200%;
-  border: none;
+  border: 3px solid #DAA520;
   border-radius: 16px;
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
   animation: gradientBtn 3s ease infinite;
+  box-shadow: 0 5px 20px rgba(218, 165, 32, 0.4);
 }
 
 @keyframes gradientBtn {
@@ -244,7 +592,7 @@
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
   animation: btnShine 2s ease infinite;
 }
 
@@ -255,7 +603,7 @@
 
 .lottery-start-btn:hover {
   transform: translateY(-3px);
-  box-shadow: 0 15px 40px rgba(255, 107, 107, 0.4);
+  box-shadow: 0 15px 40px rgba(218, 165, 32, 0.5);
 }
 
 .lottery-start-btn:active {
@@ -280,7 +628,7 @@
   border-radius: 20px;
   overflow: hidden;
   margin-bottom: 20px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  box-shadow: 0 10px 40px rgba(139, 0, 0, 0.3), 0 0 0 3px #FFD700;
   transform: scale(0);
   animation: cardAppear 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
@@ -301,19 +649,35 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-  opacity: 0;
+  background: linear-gradient(135deg, #FFF8DC 0%, #FFE4B5 100%);
+  /* 底層始終顯示，透過 canvas 的 destination-out 來刮開 */
+  opacity: 1;
   transition: opacity 0.5s ease;
 }
 
 .scratch-result-layer.win {
-  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FFD700 100%);
+  position: relative;
+}
+
+.scratch-result-layer.win::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(255,255,255,0.4) 0%, transparent 30%),
+    radial-gradient(circle at 80% 70%, rgba(255,255,255,0.3) 0%, transparent 25%);
+  pointer-events: none;
 }
 
 .scratch-result-layer.lose {
-  background: linear-gradient(135deg, #e0e5ec 0%, #c9d6e3 100%);
+  background: linear-gradient(135deg, #E8E4D9 0%, #D4CFC4 50%, #C8C3B8 100%);
 }
 
+/* 揭曉後結果層會自動完全顯示（canvas 已隱藏） */
 .scratch-result-layer.revealed {
   opacity: 1;
 }
@@ -324,7 +688,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24'%3E%3Cpath fill='%23ff6b6b' d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z'/%3E%3C/svg%3E") 16 16, crosshair;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%23FFD700' stroke='%23DAA520' stroke-width='2'/%3E%3C/svg%3E") 16 16, crosshair;
   touch-action: none;
   transition: opacity 0.5s ease;
 }
@@ -336,9 +700,27 @@
 
 /* 結果顯示 */
 .result-icon {
+  width: 70px;
+  height: 70px;
+  margin-bottom: 12px;
+}
+
+/* 中獎獎品圖片 */
+.result-prize-image {
   width: 80px;
   height: 80px;
-  margin-bottom: 15px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  border: 3px solid #DC143C;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.scratch-result-layer.revealed .result-prize-image {
+  animation: resultPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.scratch-result-layer.revealed .result-icon {
   animation: resultPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -349,9 +731,13 @@
 }
 
 .result-title {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 900;
-  margin: 0 0 10px;
+  margin: 0 0 8px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.scratch-result-layer.revealed .result-title {
   animation: resultSlide 0.6s ease 0.2s both;
 }
 
@@ -361,19 +747,22 @@
 }
 
 .result-title.win {
-  color: #10b981;
-  text-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
+  color: #8B0000;
+  text-shadow: 0 2px 10px rgba(139, 0, 0, 0.3);
 }
 
 .result-title.lose {
-  color: #6b7280;
+  color: #8B4513;
 }
 
 .result-prize-name {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
-  color: #1f2937;
+  color: #8B0000;
   margin: 0;
+}
+
+.scratch-result-layer.revealed .result-prize-name {
   animation: resultSlide 0.6s ease 0.3s both;
 }
 
@@ -383,35 +772,59 @@
 }
 
 .scratch-progress-bar {
-  height: 8px;
-  background: #e5e7eb;
-  border-radius: 4px;
+  height: 10px;
+  background: #FFE4E1;
+  border-radius: 5px;
   overflow: hidden;
+  border: 2px solid #DC143C;
 }
 
 .scratch-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #ff6b6b, #feca57);
-  border-radius: 4px;
+  background: linear-gradient(90deg, #DC143C, #FFD700, #DC143C);
+  background-size: 200% 100%;
+  border-radius: 3px;
   transition: width 0.1s ease;
+  animation: progressShine 1s linear infinite;
+}
+
+@keyframes progressShine {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .scratch-progress-text {
   font-size: 14px;
-  color: #6b7280;
+  color: #8B0000;
   text-align: center;
   margin-top: 8px;
+  font-weight: 600;
 }
 
 /* 兌換碼區域 */
 .redemption-box {
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-  border: 2px solid #34d399;
+  background: linear-gradient(135deg, #DC143C 0%, #B22222 100%);
+  border: 3px solid #FFD700;
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 20px;
   text-align: center;
   animation: slideUp 0.6s ease 0.4s both;
+  position: relative;
+  overflow: hidden;
+}
+
+.redemption-box::before {
+  content: '恭喜發財';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 60px;
+  color: rgba(255, 215, 0, 0.1);
+  font-family: 'Ma Shan Zheng', cursive;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 @keyframes slideUp {
@@ -420,9 +833,11 @@
 }
 
 .redemption-label {
-  font-size: 14px;
-  color: #059669;
-  margin-bottom: 10px;
+  font-size: 16px;
+  color: #FFD700;
+  margin-bottom: 12px;
+  font-weight: 600;
+  position: relative;
 }
 
 .redemption-code-display {
@@ -430,23 +845,25 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
+  position: relative;
 }
 
 .redemption-code {
   font-family: 'Courier New', monospace;
   font-size: 24px;
   font-weight: 900;
-  color: #059669;
-  background: white;
+  color: #8B0000;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
   padding: 12px 20px;
   border-radius: 12px;
   letter-spacing: 2px;
-  box-shadow: 0 4px 15px rgba(5, 150, 105, 0.2);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  border: 2px solid #DAA520;
 }
 
 .copy-btn {
-  background: #059669;
-  border: none;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  border: 2px solid #DAA520;
   border-radius: 10px;
   padding: 12px;
   cursor: pointer;
@@ -454,29 +871,31 @@
 }
 
 .copy-btn:hover {
-  background: #047857;
   transform: scale(1.1);
+  box-shadow: 0 5px 15px rgba(218, 165, 32, 0.5);
 }
 
 .copy-btn svg {
   width: 24px;
   height: 24px;
-  color: white;
+  color: #8B0000;
 }
 
 .redemption-note {
   font-size: 13px;
-  color: #059669;
+  color: #FFE4B5;
   margin-top: 12px;
+  position: relative;
 }
 
 /* 結果訊息 */
 .result-message {
   font-size: 16px;
-  color: #6b7280;
+  color: #8B0000;
   text-align: center;
   margin-bottom: 20px;
   animation: slideUp 0.6s ease 0.5s both;
+  font-weight: 500;
 }
 
 /* 再試一次按鈕 */
@@ -485,9 +904,9 @@
   padding: 16px 32px;
   font-size: 18px;
   font-weight: 700;
-  color: #ff6b6b;
-  background: white;
-  border: 3px solid #ff6b6b;
+  color: #DC143C;
+  background: linear-gradient(135deg, #FFF8DC 0%, #FFE4B5 100%);
+  border: 3px solid #DC143C;
   border-radius: 16px;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -495,13 +914,13 @@
 }
 
 .lottery-retry-btn:hover {
-  background: #ff6b6b;
-  color: white;
+  background: linear-gradient(135deg, #DC143C 0%, #B22222 100%);
+  color: #FFD700;
   transform: translateY(-3px);
-  box-shadow: 0 10px 30px rgba(255, 107, 107, 0.3);
+  box-shadow: 0 10px 30px rgba(220, 20, 60, 0.3);
 }
 
-/* 慶祝動畫 - 彩帶 */
+/* 慶祝動畫 - 紅包雨 */
 .confetti-container {
   position: fixed;
   top: 0;
@@ -515,19 +934,44 @@
 
 .confetti {
   position: absolute;
-  width: 10px;
-  height: 20px;
   top: -20px;
   animation: confettiFall 3s ease-in-out forwards;
 }
 
+.confetti.red-packet {
+  width: 30px;
+  height: 40px;
+  background: linear-gradient(135deg, #DC143C 0%, #B22222 100%);
+  border-radius: 4px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+}
+
+.confetti.red-packet::before {
+  content: '福';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #FFD700;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.confetti.gold-coin {
+  width: 25px;
+  height: 25px;
+  background: radial-gradient(circle at 30% 30%, #FFD700, #DAA520);
+  border-radius: 50%;
+  box-shadow: inset -2px -2px 6px rgba(0,0,0,0.3);
+}
+
 @keyframes confettiFall {
   0% {
-    transform: translateY(0) rotateZ(0deg);
+    transform: translateY(0) rotateZ(0deg) rotateY(0deg);
     opacity: 1;
   }
   100% {
-    transform: translateY(100vh) rotateZ(720deg);
+    transform: translateY(100vh) rotateZ(720deg) rotateY(360deg);
     opacity: 0;
   }
 }
@@ -535,10 +979,10 @@
 /* 煙火動畫 */
 .firework {
   position: fixed;
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  animation: fireworkExplode 1s ease-out forwards;
+  animation: fireworkExplode 1.2s ease-out forwards;
 }
 
 @keyframes fireworkExplode {
@@ -552,12 +996,38 @@
   }
 }
 
+/* 炮竹爆炸特效 */
+.firecracker-explosion {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10000;
+}
+
+.explosion-particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #FFD700;
+  border-radius: 50%;
+  animation: explode 0.8s ease-out forwards;
+}
+
+@keyframes explode {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 /* 載入動畫 */
 .loader {
   width: 40px;
   height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #ff6b6b;
+  border: 4px solid #FFE4E1;
+  border-top: 4px solid #DC143C;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto;
@@ -566,6 +1036,13 @@
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* 載入中文字 */
+.loading-text {
+  margin-top: 20px;
+  color: #8B0000;
+  font-weight: 500;
 }
 
 /* 錯誤/登入提示 */
@@ -584,13 +1061,13 @@
 .lottery-message-title {
   font-size: 24px;
   font-weight: 700;
-  color: #1f2937;
+  color: #8B0000;
   margin: 0 0 10px;
 }
 
 .lottery-message-text {
   font-size: 16px;
-  color: #6b7280;
+  color: #8B4513;
   margin: 0 0 25px;
 }
 
@@ -599,18 +1076,19 @@
   padding: 14px 40px;
   font-size: 16px;
   font-weight: 700;
-  color: white;
-  background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
-  border: none;
+  color: #8B0000;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  border: 2px solid #DAA520;
   border-radius: 12px;
   text-decoration: none;
   transition: all 0.3s ease;
+  box-shadow: 0 5px 15px rgba(218, 165, 32, 0.4);
 }
 
 .lottery-login-btn:hover {
   transform: translateY(-3px);
-  box-shadow: 0 10px 30px rgba(255, 107, 107, 0.4);
-  color: white;
+  box-shadow: 0 10px 30px rgba(218, 165, 32, 0.5);
+  color: #8B0000;
   text-decoration: none;
 }
 
@@ -623,10 +1101,11 @@
 @media (max-width: 480px) {
   .lottery-wrapper {
     padding: 15px;
+    padding-bottom: 100px;
   }
 
   .lottery-title {
-    font-size: 24px;
+    font-size: 26px;
   }
 
   .lottery-start-btn {
@@ -638,11 +1117,151 @@
     font-size: 18px;
     padding: 10px 15px;
   }
+
+  .firecracker-string {
+    transform: scale(0.8);
+  }
+
+  .horse-container {
+    height: 80px;
+  }
+
+  .running-horse svg {
+    width: 100px;
+    height: 70px;
+  }
+
+  .running-horse.horse-2 svg {
+    width: 70px;
+    height: 50px;
+  }
 }
 </style>
 
 <div class="lottery-bg"></div>
 <div class="particles" id="particles"></div>
+
+<!-- 炮竹裝飾 -->
+<div class="firecracker-container" id="firecracker-container">
+  <div class="firecracker-string left">
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+  </div>
+  <div class="firecracker-string right">
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+    <div class="firecracker-rope"></div>
+    <div class="firecracker"></div>
+  </div>
+</div>
+
+<!-- 奔馬動畫 -->
+<div class="horse-container">
+  <div class="running-horse">
+    <svg viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg" width="150" height="105">
+      <!-- 馬身體 -->
+      <ellipse cx="100" cy="70" rx="55" ry="35" fill="url(#horseBody)"/>
+      <!-- 馬頭 -->
+      <path d="M145 55 Q165 35 170 45 Q175 55 165 65 Q155 75 145 70 Z" fill="url(#horseBody)"/>
+      <!-- 馬耳朵 -->
+      <path d="M160 40 Q165 30 168 38 Q166 45 160 45 Z" fill="url(#horseBody)"/>
+      <!-- 馬眼睛 -->
+      <circle cx="162" cy="52" r="3" fill="#1a1a1a"/>
+      <circle cx="163" cy="51" r="1" fill="white"/>
+      <!-- 馬鬃毛 -->
+      <path d="M145 50 Q130 30 120 45 Q135 35 140 50" fill="#8B0000"/>
+      <path d="M135 55 Q120 35 110 50 Q125 40 130 55" fill="#8B0000"/>
+      <path d="M125 58 Q110 40 100 55 Q115 45 120 60" fill="#8B0000"/>
+      <!-- 馬尾巴 -->
+      <path d="M45 65 Q20 50 15 70 Q20 90 45 80" fill="#8B0000" class="horse-tail"/>
+      <path d="M45 68 Q25 55 22 72 Q27 85 45 78" fill="#6B0000" class="horse-tail"/>
+      <!-- 前腿 -->
+      <path d="M120 95 Q125 115 120 130 Q118 135 115 130 Q110 115 115 95" fill="url(#horseBody)" class="front-leg-1"/>
+      <path d="M135 95 Q140 115 135 130 Q133 135 130 130 Q125 115 130 95" fill="url(#horseBody)" class="front-leg-2"/>
+      <!-- 後腿 -->
+      <path d="M65 95 Q70 115 65 130 Q63 135 60 130 Q55 115 60 95" fill="url(#horseBody)" class="back-leg-1"/>
+      <path d="M80 95 Q85 115 80 130 Q78 135 75 130 Q70 115 75 95" fill="url(#horseBody)" class="back-leg-2"/>
+      <!-- 蹄子 -->
+      <ellipse cx="117" cy="132" rx="5" ry="3" fill="#4a3728"/>
+      <ellipse cx="132" cy="132" rx="5" ry="3" fill="#4a3728"/>
+      <ellipse cx="62" cy="132" rx="5" ry="3" fill="#4a3728"/>
+      <ellipse cx="77" cy="132" rx="5" ry="3" fill="#4a3728"/>
+      <!-- 新年裝飾 - 紅色緞帶 -->
+      <path d="M155 60 Q160 65 165 60 Q170 70 165 75 Q155 70 155 60" fill="#DC143C"/>
+      <circle cx="163" cy="62" r="4" fill="#FFD700"/>
+      <!-- 漸變定義 -->
+      <defs>
+        <linearGradient id="horseBody" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#D4A574"/>
+          <stop offset="50%" style="stop-color:#C4956A"/>
+          <stop offset="100%" style="stop-color:#A67B5B"/>
+        </linearGradient>
+      </defs>
+      <style>
+        .horse-tail { animation: tailWag 0.3s ease-in-out infinite alternate; transform-origin: 45px 72px; }
+        .front-leg-1 { animation: legRun1 0.2s ease-in-out infinite; transform-origin: 117px 95px; }
+        .front-leg-2 { animation: legRun2 0.2s ease-in-out infinite; transform-origin: 132px 95px; }
+        .back-leg-1 { animation: legRun2 0.2s ease-in-out infinite; transform-origin: 62px 95px; }
+        .back-leg-2 { animation: legRun1 0.2s ease-in-out infinite; transform-origin: 77px 95px; }
+        @keyframes tailWag { 0% { transform: rotate(-10deg); } 100% { transform: rotate(10deg); } }
+        @keyframes legRun1 { 0% { transform: rotate(-20deg); } 100% { transform: rotate(20deg); } }
+        @keyframes legRun2 { 0% { transform: rotate(20deg); } 100% { transform: rotate(-20deg); } }
+      </style>
+    </svg>
+  </div>
+  <div class="running-horse horse-2">
+    <svg viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg" width="100" height="70">
+      <ellipse cx="100" cy="70" rx="55" ry="35" fill="url(#horseBody2)"/>
+      <path d="M145 55 Q165 35 170 45 Q175 55 165 65 Q155 75 145 70 Z" fill="url(#horseBody2)"/>
+      <path d="M160 40 Q165 30 168 38 Q166 45 160 45 Z" fill="url(#horseBody2)"/>
+      <circle cx="162" cy="52" r="3" fill="#1a1a1a"/>
+      <path d="M145 50 Q130 30 120 45 Q135 35 140 50" fill="#5D4037"/>
+      <path d="M135 55 Q120 35 110 50 Q125 40 130 55" fill="#5D4037"/>
+      <path d="M45 65 Q20 50 15 70 Q20 90 45 80" fill="#5D4037" class="horse-tail"/>
+      <path d="M120 95 Q125 115 120 130 Q118 135 115 130 Q110 115 115 95" fill="url(#horseBody2)" class="front-leg-1"/>
+      <path d="M135 95 Q140 115 135 130 Q133 135 130 130 Q125 115 130 95" fill="url(#horseBody2)" class="front-leg-2"/>
+      <path d="M65 95 Q70 115 65 130 Q63 135 60 130 Q55 115 60 95" fill="url(#horseBody2)" class="back-leg-1"/>
+      <path d="M80 95 Q85 115 80 130 Q78 135 75 130 Q70 115 75 95" fill="url(#horseBody2)" class="back-leg-2"/>
+      <ellipse cx="117" cy="132" rx="5" ry="3" fill="#4a3728"/>
+      <ellipse cx="132" cy="132" rx="5" ry="3" fill="#4a3728"/>
+      <ellipse cx="62" cy="132" rx="5" ry="3" fill="#4a3728"/>
+      <ellipse cx="77" cy="132" rx="5" ry="3" fill="#4a3728"/>
+      <defs>
+        <linearGradient id="horseBody2" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#8B7355"/>
+          <stop offset="50%" style="stop-color:#7B6348"/>
+          <stop offset="100%" style="stop-color:#6B5344"/>
+        </linearGradient>
+      </defs>
+    </svg>
+  </div>
+</div>
 
 <div class="lottery-wrapper">
   <div class="lottery-card">
@@ -650,29 +1269,35 @@
     <div id="lottery-loading" class="lottery-content">
       <div style="text-align: center; padding: 60px 20px;">
         <div class="loader"></div>
-        <p style="margin-top: 20px; color: #6b7280;">載入中...</p>
+        <p class="loading-text">載入中...</p>
       </div>
     </div>
 
     <!-- 需要登入 -->
     <div id="lottery-login" class="hidden">
       <div class="lottery-header">
-        <svg class="lottery-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+        <svg class="lottery-icon" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2">
           <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/>
         </svg>
         <h1 class="lottery-title">會員專屬活動</h1>
-        <p class="lottery-subtitle">登入即可參加刮刮樂</p>
+        <p class="lottery-subtitle">登入即可參加新春刮刮樂</p>
+        <div class="cny-blessing">
+          <span class="blessing-char">馬</span>
+          <span class="blessing-char">到</span>
+          <span class="blessing-char">成</span>
+          <span class="blessing-char">功</span>
+        </div>
       </div>
       <div class="lottery-message-box">
         <p class="lottery-message-text">請先登入會員帳號才能參加刮刮樂活動</p>
-        <a href="/users/sign_in" class="lottery-login-btn">立即登入</a>
+        <a href="/users/sign_in" class="lottery-login-btn">🧧 立即登入</a>
       </div>
     </div>
 
     <!-- 錯誤訊息 -->
     <div id="lottery-error" class="hidden">
-      <div class="lottery-header" style="background: linear-gradient(135deg, #6b7280 0%, #9ca3af 100%);">
-        <svg class="lottery-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+      <div class="lottery-header" style="background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);">
+        <svg class="lottery-icon" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2">
           <circle cx="12" cy="12" r="10"/>
           <line x1="12" y1="8" x2="12" y2="12"/>
           <line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -687,22 +1312,26 @@
     <!-- 準備開始 -->
     <div id="lottery-ready" class="hidden">
       <div class="lottery-header">
-        <svg class="lottery-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+        <svg class="lottery-icon" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2">
           <path d="M20 12v10H4V12M22 7H2v5h20V7zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
         </svg>
         <h1 id="campaign-name" class="lottery-title"></h1>
         <p id="campaign-desc" class="lottery-subtitle"></p>
+        <div class="cny-blessing">
+          <span class="blessing-char">馬</span>
+          <span class="blessing-char">年</span>
+          <span class="blessing-char">行</span>
+          <span class="blessing-char">運</span>
+        </div>
       </div>
       <div class="lottery-content">
-        <div class="lottery-attempts-box">
-          <p class="lottery-attempts-text">您還有</p>
-          <span id="attempts-left" class="lottery-attempts-count">0</span>
-          <p class="lottery-attempts-text">次刮獎機會</p>
+        <!-- 獎品展示區塊（根據 API 回傳動態顯示） -->
+        <div id="prizes-section" class="lottery-prizes-section hidden">
+          <p class="lottery-prizes-title">🎊 豐富獎品等你來拿 🎊</p>
+          <div id="prizes-list" class="lottery-prizes-grid"></div>
         </div>
-        <p class="lottery-prizes-title">豐富獎品等你來拿</p>
-        <div id="prizes-list" class="lottery-prizes-grid"></div>
         <button id="start-btn" class="lottery-start-btn" onclick="startScratchGame()">
-          ✨ 開始刮獎 ✨
+          🧧 開始刮獎 🧧
         </button>
       </div>
     </div>
@@ -711,16 +1340,18 @@
     <div id="lottery-scratch" class="hidden">
       <div class="lottery-header">
         <h1 id="scratch-title" class="lottery-title"></h1>
-        <p class="lottery-subtitle">用手指刮開灰色區域</p>
+        <p class="lottery-subtitle">用手指刮開金色區域試試手氣</p>
       </div>
       <div class="lottery-content">
         <div class="scratch-container" id="scratch-container">
           <div id="scratch-result" class="scratch-result-layer">
-            <svg id="win-icon" class="result-icon hidden" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+            <!-- 中獎獎品圖片 -->
+            <img id="prize-image" class="result-prize-image hidden" src="" alt="獎品圖片" />
+            <svg id="win-icon" class="result-icon hidden" viewBox="0 0 24 24" fill="none" stroke="#DC143C" stroke-width="2">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
               <polyline points="22 4 12 14.01 9 11.01"/>
             </svg>
-            <svg id="lose-icon" class="result-icon hidden" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2">
+            <svg id="lose-icon" class="result-icon hidden" viewBox="0 0 24 24" fill="none" stroke="#8B4513" stroke-width="2">
               <circle cx="12" cy="12" r="10"/>
               <line x1="15" y1="9" x2="9" y2="15"/>
               <line x1="9" y1="9" x2="15" y2="15"/>
@@ -735,11 +1366,11 @@
           <div class="scratch-progress-bar">
             <div id="progress-fill" class="scratch-progress-fill" style="width: 0%;"></div>
           </div>
-          <p id="progress-text" class="scratch-progress-text">開始刮吧！</p>
+          <p id="progress-text" class="scratch-progress-text">開始刮吧！祝您馬到成功！</p>
         </div>
 
         <div id="redemption-box" class="redemption-box hidden">
-          <p class="redemption-label">🎉 您的專屬兌換碼</p>
+          <p class="redemption-label">🧧 恭喜發財！您的專屬兌換碼 🧧</p>
           <div class="redemption-code-display">
             <span id="redemption-code" class="redemption-code"></span>
             <button class="copy-btn" onclick="copyRedemptionCode()">
@@ -769,7 +1400,7 @@
   // ============================================
   // 設定區 - 請修改以下設定
   // ============================================
-  const API_BASE_URL = 'https://grown-century-humor-coins.trycloudflare.com';
+  const API_BASE_URL = 'https://violations-logged-manufacturing-updating.trycloudflare.com';
   const CAMPAIGN_ID = '5973d399-3f88-4dd6-bd6b-6ca8d53f07aa';
 
   // ============================================
@@ -789,8 +1420,11 @@
   // 初始化
   // ============================================
   document.addEventListener('DOMContentLoaded', function() {
-    // 建立背景粒子
+    // 建立背景粒子（金幣和燈籠）
     createParticles();
+
+    // 定期添加炮竹火花
+    setInterval(createFirecrackerSparks, 2000);
 
     // 取得 Shopline 會員資訊
     {% if customer %}
@@ -803,17 +1437,38 @@
     checkEligibility();
   });
 
-  // 建立背景粒子
+  // 建立背景粒子（金幣和燈籠）
   function createParticles() {
     const container = document.getElementById('particles');
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 15; i++) {
       const particle = document.createElement('div');
-      particle.className = 'particle';
+      const isCoin = Math.random() > 0.4;
+      particle.className = 'particle ' + (isCoin ? 'coin' : 'lantern');
       particle.style.left = Math.random() * 100 + '%';
       particle.style.animationDelay = Math.random() * 20 + 's';
       particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+      if (isCoin) {
+        particle.innerHTML = '福';
+      }
       container.appendChild(particle);
     }
+  }
+
+  // 炮竹火花效果
+  function createFirecrackerSparks() {
+    const container = document.getElementById('firecracker-container');
+    const firecrackers = container.querySelectorAll('.firecracker');
+
+    firecrackers.forEach((fc, index) => {
+      if (Math.random() > 0.7) {
+        const spark = document.createElement('div');
+        spark.className = 'firecracker-spark';
+        spark.style.left = (Math.random() * 10 - 5) + 'px';
+        spark.style.top = '-8px';
+        fc.appendChild(spark);
+        setTimeout(() => spark.remove(), 500);
+      }
+    });
   }
 
   // ============================================
@@ -867,20 +1522,48 @@
   function showReady() {
     const campaign = eligibility.campaign;
 
-    document.getElementById('campaign-name').textContent = campaign.name || '刮刮樂';
-    document.getElementById('campaign-desc').textContent = campaign.description || '試試手氣吧！';
-    document.getElementById('attempts-left').textContent = eligibility.attempts_remaining;
+    document.getElementById('campaign-name').textContent = campaign.name || '新春刮刮樂';
+    document.getElementById('campaign-desc').textContent = campaign.description || '馬年行大運！試試手氣吧！';
 
-    // 顯示獎品
+    // 顯示獎品（只顯示 show_on_frontend = true 的獎品，由後端 API 已過濾）
+    const prizesSection = document.getElementById('prizes-section');
     const prizesList = document.getElementById('prizes-list');
     prizesList.innerHTML = '';
+
     if (campaign.prizes && campaign.prizes.length > 0) {
+      // 有要顯示的獎品，顯示獎品區塊
+      prizesSection.classList.remove('hidden');
+
       campaign.prizes.forEach(prize => {
-        const chip = document.createElement('span');
-        chip.className = 'lottery-prize-chip';
-        chip.textContent = prize.name;
-        prizesList.appendChild(chip);
+        const card = document.createElement('div');
+        card.className = 'lottery-prize-card';
+
+        // 如果有圖片，顯示圖片；否則顯示佔位符
+        if (prize.image_url) {
+          const img = document.createElement('img');
+          img.src = prize.image_url;
+          img.alt = prize.name;
+          img.onerror = function() {
+            // 圖片載入失敗時顯示佔位符
+            this.parentNode.innerHTML = '<div class="prize-placeholder">🎁</div><span>' + prize.name + '</span>';
+          };
+          card.appendChild(img);
+        } else {
+          const placeholder = document.createElement('div');
+          placeholder.className = 'prize-placeholder';
+          placeholder.textContent = '🎁';
+          card.appendChild(placeholder);
+        }
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = prize.name;
+        card.appendChild(nameSpan);
+
+        prizesList.appendChild(card);
       });
+    } else {
+      // 沒有要顯示的獎品，隱藏獎品區塊
+      prizesSection.classList.add('hidden');
     }
 
     showState('ready');
@@ -922,23 +1605,33 @@
   // 顯示刮刮卡
   // ============================================
   function showScratchCard() {
-    document.getElementById('scratch-title').textContent = eligibility.campaign.name || '刮刮樂';
+    document.getElementById('scratch-title').textContent = eligibility.campaign.name || '新春刮刮樂';
 
     // 設定結果
     const resultLayer = document.getElementById('scratch-result');
     const winIcon = document.getElementById('win-icon');
     const loseIcon = document.getElementById('lose-icon');
+    const prizeImage = document.getElementById('prize-image');
     const resultTitle = document.getElementById('result-title');
     const prizeName = document.getElementById('prize-name');
 
     resultLayer.classList.remove('win', 'lose', 'revealed');
     winIcon.classList.add('hidden');
     loseIcon.classList.add('hidden');
+    prizeImage.classList.add('hidden');
 
     if (scratchResult.is_winner) {
       resultLayer.classList.add('win');
-      winIcon.classList.remove('hidden');
-      resultTitle.textContent = '🎊 恭喜中獎！';
+
+      // 如果有獎品圖片，顯示圖片；否則顯示勾勾圖示
+      if (scratchResult.prize && scratchResult.prize.image_url) {
+        prizeImage.src = scratchResult.prize.image_url;
+        prizeImage.classList.remove('hidden');
+      } else {
+        winIcon.classList.remove('hidden');
+      }
+
+      resultTitle.textContent = '恭喜中獎';
       resultTitle.className = 'result-title win';
       prizeName.textContent = scratchResult.prize.name;
     } else {
@@ -946,7 +1639,7 @@
       loseIcon.classList.remove('hidden');
       resultTitle.textContent = '再接再厲';
       resultTitle.className = 'result-title lose';
-      prizeName.textContent = '下次一定會更幸運 💪';
+      prizeName.textContent = '下次一定中';
     }
 
     // 重置狀態
@@ -956,7 +1649,7 @@
     document.getElementById('result-msg').classList.add('hidden');
     document.getElementById('retry-btn').classList.add('hidden');
     document.getElementById('progress-fill').style.width = '0%';
-    document.getElementById('progress-text').textContent = '開始刮吧！';
+    document.getElementById('progress-text').textContent = '開始刮吧！祝您馬到成功！';
 
     showState('scratch');
 
@@ -964,48 +1657,87 @@
     setTimeout(initCanvas, 100);
   }
 
-  // ============================================
-  // Canvas 刮刮卡
-  // ============================================
   function initCanvas() {
     canvas = document.getElementById('scratch-canvas');
     ctx = canvas.getContext('2d');
-
     canvas.classList.remove('hidden');
 
     const container = document.getElementById('scratch-container');
     const rect = container.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
 
-    canvas.width = rect.width * 2;
-    canvas.height = rect.height * 2;
-    ctx.scale(2, 2);
+    const w = rect.width;
+    const h = rect.height;
 
-    // 繪製刮刮層
-    const gradient = ctx.createLinearGradient(0, 0, rect.width, rect.height);
-    gradient.addColorStop(0, '#b8c6db');
-    gradient.addColorStop(0.5, '#a0aec0');
-    gradient.addColorStop(1, '#b8c6db');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, rect.width, rect.height);
+    const redGradient = ctx.createLinearGradient(0, 0, w, h);
+    redGradient.addColorStop(0, '#C41E3A');
+    redGradient.addColorStop(0.5, '#DC143C');
+    redGradient.addColorStop(1, '#B22222');
+    ctx.fillStyle = redGradient;
+    ctx.fillRect(0, 0, w, h);
 
-    // 添加閃光效果
-    const shimmer = ctx.createLinearGradient(0, 0, rect.width, 0);
-    shimmer.addColorStop(0, 'rgba(255,255,255,0)');
-    shimmer.addColorStop(0.5, 'rgba(255,255,255,0.3)');
-    shimmer.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = shimmer;
-    ctx.fillRect(0, 0, rect.width, rect.height);
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(5, 5, w - 10, h - 10);
+    ctx.strokeStyle = '#DAA520';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(12, 12, w - 24, h - 24);
 
-    // 添加文字
-    ctx.fillStyle = '#64748b';
-    ctx.font = 'bold 24px "Noto Sans TC", sans-serif';
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(18, 32); ctx.lineTo(18, 18); ctx.lineTo(32, 18);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(w - 32, 18); ctx.lineTo(w - 18, 18); ctx.lineTo(w - 18, 32);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(18, h - 32); ctx.lineTo(18, h - 18); ctx.lineTo(32, h - 18);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(w - 32, h - 18); ctx.lineTo(w - 18, h - 18); ctx.lineTo(w - 18, h - 32);
+    ctx.stroke();
+
+    const centerX = w / 2;
+    const centerY = h / 2;
+
+    ctx.save();
+    ctx.translate(w * 0.2, centerY + 8);
+    ctx.scale(0.45, 0.45);
+    drawHorseSilhouette(ctx, '#FFD700');
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(w * 0.8, centerY + 8);
+    ctx.scale(-0.45, 0.45);
+    drawHorseSilhouette(ctx, '#FFD700');
+    ctx.restore();
+
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 26px "Noto Sans TC", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('👆 刮開此處', rect.width / 2, rect.height / 2 - 15);
-    ctx.font = '16px "Noto Sans TC", sans-serif';
-    ctx.fillText('SCRATCH HERE', rect.width / 2, rect.height / 2 + 15);
+    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    ctx.fillText('刮我', centerX, centerY - 6);
 
-    // 事件監聽
+    ctx.font = '13px "Noto Sans TC", sans-serif';
+    ctx.shadowBlur = 2;
+    ctx.fillText('馬年行大運', centerX, centerY + 16);
+
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    drawCoin(ctx, 40, 40, 10);
+    drawCoin(ctx, w - 40, 40, 10);
+    drawCoin(ctx, 40, h - 40, 10);
+    drawCoin(ctx, w - 40, h - 40, 10);
+
     canvas.addEventListener('mousedown', handleStart);
     canvas.addEventListener('mousemove', handleMove);
     canvas.addEventListener('mouseup', handleEnd);
@@ -1013,6 +1745,61 @@
     canvas.addEventListener('touchstart', handleStart, { passive: false });
     canvas.addEventListener('touchmove', handleMove, { passive: false });
     canvas.addEventListener('touchend', handleEnd);
+  }
+
+  function drawHorseSilhouette(ctx, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(20, -30, 40, -22);
+    ctx.quadraticCurveTo(48, -28, 52, -40);
+    ctx.quadraticCurveTo(54, -28, 58, -22);
+    ctx.quadraticCurveTo(65, -18, 62, -5);
+    ctx.quadraticCurveTo(52, 5, 42, 10);
+    ctx.quadraticCurveTo(25, 14, 8, 18);
+    ctx.quadraticCurveTo(-15, 22, -35, 14);
+    ctx.quadraticCurveTo(-52, 5, -58, -8);
+    ctx.quadraticCurveTo(-48, 0, -38, 10);
+    ctx.quadraticCurveTo(-35, 30, -32, 48);
+    ctx.quadraticCurveTo(-28, 48, -24, 30);
+    ctx.quadraticCurveTo(-18, 22, -12, 30);
+    ctx.quadraticCurveTo(-8, 48, -4, 48);
+    ctx.quadraticCurveTo(0, 30, 4, 22);
+    ctx.quadraticCurveTo(22, 26, 26, 48);
+    ctx.quadraticCurveTo(30, 48, 34, 30);
+    ctx.quadraticCurveTo(38, 22, 42, 30);
+    ctx.quadraticCurveTo(46, 48, 50, 48);
+    ctx.quadraticCurveTo(54, 30, 52, 14);
+    ctx.quadraticCurveTo(35, 5, 0, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(42, 5);
+    ctx.quadraticCurveTo(30, -5, 38, -12);
+    ctx.quadraticCurveTo(25, -8, 33, -18);
+    ctx.quadraticCurveTo(22, -12, 30, -22);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  function drawCoin(ctx, x, y, r) {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFD700';
+    ctx.fill();
+    ctx.strokeStyle = '#B8860B';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.55, 0, Math.PI * 2);
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#C41E3A';
+    const sq = r * 0.35;
+    ctx.fillRect(x - sq, y - sq, sq * 2, sq * 2);
   }
 
   function handleStart(e) {
@@ -1044,34 +1831,42 @@
       y = e.clientY - rect.top;
     }
 
-    const scaleX = canvas.width / rect.width / 2;
-    const scaleY = canvas.height / rect.height / 2;
+    // 計算縮放比例
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
 
+    // 刮除效果 - 使用小筆刷讓體驗更細緻
     ctx.globalCompositeOperation = 'destination-out';
     ctx.beginPath();
-    ctx.arc(x * scaleX, y * scaleY, 30, 0, Math.PI * 2);
+    ctx.arc(x * scaleX, y * scaleY, 12, 0, Math.PI * 2);
     ctx.fill();
 
-    // 計算進度
+    // 計算進度（採樣方式計算，避免效能問題）
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     let transparent = 0;
-    for (let i = 3; i < imageData.data.length; i += 4) {
+    const step = 8; // 每隔 8 個像素取樣，提升效能
+    for (let i = 3; i < imageData.data.length; i += 4 * step) {
       if (imageData.data[i] === 0) transparent++;
     }
-    const progress = transparent / (imageData.data.length / 4);
+    const totalSampled = Math.ceil(imageData.data.length / 4 / step);
+    const progress = transparent / totalSampled;
 
-    document.getElementById('progress-fill').style.width = (progress * 100) + '%';
+    // 進度條顯示（乘以 1.25 讓視覺進度對應）
+    const displayProgress = Math.min(progress * 1.25, 1);
+    document.getElementById('progress-fill').style.width = (displayProgress * 100) + '%';
 
     if (progress < 0.3) {
-      document.getElementById('progress-text').textContent = '繼續刮！加油！';
+      document.getElementById('progress-text').textContent = '繼續刮！馬到成功！';
     } else if (progress < 0.5) {
-      document.getElementById('progress-text').textContent = '快刮完了...';
+      document.getElementById('progress-text').textContent = '加油！快看到了...';
+    } else if (progress < 0.7) {
+      document.getElementById('progress-text').textContent = '好運即將揭曉！';
     } else {
       document.getElementById('progress-text').textContent = '即將揭曉...';
     }
 
-    // 自動揭曉
-    if (progress > 0.5 && !isRevealed) {
+    // 自動揭曉（需要刮開 80% 才會揭曉）
+    if (progress > 0.80 && !isRevealed) {
       revealResult();
     }
   }
@@ -1109,11 +1904,16 @@
   }
 
   // ============================================
-  // 慶祝動畫
+  // 慶祝動畫 - 新年版
   // ============================================
   function triggerCelebration() {
-    // 彩帶
-    createConfetti();
+    // 紅包雨和金幣
+    createRedPacketRain();
+
+    // 炮竹爆炸
+    setTimeout(() => createFirecrackerExplosion(100, 200), 200);
+    setTimeout(() => createFirecrackerExplosion(window.innerWidth - 100, 200), 400);
+    setTimeout(() => createFirecrackerExplosion(window.innerWidth / 2, 150), 600);
 
     // 煙火
     setTimeout(() => createFireworks(), 300);
@@ -1121,46 +1921,38 @@
     setTimeout(() => createFireworks(), 900);
   }
 
-  function createConfetti() {
+  function createRedPacketRain() {
     const container = document.getElementById('confetti-container');
-    const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#00d2d3', '#1dd1a1'];
 
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 60; i++) {
       setTimeout(() => {
-        const confetti = document.createElement('div');
-        confetti.className = 'confetti';
-        confetti.style.left = Math.random() * 100 + '%';
-        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-        confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
-        confetti.style.animationDelay = Math.random() * 0.5 + 's';
+        const item = document.createElement('div');
+        const isPacket = Math.random() > 0.5;
+        item.className = 'confetti ' + (isPacket ? 'red-packet' : 'gold-coin');
+        item.style.left = Math.random() * 100 + '%';
+        item.style.animationDuration = (2.5 + Math.random() * 2) + 's';
+        item.style.animationDelay = Math.random() * 0.5 + 's';
 
-        if (Math.random() > 0.5) {
-          confetti.style.borderRadius = '0';
-          confetti.style.transform = 'rotate(' + Math.random() * 360 + 'deg)';
-        }
+        container.appendChild(item);
 
-        container.appendChild(confetti);
-
-        setTimeout(() => confetti.remove(), 4000);
-      }, i * 20);
+        setTimeout(() => item.remove(), 5000);
+      }, i * 30);
     }
   }
 
-  function createFireworks() {
+  function createFirecrackerExplosion(x, y) {
     const container = document.getElementById('confetti-container');
-    const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff'];
-    const x = Math.random() * window.innerWidth;
-    const y = Math.random() * (window.innerHeight * 0.5);
+    const colors = ['#DC143C', '#FFD700', '#FF4500', '#FF6347', '#FFA500'];
 
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 20; i++) {
       const particle = document.createElement('div');
-      particle.className = 'firework';
+      particle.className = 'explosion-particle';
       particle.style.left = x + 'px';
       particle.style.top = y + 'px';
       particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
 
-      const angle = (Math.PI * 2 / 30) * i;
-      const velocity = 50 + Math.random() * 50;
+      const angle = (Math.PI * 2 / 20) * i;
+      const velocity = 40 + Math.random() * 60;
       const dx = Math.cos(angle) * velocity;
       const dy = Math.sin(angle) * velocity;
 
@@ -1169,12 +1961,44 @@
         { transform: 'translate(0, 0) scale(1)', opacity: 1 },
         { transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(0)', opacity: 0 }
       ], {
-        duration: 1000,
+        duration: 800,
         easing: 'cubic-bezier(0, 0.5, 0.5, 1)'
       });
 
       container.appendChild(particle);
-      setTimeout(() => particle.remove(), 1000);
+      setTimeout(() => particle.remove(), 800);
+    }
+  }
+
+  function createFireworks() {
+    const container = document.getElementById('confetti-container');
+    const colors = ['#DC143C', '#FFD700', '#FF4500', '#FF6347', '#FFA500', '#FFFF00'];
+    const x = Math.random() * window.innerWidth;
+    const y = Math.random() * (window.innerHeight * 0.4) + 50;
+
+    for (let i = 0; i < 40; i++) {
+      const particle = document.createElement('div');
+      particle.className = 'firework';
+      particle.style.left = x + 'px';
+      particle.style.top = y + 'px';
+      particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+
+      const angle = (Math.PI * 2 / 40) * i;
+      const velocity = 60 + Math.random() * 80;
+      const dx = Math.cos(angle) * velocity;
+      const dy = Math.sin(angle) * velocity;
+
+      particle.style.boxShadow = '0 0 8px 3px ' + particle.style.backgroundColor;
+      particle.animate([
+        { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+        { transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(0)', opacity: 0 }
+      ], {
+        duration: 1200,
+        easing: 'cubic-bezier(0, 0.5, 0.5, 1)'
+      });
+
+      container.appendChild(particle);
+      setTimeout(() => particle.remove(), 1200);
     }
   }
 

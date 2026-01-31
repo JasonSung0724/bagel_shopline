@@ -25,6 +25,9 @@ import {
   Percent,
   Package,
   TicketCheck,
+  Upload,
+  Image as ImageIcon,
+  X,
 } from 'lucide-react';
 
 // API Base URL
@@ -44,6 +47,8 @@ interface Prize {
   probability: number;
   display_order: number;
   is_active: boolean;
+  show_on_frontend?: boolean;
+  win_message?: string;
 }
 
 interface Campaign {
@@ -150,10 +155,16 @@ export default function LotteryAdminPage() {
     description: '',
     prize_type: 'physical' as Prize['prize_type'],
     prize_value: '',
+    image_url: '',
     total_quantity: 0,
     probability: 0,
     display_order: 0,
+    show_on_frontend: false,
+    win_message: '',
   });
+
+  // Image upload state
+  const [isUploading, setIsUploading] = useState(false);
 
   const [redeemCode, setRedeemCode] = useState('');
   const [redeemResult, setRedeemResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -712,9 +723,12 @@ export default function LotteryAdminPage() {
                           description: '',
                           prize_type: 'physical',
                           prize_value: '',
+                          image_url: '',
                           total_quantity: 0,
                           probability: 0,
                           display_order: (selectedCampaign.prizes?.length || 0) + 1,
+                          show_on_frontend: false,
+                          win_message: '',
                         });
                         setShowPrizeModal(true);
                       }}
@@ -729,11 +743,12 @@ export default function LotteryAdminPage() {
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="text-left px-4 py-3">獎品名稱</th>
+                          <th className="text-left px-4 py-3">獎品</th>
                           <th className="text-center px-4 py-3">類型</th>
                           <th className="text-center px-4 py-3">數量</th>
                           <th className="text-center px-4 py-3">剩餘</th>
                           <th className="text-center px-4 py-3">機率</th>
+                          <th className="text-center px-4 py-3">前端顯示</th>
                           <th className="text-center px-4 py-3">狀態</th>
                           <th className="text-center px-4 py-3">操作</th>
                         </tr>
@@ -742,10 +757,25 @@ export default function LotteryAdminPage() {
                         {selectedCampaign.prizes?.map((prize) => (
                           <tr key={prize.id} className="border-t">
                             <td className="px-4 py-3">
-                              <div className="font-medium">{prize.name}</div>
-                              {prize.description && (
-                                <div className="text-gray-500 text-xs">{prize.description}</div>
-                              )}
+                              <div className="flex items-center gap-3">
+                                {prize.image_url ? (
+                                  <img
+                                    src={prize.image_url}
+                                    alt={prize.name}
+                                    className="w-12 h-12 rounded-lg object-cover border"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center">
+                                    <ImageIcon className="w-5 h-5 text-gray-400" />
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="font-medium">{prize.name}</div>
+                                  {prize.description && (
+                                    <div className="text-gray-500 text-xs line-clamp-1">{prize.description}</div>
+                                  )}
+                                </div>
+                              </div>
                             </td>
                             <td className="text-center px-4 py-3">
                               {prizeTypeLabels[prize.prize_type]}
@@ -753,6 +783,19 @@ export default function LotteryAdminPage() {
                             <td className="text-center px-4 py-3">{prize.total_quantity}</td>
                             <td className="text-center px-4 py-3">{prize.remaining_quantity}</td>
                             <td className="text-center px-4 py-3">{(prize.probability * 100).toFixed(2)}%</td>
+                            <td className="text-center px-4 py-3">
+                              {prize.show_on_frontend ? (
+                                <span className="inline-flex items-center gap-1 text-blue-600">
+                                  <Eye className="w-4 h-4" />
+                                  顯示
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-gray-400">
+                                  <EyeOff className="w-4 h-4" />
+                                  隱藏
+                                </span>
+                              )}
+                            </td>
                             <td className="text-center px-4 py-3">
                               {prize.is_active ? (
                                 <span className="text-green-600">啟用</span>
@@ -770,9 +813,12 @@ export default function LotteryAdminPage() {
                                       description: prize.description || '',
                                       prize_type: prize.prize_type,
                                       prize_value: prize.prize_value || '',
+                                      image_url: prize.image_url || '',
                                       total_quantity: prize.total_quantity,
                                       probability: prize.probability,
                                       display_order: prize.display_order,
+                                      show_on_frontend: prize.show_on_frontend || false,
+                                      win_message: prize.win_message || '',
                                     });
                                     setShowPrizeModal(true);
                                   }}
@@ -792,7 +838,7 @@ export default function LotteryAdminPage() {
                         ))}
                         {(!selectedCampaign.prizes || selectedCampaign.prizes.length === 0) && (
                           <tr>
-                            <td colSpan={7} className="text-center py-8 text-gray-500">
+                            <td colSpan={8} className="text-center py-8 text-gray-500">
                               尚未設定獎品
                             </td>
                           </tr>
@@ -929,6 +975,84 @@ export default function LotteryAdminPage() {
                     />
                   </div>
 
+                  {/* Image Upload */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">獎品圖片</label>
+                    <div className="space-y-2">
+                      {prizeForm.image_url && (
+                        <div className="relative inline-block">
+                          <img
+                            src={prizeForm.image_url}
+                            alt="獎品預覽"
+                            className="w-24 h-24 rounded-lg object-cover border"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setPrizeForm({ ...prizeForm, image_url: '' })}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <label className="flex-1">
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+
+                              if (file.size > 5 * 1024 * 1024) {
+                                alert('檔案大小不得超過 5MB');
+                                return;
+                              }
+
+                              setIsUploading(true);
+                              try {
+                                const formData = new FormData();
+                                formData.append('image', file);
+
+                                const res = await fetch(`${API_BASE_URL}/api/lottery/admin/upload`, {
+                                  method: 'POST',
+                                  headers: {
+                                    'X-Admin-Password': password,
+                                  },
+                                  body: formData,
+                                });
+
+                                const data = await res.json();
+                                if (data.success && data.url) {
+                                  setPrizeForm({ ...prizeForm, image_url: data.url });
+                                } else {
+                                  alert(data.error || '上傳失敗');
+                                }
+                              } catch (err) {
+                                console.error('Upload error:', err);
+                                alert('上傳失敗');
+                              } finally {
+                                setIsUploading(false);
+                              }
+                            }}
+                          />
+                          <div className={`flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed rounded-lg cursor-pointer hover:border-orange-500 hover:bg-orange-50 transition-colors ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                            {isUploading ? (
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <Upload className="w-5 h-5 text-gray-400" />
+                            )}
+                            <span className="text-sm text-gray-600">
+                              {isUploading ? '上傳中...' : '點擊上傳圖片'}
+                            </span>
+                          </div>
+                        </label>
+                      </div>
+                      <p className="text-xs text-gray-500">支援 JPG、PNG、GIF、WebP，最大 5MB</p>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium mb-1">獎品類型</label>
                     <select
@@ -979,6 +1103,39 @@ export default function LotteryAdminPage() {
                         step={0.01}
                       />
                     </div>
+                  </div>
+
+                  {/* Show on Frontend */}
+                  <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+                    <input
+                      type="checkbox"
+                      id="show_on_frontend"
+                      checked={prizeForm.show_on_frontend}
+                      onChange={(e) => setPrizeForm({ ...prizeForm, show_on_frontend: e.target.checked })}
+                      className="w-4 h-4 text-blue-500"
+                    />
+                    <label htmlFor="show_on_frontend" className="text-sm">
+                      <span className="font-medium">在前端顯示此獎品</span>
+                      <span className="text-gray-500 ml-1">（開啟後，顧客可在刮獎頁面看到獎品名稱和圖片）</span>
+                    </label>
+                  </div>
+
+                  {/* Win Message */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      中獎提示訊息
+                      <span className="text-gray-400 font-normal ml-1">（選填）</span>
+                    </label>
+                    <textarea
+                      value={prizeForm.win_message}
+                      onChange={(e) => setPrizeForm({ ...prizeForm, win_message: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                      rows={2}
+                      placeholder="例：恭喜您獲得新年大禮！請至門市領取。"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      留空則使用預設訊息「恭喜您獲得 [獎品名稱]！」
+                    </p>
                   </div>
                 </div>
 

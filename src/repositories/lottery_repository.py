@@ -248,6 +248,8 @@ class LotteryRepository:
                 - total_quantity: 總數量
                 - probability: 中獎機率 (0.0000 ~ 1.0000)
                 - display_order: 顯示順序
+                - show_on_frontend: 是否在前端顯示
+                - win_message: 中獎時自訂訊息
 
         Returns:
             Created prize data or None
@@ -268,6 +270,8 @@ class LotteryRepository:
                 "probability": data.get("probability", 0),
                 "display_order": data.get("display_order", 0),
                 "is_active": data.get("is_active", True),
+                "show_on_frontend": data.get("show_on_frontend", False),
+                "win_message": data.get("win_message"),
             }
 
             result = self.client.table(self.TABLE_PRIZES).insert(prize_data).execute()
@@ -752,6 +756,81 @@ class LotteryRepository:
         except Exception as e:
             logger.error(f"Failed to get campaign stats: {e}")
             return {}
+
+    # =========================================================================
+    # Image Upload (圖片上傳)
+    # =========================================================================
+
+    STORAGE_BUCKET = "lottery-images"
+
+    def upload_image(self, file_data: bytes, filename: str, content_type: str) -> Optional[str]:
+        """
+        Upload an image to Supabase Storage.
+
+        Args:
+            file_data: Image file binary data
+            filename: Original filename
+            content_type: MIME type (e.g., image/jpeg)
+
+        Returns:
+            Public URL of uploaded image or None
+        """
+        if not self.is_connected:
+            return None
+
+        try:
+            # Generate unique filename
+            file_ext = filename.rsplit(".", 1)[-1] if "." in filename else "jpg"
+            unique_filename = f"{uuid.uuid4().hex}.{file_ext}"
+            file_path = f"prizes/{unique_filename}"
+
+            # Upload to Supabase Storage
+            result = self.client.storage.from_(self.STORAGE_BUCKET).upload(
+                path=file_path,
+                file=file_data,
+                file_options={"content-type": content_type}
+            )
+
+            if result:
+                # Get public URL
+                public_url = self.client.storage.from_(self.STORAGE_BUCKET).get_public_url(file_path)
+                logger.success(f"Uploaded image: {public_url}")
+                return public_url
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to upload image: {e}")
+            return None
+
+    def delete_image(self, image_url: str) -> bool:
+        """
+        Delete an image from Supabase Storage.
+
+        Args:
+            image_url: Public URL of the image
+
+        Returns:
+            True if deleted successfully
+        """
+        if not self.is_connected:
+            return False
+
+        try:
+            # Extract file path from URL
+            # URL format: https://<project>.supabase.co/storage/v1/object/public/lottery-images/prizes/<filename>
+            if self.STORAGE_BUCKET not in image_url:
+                return False
+
+            file_path = image_url.split(f"{self.STORAGE_BUCKET}/")[-1]
+
+            self.client.storage.from_(self.STORAGE_BUCKET).remove([file_path])
+            logger.info(f"Deleted image: {file_path}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to delete image: {e}")
+            return False
 
     # =========================================================================
     # Admin Logs (管理日誌)
