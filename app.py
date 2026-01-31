@@ -2041,6 +2041,7 @@ def get_lottery_results(campaign_id):
 
     Query params:
         winners_only: Only show winners (default: false)
+        search: Search query for customer name/email/ID
         limit: Number of records (default: 100)
         offset: Offset for pagination (default: 0)
     """
@@ -2049,17 +2050,57 @@ def get_lottery_results(campaign_id):
             return jsonify({"success": False, "error": "管理員密碼錯誤"}), 401
 
         winners_only = request.args.get("winners_only", "false").lower() == "true"
+        search_query = request.args.get("search", "").strip()
         limit = request.args.get("limit", 100, type=int)
         offset = request.args.get("offset", 0, type=int)
 
         service = LotteryService()
-        results = service.get_results(campaign_id, winners_only, limit, offset)
+
+        # If search query is provided, use search_results
+        if search_query:
+            results = service.search_results(campaign_id, search_query, limit, offset)
+        else:
+            results = service.get_results(campaign_id, winners_only, limit, offset)
 
         return jsonify({
             "success": True,
             "data": results,
             "count": len(results)
         }), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/lottery/admin/results/<result_id>/redemption", methods=["PUT"])
+def update_result_redemption(result_id):
+    """
+    Update the redemption status of a result.
+    Requires admin password.
+
+    Request body:
+        is_redeemed: boolean
+        redeemed_by: string (optional)
+    """
+    try:
+        if not verify_lottery_admin():
+            return jsonify({"success": False, "error": "管理員密碼錯誤"}), 401
+
+        data = request.get_json() or {}
+        is_redeemed = data.get("is_redeemed")
+
+        if is_redeemed is None:
+            return jsonify({"success": False, "error": "Missing is_redeemed field"}), 400
+
+        redeemed_by = data.get("redeemed_by")
+
+        service = LotteryService()
+        result = service.update_result_redemption(result_id, is_redeemed, redeemed_by)
+
+        if result.get("success"):
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

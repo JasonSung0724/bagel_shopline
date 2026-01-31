@@ -636,3 +636,50 @@ class LotteryService:
         if not participant:
             return []
         return self.repo.get_results_by_participant(participant["id"])
+
+    def search_results(
+        self,
+        campaign_id: str,
+        search_query: str,
+        limit: int = 100,
+        offset: int = 0
+    ) -> List[Dict]:
+        """Search results by customer name, email, or customer ID."""
+        return self.repo.search_results(campaign_id, search_query, limit, offset)
+
+    def update_result_redemption(
+        self,
+        result_id: str,
+        is_redeemed: bool,
+        redeemed_by: Optional[str] = None
+    ) -> Dict:
+        """
+        Update the redemption status of a result.
+
+        Args:
+            result_id: Result ID
+            is_redeemed: New redemption status
+            redeemed_by: Staff who processed the redemption
+
+        Returns:
+            {"success": True, "result": {...}} or {"success": False, "error": "..."}
+        """
+        try:
+            result = self.repo.update_result_redemption(result_id, is_redeemed, redeemed_by)
+
+            if result:
+                self.repo.log_admin_action(
+                    action="update_redemption",
+                    details={
+                        "result_id": result_id,
+                        "is_redeemed": is_redeemed,
+                        "redeemed_by": redeemed_by
+                    },
+                )
+                return {"success": True, "result": result}
+
+            return {"success": False, "error": "Failed to update redemption status"}
+
+        except Exception as e:
+            logger.error(f"Error updating result redemption: {e}")
+            return {"success": False, "error": str(e)}

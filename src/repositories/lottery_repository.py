@@ -682,6 +682,118 @@ class LotteryRepository:
             logger.error(f"Failed to get results by participant: {e}")
             return []
 
+    def search_results(
+        self,
+        campaign_id: str,
+        search_query: str,
+        limit: int = 100,
+        offset: int = 0
+    ) -> List[Dict]:
+        """
+        Search results by customer name, email, or customer ID.
+
+        Args:
+            campaign_id: Campaign ID
+            search_query: Search term (name, email, or customer ID)
+            limit: Max results
+            offset: Pagination offset
+
+        Returns:
+            List of matching results with participant info
+        """
+        if not self.is_connected:
+            return []
+
+        try:
+            # First, search participants that match the query
+            search_pattern = f"%{search_query}%"
+
+            participants_query = (
+                self.client.table(self.TABLE_PARTICIPANTS)
+                .select("id")
+                .eq("campaign_id", campaign_id)
+                .or_(
+                    f"customer_name.ilike.{search_pattern},"
+                    f"customer_email.ilike.{search_pattern},"
+                    f"shopline_customer_id.ilike.{search_pattern}"
+                )
+            )
+
+            participants_result = participants_query.execute()
+
+            if not participants_result.data:
+                return []
+
+            participant_ids = [p["id"] for p in participants_result.data]
+
+            # Get results for those participants
+            result = (
+                self.client.table(self.TABLE_RESULTS)
+                .select("*, lottery_participants(customer_email, customer_name, shopline_customer_id)")
+                .eq("campaign_id", campaign_id)
+                .in_("participant_id", participant_ids)
+                .order("scratched_at", desc=True)
+                .range(offset, offset + limit - 1)
+                .execute()
+            )
+
+            return result.data or []
+
+        except Exception as e:
+            logger.error(f"Failed to search results: {e}")
+            return []
+
+    def update_result_redemption(
+        self,
+        result_id: str,
+        is_redeemed: bool,
+        redeemed_by: Optional[str] = None
+    ) -> Optional[Dict]:
+        """
+        Update the redemption status of a result.
+
+        Args:
+            result_id: Result ID
+            is_redeemed: New redemption status
+            redeemed_by: Staff who processed the redemption
+
+        Returns:
+            Updated result or None
+        """
+        if not self.is_connected:
+            return None
+
+        try:
+            update_data = {
+                "is_redeemed": is_redeemed,
+                "updated_at": datetime.now().isoformat(),
+            }
+
+            if is_redeemed:
+                update_data["redeemed_at"] = datetime.now().isoformat()
+                if redeemed_by:
+                    update_data["redeemed_by"] = redeemed_by
+            else:
+                # If un-redeeming, clear the redeemed_at and redeemed_by
+                update_data["redeemed_at"] = None
+                update_data["redeemed_by"] = None
+
+            result = (
+                self.client.table(self.TABLE_RESULTS)
+                .update(update_data)
+                .eq("id", result_id)
+                .execute()
+            )
+
+            if result.data:
+                logger.info(f"Updated result {result_id} redemption to {is_redeemed}")
+                return result.data[0]
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to update result redemption: {e}")
+            return None
+
     # =========================================================================
     # Statistics (統計)
     # =========================================================================

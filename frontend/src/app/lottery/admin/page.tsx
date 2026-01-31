@@ -136,7 +136,6 @@ export default function LotteryAdminPage() {
   // Modal state
   const [showCampaignModal, setShowCampaignModal] = useState(false);
   const [showPrizeModal, setShowPrizeModal] = useState(false);
-  const [showRedeemModal, setShowRedeemModal] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [editingPrize, setEditingPrize] = useState<Prize | null>(null);
 
@@ -166,8 +165,10 @@ export default function LotteryAdminPage() {
   // Image upload state
   const [isUploading, setIsUploading] = useState(false);
 
-  const [redeemCode, setRedeemCode] = useState('');
-  const [redeemResult, setRedeemResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Search state for results
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'overview' | 'prizes' | 'results'>('overview');
@@ -225,6 +226,47 @@ export default function LotteryAdminPage() {
       setIsLoading(false);
     }
   }, [fetchWithAuth]);
+
+  // Search results
+  const searchResults = useCallback(async (campaignId: string, query: string) => {
+    setIsSearching(true);
+    try {
+      const searchParam = query ? `&search=${encodeURIComponent(query)}` : '';
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/lottery/admin/campaigns/${campaignId}/results?limit=100${searchParam}`);
+      const data = await res.json();
+      if (data.success) {
+        setResults(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to search results:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [fetchWithAuth]);
+
+  // Toggle redemption status
+  const toggleRedemption = useCallback(async (resultId: string, currentStatus: boolean) => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/lottery/admin/results/${resultId}/redemption`, {
+        method: 'PUT',
+        body: JSON.stringify({ is_redeemed: !currentStatus }),
+      });
+      const data = await res.json();
+      if (data.success && selectedCampaign) {
+        // Refresh results
+        if (searchQuery) {
+          searchResults(selectedCampaign.id, searchQuery);
+        } else {
+          loadCampaignDetails(selectedCampaign.id);
+        }
+      } else {
+        alert(data.error || '更新失敗');
+      }
+    } catch (error) {
+      console.error('Failed to toggle redemption:', error);
+      alert('更新失敗');
+    }
+  }, [fetchWithAuth, selectedCampaign, searchQuery, searchResults, loadCampaignDetails]);
 
   // Auth
   const handleAuth = async () => {
@@ -392,31 +434,6 @@ export default function LotteryAdminPage() {
     } catch (error) {
       console.error('Failed to delete prize:', error);
       alert('刪除失敗');
-    }
-  };
-
-  // Redeem
-  const handleRedeem = async () => {
-    if (!redeemCode.trim()) return;
-
-    try {
-      const res = await fetchWithAuth(`${API_BASE_URL}/api/lottery/redeem`, {
-        method: 'POST',
-        body: JSON.stringify({ code: redeemCode.trim() }),
-      });
-
-      const data = await res.json();
-      setRedeemResult({
-        success: data.success,
-        message: data.success ? '兌換成功！' : (data.error || '兌換失敗'),
-      });
-
-      if (data.success && selectedCampaign) {
-        loadCampaignDetails(selectedCampaign.id);
-      }
-    } catch (error) {
-      console.error('Failed to redeem:', error);
-      setRedeemResult({ success: false, message: '兌換失敗' });
     }
   };
 
@@ -682,31 +699,6 @@ export default function LotteryAdminPage() {
                     </div>
                   </div>
 
-                  {/* Redeem Section */}
-                  <div className="bg-white rounded-lg p-6 shadow-sm">
-                    <h3 className="font-semibold mb-4">兌獎</h3>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={redeemCode}
-                        onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
-                        placeholder="輸入兌換碼 (XXXX-XXXX-XXXX)"
-                        className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500"
-                      />
-                      <button
-                        onClick={handleRedeem}
-                        disabled={!redeemCode.trim()}
-                        className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg disabled:opacity-50"
-                      >
-                        兌換
-                      </button>
-                    </div>
-                    {redeemResult && (
-                      <div className={`mt-2 text-sm ${redeemResult.success ? 'text-green-600' : 'text-red-600'}`}>
-                        {redeemResult.message}
-                      </div>
-                    )}
-                  </div>
                 </div>
               )}
 
@@ -866,79 +858,153 @@ export default function LotteryAdminPage() {
 
               {/* Results Tab */}
               {activeTab === 'results' && (
-                <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="text-left px-4 py-3">時間</th>
-                        <th className="text-left px-4 py-3">會員</th>
-                        <th className="text-center px-4 py-3">結果</th>
-                        <th className="text-left px-4 py-3">獎品</th>
-                        <th className="text-left px-4 py-3">兌換碼</th>
-                        <th className="text-center px-4 py-3">兌換狀態</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {results.map((result) => (
-                        <tr key={result.id} className="border-t">
-                          <td className="px-4 py-3 text-gray-500">
-                            {new Date(result.scratched_at).toLocaleString('zh-TW')}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div>{result.lottery_participants?.customer_name || '-'}</div>
-                            <div className="text-gray-500 text-xs">
-                              {result.lottery_participants?.customer_email || result.lottery_participants?.shopline_customer_id}
-                            </div>
-                          </td>
-                          <td className="text-center px-4 py-3">
-                            {result.is_winner ? (
-                              <span className="inline-flex items-center gap-1 text-green-600">
-                                <CheckCircle className="w-4 h-4" />
-                                中獎
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-gray-400">
-                                <XCircle className="w-4 h-4" />
-                                未中
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">{result.prize_name || '-'}</td>
-                          <td className="px-4 py-3">
-                            {result.redemption_code && (
-                              <div className="flex items-center gap-1">
-                                <code className="bg-gray-100 px-2 py-0.5 rounded text-xs">
-                                  {result.redemption_code}
-                                </code>
-                                <button
-                                  onClick={() => navigator.clipboard.writeText(result.redemption_code!)}
-                                  className="text-gray-400 hover:text-gray-600"
-                                >
-                                  <Copy className="w-3 h-3" />
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                          <td className="text-center px-4 py-3">
-                            {result.is_winner && (
-                              result.is_redeemed ? (
-                                <span className="text-green-600">已兌換</span>
-                              ) : (
-                                <span className="text-orange-600">未兌換</span>
-                              )
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                      {results.length === 0 && (
-                        <tr>
-                          <td colSpan={6} className="text-center py-8 text-gray-500">
-                            尚無刮獎記錄
-                          </td>
-                        </tr>
+                <div className="space-y-4">
+                  {/* Search Bar */}
+                  <div className="bg-white rounded-lg p-4 shadow-sm">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && selectedCampaign) {
+                              searchResults(selectedCampaign.id, searchQuery);
+                            }
+                          }}
+                          placeholder="搜尋會員姓名、Email 或會員編號..."
+                          className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                        />
+                      </div>
+                      <button
+                        onClick={() => selectedCampaign && searchResults(selectedCampaign.id, searchQuery)}
+                        disabled={isSearching}
+                        className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {isSearching ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Search className="w-4 h-4" />
+                        )}
+                        搜尋
+                      </button>
+                      {searchQuery && (
+                        <button
+                          onClick={() => {
+                            setSearchQuery('');
+                            if (selectedCampaign) {
+                              searchResults(selectedCampaign.id, '');
+                            }
+                          }}
+                          className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-lg"
+                        >
+                          清除
+                        </button>
                       )}
-                    </tbody>
-                  </table>
+                    </div>
+                    {searchQuery && (
+                      <div className="mt-2 text-sm text-gray-500">
+                        搜尋 &quot;{searchQuery}&quot; 找到 {results.length} 筆結果
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Results Table */}
+                  <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-4 py-3">時間</th>
+                          <th className="text-left px-4 py-3">會員</th>
+                          <th className="text-center px-4 py-3">結果</th>
+                          <th className="text-left px-4 py-3">獎品</th>
+                          <th className="text-left px-4 py-3">兌換碼</th>
+                          <th className="text-center px-4 py-3">兌換狀態</th>
+                          <th className="text-center px-4 py-3">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {results.map((result) => (
+                          <tr key={result.id} className="border-t">
+                            <td className="px-4 py-3 text-gray-500">
+                              {new Date(result.scratched_at).toLocaleString('zh-TW')}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div>{result.lottery_participants?.customer_name || '-'}</div>
+                              <div className="text-gray-500 text-xs">
+                                {result.lottery_participants?.customer_email || result.lottery_participants?.shopline_customer_id}
+                              </div>
+                            </td>
+                            <td className="text-center px-4 py-3">
+                              {result.is_winner ? (
+                                <span className="inline-flex items-center gap-1 text-green-600">
+                                  <CheckCircle className="w-4 h-4" />
+                                  中獎
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-gray-400">
+                                  <XCircle className="w-4 h-4" />
+                                  未中
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">{result.prize_name || '-'}</td>
+                            <td className="px-4 py-3">
+                              {result.redemption_code && (
+                                <div className="flex items-center gap-1">
+                                  <code className="bg-gray-100 px-2 py-0.5 rounded text-xs">
+                                    {result.redemption_code}
+                                  </code>
+                                  <button
+                                    onClick={() => navigator.clipboard.writeText(result.redemption_code!)}
+                                    className="text-gray-400 hover:text-gray-600"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                            <td className="text-center px-4 py-3">
+                              {result.is_winner && (
+                                result.is_redeemed ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
+                                    <CheckCircle className="w-3 h-3" />
+                                    已兌換
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs">
+                                    未兌換
+                                  </span>
+                                )
+                              )}
+                            </td>
+                            <td className="text-center px-4 py-3">
+                              {result.is_winner && (
+                                <button
+                                  onClick={() => toggleRedemption(result.id, result.is_redeemed)}
+                                  className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                                    result.is_redeemed
+                                      ? 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                                      : 'bg-green-500 hover:bg-green-600 text-white'
+                                  }`}
+                                >
+                                  {result.is_redeemed ? '取消兌換' : '標記已兌換'}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        {results.length === 0 && (
+                          <tr>
+                            <td colSpan={7} className="text-center py-8 text-gray-500">
+                              {searchQuery ? '找不到符合的記錄' : '尚無刮獎記錄'}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </>
