@@ -682,6 +682,58 @@ class LotteryRepository:
             logger.error(f"Failed to get results by participant: {e}")
             return []
 
+    def get_last_result_by_customer(
+        self,
+        campaign_id: str,
+        shopline_customer_id: str
+    ) -> Optional[Dict]:
+        """
+        Get the most recent result for a customer in a campaign.
+
+        Args:
+            campaign_id: Campaign ID
+            shopline_customer_id: Shopline customer ID
+
+        Returns:
+            Most recent result or None
+        """
+        if not self.is_connected:
+            return None
+
+        try:
+            # First get participant
+            participant = (
+                self.client.table(self.TABLE_PARTICIPANTS)
+                .select("id")
+                .eq("campaign_id", campaign_id)
+                .eq("shopline_customer_id", shopline_customer_id)
+                .execute()
+            )
+
+            if not participant.data:
+                return None
+
+            participant_id = participant.data[0]["id"]
+
+            # Get most recent result with prize info
+            result = (
+                self.client.table(self.TABLE_RESULTS)
+                .select("*, lottery_prizes(name, description, prize_type, prize_value, image_url, win_message)")
+                .eq("participant_id", participant_id)
+                .eq("campaign_id", campaign_id)
+                .order("scratched_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+
+            if result.data:
+                return result.data[0]
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to get last result by customer: {e}")
+            return None
+
     def search_results(
         self,
         campaign_id: str,

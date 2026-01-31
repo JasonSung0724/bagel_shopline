@@ -7,6 +7,7 @@
   2. 將此代碼貼入 Custom Liquid / Custom Code 區塊
   3. 修改 CAMPAIGN_ID 為您的活動 ID
   4. 修改 API_BASE_URL 為您的 API 伺服器位址
+  sudo docker logs bagel-cloudflared 2>&1 | grep -E "https://.*trycloudflare.com"
 {% endcomment %}
 
 <style>
@@ -77,7 +78,7 @@
 
 .particle {
   position: absolute;
-  animation: float 20s infinite;
+  animation: float 35s infinite;
 }
 
 .particle.coin {
@@ -148,7 +149,7 @@
 .running-horse {
   position: absolute;
   bottom: 10px;
-  animation: horseRun 10s linear infinite;
+  animation: horseRun 25s linear infinite;
   filter: drop-shadow(0 5px 15px rgba(0,0,0,0.3));
 }
 
@@ -1224,11 +1225,11 @@
         </linearGradient>
       </defs>
       <style>
-        .horse-tail { animation: tailWag 0.3s ease-in-out infinite alternate; transform-origin: 45px 72px; }
-        .front-leg-1 { animation: legRun1 0.2s ease-in-out infinite; transform-origin: 117px 95px; }
-        .front-leg-2 { animation: legRun2 0.2s ease-in-out infinite; transform-origin: 132px 95px; }
-        .back-leg-1 { animation: legRun2 0.2s ease-in-out infinite; transform-origin: 62px 95px; }
-        .back-leg-2 { animation: legRun1 0.2s ease-in-out infinite; transform-origin: 77px 95px; }
+        .horse-tail { animation: tailWag 0.8s ease-in-out infinite alternate; transform-origin: 45px 72px; }
+        .front-leg-1 { animation: legRun1 0.5s ease-in-out infinite; transform-origin: 117px 95px; }
+        .front-leg-2 { animation: legRun2 0.5s ease-in-out infinite; transform-origin: 132px 95px; }
+        .back-leg-1 { animation: legRun2 0.5s ease-in-out infinite; transform-origin: 62px 95px; }
+        .back-leg-2 { animation: legRun1 0.5s ease-in-out infinite; transform-origin: 77px 95px; }
         @keyframes tailWag { 0% { transform: rotate(-10deg); } 100% { transform: rotate(10deg); } }
         @keyframes legRun1 { 0% { transform: rotate(-20deg); } 100% { transform: rotate(20deg); } }
         @keyframes legRun2 { 0% { transform: rotate(20deg); } 100% { transform: rotate(-20deg); } }
@@ -1306,6 +1307,53 @@
       </div>
       <div class="lottery-message-box">
         <p id="lottery-error-msg" class="lottery-message-text"></p>
+      </div>
+    </div>
+
+    <!-- 已參加過 - 顯示上一次結果 -->
+    <div id="lottery-already-played" class="hidden">
+      <div id="already-played-header" class="lottery-header">
+        <svg id="already-played-icon-win" class="lottery-icon hidden" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        <svg id="already-played-icon-lose" class="lottery-icon hidden" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="15" y1="9" x2="9" y2="15"/>
+          <line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+        <h1 id="already-played-title" class="lottery-title"></h1>
+        <p class="lottery-subtitle">您已參加過此活動</p>
+        <div class="cny-blessing">
+          <span class="blessing-char">馬</span>
+          <span class="blessing-char">年</span>
+          <span class="blessing-char">吉</span>
+          <span class="blessing-char">祥</span>
+        </div>
+      </div>
+      <div class="lottery-content">
+        <!-- 中獎獎品圖片 -->
+        <div id="already-played-prize-box" class="hidden" style="text-align: center; margin-bottom: 20px;">
+          <img id="already-played-prize-image" style="width: 120px; height: 120px; object-fit: cover; border-radius: 16px; border: 3px solid #FFD700; box-shadow: 0 5px 20px rgba(0,0,0,0.2);" src="" alt="獎品" />
+        </div>
+
+        <!-- 兌換碼區域 -->
+        <div id="already-played-redemption" class="redemption-box hidden">
+          <p class="redemption-label">🧧 您的專屬兌換碼 🧧</p>
+          <div class="redemption-code-display">
+            <span id="already-played-code" class="redemption-code"></span>
+            <button class="copy-btn" onclick="copyAlreadyPlayedCode()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </button>
+          </div>
+          <p id="already-played-redeem-status" class="redemption-note"></p>
+        </div>
+
+        <p id="already-played-message" class="result-message"></p>
+        <p id="already-played-time" style="text-align: center; color: #8B4513; font-size: 14px; margin-top: 10px;"></p>
       </div>
     </div>
 
@@ -1400,7 +1448,7 @@
   // ============================================
   // 設定區 - 請修改以下設定
   // ============================================
-  const API_BASE_URL = 'https://nvidia-goals-demographic-side.trycloudflare.com';
+  const API_BASE_URL = 'https://simpson-ext-radio-disclaimers.trycloudflare.com';
   const CAMPAIGN_ID = '5973d399-3f88-4dd6-bd6b-6ca8d53f07aa';
 
   // ============================================
@@ -1446,7 +1494,7 @@
       particle.className = 'particle ' + (isCoin ? 'coin' : 'lantern');
       particle.style.left = Math.random() * 100 + '%';
       particle.style.animationDelay = Math.random() * 20 + 's';
-      particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+      particle.style.animationDuration = (30 + Math.random() * 15) + 's';
       if (isCoin) {
         particle.innerHTML = '福';
       }
@@ -1491,6 +1539,9 @@
           showReady();
         } else if (data.campaign && data.campaign.require_login && !customerId) {
           showState('login');
+        } else if (data.last_result) {
+          // 已參加過，顯示上一次結果
+          showAlreadyPlayed(data.last_result, data.campaign);
         } else {
           showError(data.reason || '無法參加此活動');
         }
@@ -1510,6 +1561,7 @@
     document.getElementById('lottery-error').classList.add('hidden');
     document.getElementById('lottery-ready').classList.add('hidden');
     document.getElementById('lottery-scratch').classList.add('hidden');
+    document.getElementById('lottery-already-played').classList.add('hidden');
 
     document.getElementById('lottery-' + state).classList.remove('hidden');
   }
@@ -1518,6 +1570,91 @@
     document.getElementById('lottery-error-msg').textContent = message;
     showState('error');
   }
+
+  function showAlreadyPlayed(lastResult, campaign) {
+    const header = document.getElementById('already-played-header');
+    const winIcon = document.getElementById('already-played-icon-win');
+    const loseIcon = document.getElementById('already-played-icon-lose');
+    const title = document.getElementById('already-played-title');
+    const prizeBox = document.getElementById('already-played-prize-box');
+    const prizeImage = document.getElementById('already-played-prize-image');
+    const redemptionBox = document.getElementById('already-played-redemption');
+    const codeDisplay = document.getElementById('already-played-code');
+    const redeemStatus = document.getElementById('already-played-redeem-status');
+    const message = document.getElementById('already-played-message');
+    const timeDisplay = document.getElementById('already-played-time');
+
+    // Reset
+    winIcon.classList.add('hidden');
+    loseIcon.classList.add('hidden');
+    prizeBox.classList.add('hidden');
+    redemptionBox.classList.add('hidden');
+
+    if (lastResult.is_winner) {
+      // 中獎
+      header.style.background = 'linear-gradient(135deg, #DC143C 0%, #B22222 50%, #8B0000 100%)';
+      winIcon.classList.remove('hidden');
+      title.textContent = '🎉 恭喜中獎！';
+
+      // 顯示獎品圖片
+      if (lastResult.prize && lastResult.prize.image_url) {
+        prizeImage.src = lastResult.prize.image_url;
+        prizeBox.classList.remove('hidden');
+      }
+
+      // 顯示兌換碼
+      if (lastResult.redemption_code) {
+        codeDisplay.textContent = lastResult.redemption_code;
+        if (lastResult.is_redeemed) {
+          redeemStatus.textContent = '✅ 此獎品已兌換';
+          redeemStatus.style.color = '#90EE90';
+        } else {
+          redeemStatus.textContent = '📱 請截圖保存，兌獎時出示此畫面';
+          redeemStatus.style.color = '#FFE4B5';
+        }
+        redemptionBox.classList.remove('hidden');
+      }
+
+      message.textContent = lastResult.message || '恭喜您獲得獎品！';
+      message.style.color = '#8B0000';
+    } else {
+      // 未中獎
+      header.style.background = 'linear-gradient(135deg, #8B4513 0%, #A0522D 100%)';
+      loseIcon.classList.remove('hidden');
+      title.textContent = '再接再厲';
+      message.textContent = lastResult.message || '很可惜，這次沒有中獎';
+      message.style.color = '#8B4513';
+    }
+
+    // 顯示參加時間
+    if (lastResult.scratched_at) {
+      const date = new Date(lastResult.scratched_at);
+      timeDisplay.textContent = '參加時間：' + date.toLocaleString('zh-TW');
+    }
+
+    message.classList.remove('hidden');
+    showState('already-played');
+  }
+
+  // 儲存上一次結果的兌換碼（用於複製）
+  let lastResultCode = null;
+
+  window.copyAlreadyPlayedCode = function() {
+    const code = document.getElementById('already-played-code').textContent;
+    if (code) {
+      navigator.clipboard.writeText(code).then(() => {
+        const btns = document.querySelectorAll('#already-played-redemption .copy-btn');
+        btns.forEach(btn => {
+          btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+          setTimeout(() => {
+            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+          }, 2000);
+        });
+      }).catch(() => {
+        alert('兌換碼: ' + code);
+      });
+    }
+  };
 
   function showReady() {
     const campaign = eligibility.campaign;

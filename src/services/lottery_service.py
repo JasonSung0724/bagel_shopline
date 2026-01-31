@@ -481,12 +481,36 @@ class LotteryService:
             attempts_remaining = max(0, max_attempts - attempts_used)
 
             if attempts_remaining == 0:
+                # Get last result to show user their previous result
+                last_result = None
+                if shopline_customer_id:
+                    last_result_data = self.repo.get_last_result_by_customer(campaign_id, shopline_customer_id)
+                    if last_result_data:
+                        prize_info = last_result_data.get("lottery_prizes")
+                        last_result = {
+                            "is_winner": last_result_data.get("is_winner", False),
+                            "prize": {
+                                "name": prize_info.get("name") if prize_info else last_result_data.get("prize_name"),
+                                "description": prize_info.get("description") if prize_info else None,
+                                "prize_type": prize_info.get("prize_type") if prize_info else last_result_data.get("prize_type"),
+                                "prize_value": prize_info.get("prize_value") if prize_info else None,
+                                "image_url": prize_info.get("image_url") if prize_info else None,
+                            } if last_result_data.get("is_winner") else None,
+                            "redemption_code": last_result_data.get("redemption_code"),
+                            "message": prize_info.get("win_message") if prize_info and prize_info.get("win_message") else (
+                                f"恭喜您獲得 {last_result_data.get('prize_name')}！" if last_result_data.get("is_winner") else "很可惜，這次沒有中獎"
+                            ),
+                            "scratched_at": last_result_data.get("scratched_at"),
+                            "is_redeemed": last_result_data.get("is_redeemed", False),
+                        }
+
                 return {
                     "eligible": False,
                     "reason": f"您已使用完所有刮獎機會 ({max_attempts}次)",
                     "campaign": self._sanitize_campaign_for_public(campaign),
                     "attempts_used": attempts_used,
-                    "attempts_remaining": 0
+                    "attempts_remaining": 0,
+                    "last_result": last_result
                 }
 
             return {
