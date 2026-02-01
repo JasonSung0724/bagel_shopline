@@ -126,11 +126,13 @@ export default function Home() {
       const timeTaken = parseFloat(response.headers.get('X-Report-Time-Taken') || '0');
       const platformUsed = response.headers.get('X-Report-Platform') || platform;
 
-      // Parse detailed errors from header
+      // Parse detailed errors from header (base64 encoded)
       let detailedErrors: ProcessingError[] = [];
       try {
-        const errorsJson = response.headers.get('X-Report-Errors');
-        if (errorsJson) {
+        const errorsBase64 = response.headers.get('X-Report-Errors');
+        if (errorsBase64) {
+          // Decode base64 to JSON string
+          const errorsJson = atob(errorsBase64);
           const parsed = JSON.parse(errorsJson);
           detailedErrors = parsed.map((e: { order_id: string; field: string; message: string; severity: string }) => ({
             orderId: e.order_id,

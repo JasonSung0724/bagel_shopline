@@ -1230,10 +1230,14 @@ def generate_report():
         response.headers['X-Report-Time-Taken'] = f"{summary.get('time_taken', 0):.2f}"
         response.headers['X-Report-Error-Count'] = str(len(summary['errors']))
 
-        # Encode errors as JSON in header (limit to first 20 for header size)
+        # Encode errors as base64 JSON in header (limit to first 20 for header size)
+        # Use base64 to avoid HTTP header encoding issues with non-ASCII characters
         import json
+        import base64
         errors_to_send = summary['errors'][:20]
-        response.headers['X-Report-Errors'] = json.dumps(errors_to_send, ensure_ascii=False)
+        errors_json = json.dumps(errors_to_send, ensure_ascii=False)
+        errors_base64 = base64.b64encode(errors_json.encode('utf-8')).decode('ascii')
+        response.headers['X-Report-Errors'] = errors_base64
         
         return response
 
