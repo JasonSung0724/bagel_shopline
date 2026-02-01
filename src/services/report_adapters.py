@@ -172,7 +172,13 @@ class ShoplineAdapter(BaseAdapter):
         final_address = full_address
         final_delivery = "Tcat"
 
-        if "黑貓" in delivery_simple or "宅配" in delivery_simple:
+        # Check for Hong Kong delivery - mark as ERROR (not supported)
+        if "香港" in delivery_simple or "香港" in delivery_raw:
+            final_delivery = "ERROR"
+            # Keep the address but mark delivery method as error
+            final_address = full_address
+            self.add_error(order_id, "配送方式", f"不支援香港配送: {delivery_raw}", "error")
+        elif "黑貓" in delivery_simple or "宅配" in delivery_simple:
             final_delivery = "Tcat"
         elif "全家" in delivery_simple:
             final_delivery = "全家"
