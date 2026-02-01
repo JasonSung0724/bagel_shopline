@@ -23,5 +23,5 @@ EXPOSE 8080
 
 # Use gunicorn for production
 # Single worker to ensure background_tasks dict is shared across requests
-# Increased threads to handle concurrent requests
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "8", "app:app"]
+# Reduced threads to 4 for lower memory usage (optimized for e2-small)
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "4", "--timeout", "120", "app:app"]
