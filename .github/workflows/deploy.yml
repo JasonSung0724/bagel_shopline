@@ -175,7 +175,7 @@ jobs:
         run: |
           gcloud compute ssh ${{ env.GCE_INSTANCE }} --zone=${{ env.GCE_ZONE }} --command="
             sudo mkdir -p /opt/bagel-shop
-            sudo chown \$(whoami):\$(whoami) /opt/bagel-shop
+            sudo chown -R \$(whoami):\$(whoami) /opt/bagel-shop
             cat > /opt/bagel-shop/.env << 'EOF'
           REGISTRY=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}
           TAG=latest
