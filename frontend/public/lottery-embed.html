@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -284,7 +285,9 @@
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         /* Hidden */
@@ -293,6 +296,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="lottery-container">
         <!-- Loading State -->
@@ -304,7 +308,7 @@
         <!-- Login Required State -->
         <div id="login-state" class="hidden">
             <svg class="lottery-message-icon" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2">
-                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/>
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" />
             </svg>
             <h2 class="lottery-message-title">請先登入</h2>
             <p class="lottery-message-text">參加刮刮樂活動需要先登入會員</p>
@@ -314,9 +318,9 @@
         <!-- Not Eligible State -->
         <div id="error-state" class="hidden">
             <svg class="lottery-message-icon" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="8" x2="12" y2="12"/>
-                <line x1="12" y1="16" x2="12.01" y2="16"/>
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
             <h2 class="lottery-message-title">無法參加</h2>
             <p id="error-message" class="lottery-message-text"></p>
@@ -325,7 +329,8 @@
         <!-- Ready State -->
         <div id="ready-state" class="hidden">
             <svg class="lottery-icon" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2">
-                <path d="M20 12v10H4V12M22 7H2v5h20V7zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+                <path
+                    d="M20 12v10H4V12M22 7H2v5h20V7zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
             </svg>
             <h1 id="campaign-title" class="lottery-title"></h1>
             <p id="campaign-desc" class="lottery-desc"></p>
@@ -343,14 +348,16 @@
             <h2 id="scratch-title" class="lottery-title" style="margin-bottom: 15px;"></h2>
             <div class="scratch-area">
                 <div id="scratch-result" class="scratch-result">
-                    <svg id="win-icon" class="result-icon hidden" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                        <polyline points="22 4 12 14.01 9 11.01"/>
+                    <svg id="win-icon" class="result-icon hidden" viewBox="0 0 24 24" fill="none" stroke="#16a34a"
+                        stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
                     </svg>
-                    <svg id="lose-icon" class="result-icon hidden" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <line x1="15" y1="9" x2="9" y2="15"/>
-                        <line x1="9" y1="9" x2="15" y2="15"/>
+                    <svg id="lose-icon" class="result-icon hidden" viewBox="0 0 24 24" fill="none" stroke="#9ca3af"
+                        stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="15" y1="9" x2="9" y2="15" />
+                        <line x1="9" y1="9" x2="15" y2="15" />
                     </svg>
                     <h3 id="result-title" class="result-title"></h3>
                     <p id="result-prize" class="result-prize"></p>
@@ -369,9 +376,10 @@
                     <div class="redemption-code">
                         <code id="redemption-code"></code>
                         <button class="copy-btn" onclick="copyCode()">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                             </svg>
                         </button>
                     </div>
@@ -386,8 +394,7 @@
     </div>
 
     <script>
-        // Configuration - Replace with your actual values
-        const API_BASE_URL = 'http://34.69.106.98:3000'; // Your API server URL
+        const API_BASE_URL = 'https://carbs-reduced-admin.com'; // Your API server URL
         const CAMPAIGN_ID = ''; // Will be set from URL or config
 
         // State
@@ -409,18 +416,15 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            // Get campaign ID from URL or data attribute
             const urlParams = new URLSearchParams(window.location.search);
             campaignId = urlParams.get('campaign') || CAMPAIGN_ID;
 
-            // Get customer info from Shopline (set via Liquid)
             if (window.shoplineCustomer) {
                 customerId = window.shoplineCustomer.id;
                 customerEmail = window.shoplineCustomer.email;
                 customerName = window.shoplineCustomer.name;
             }
 
-            // Test params (for development)
             if (urlParams.get('customer_id')) customerId = urlParams.get('customer_id');
             if (urlParams.get('email')) customerEmail = urlParams.get('email');
             if (urlParams.get('name')) customerName = urlParams.get('name');
@@ -711,4 +715,5 @@
         }
     </script>
 </body>
+
 </html>
