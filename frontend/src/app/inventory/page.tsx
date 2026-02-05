@@ -592,6 +592,13 @@ export default function InventoryDashboard() {
 
       if (result.success && result.data) {
         setDiagnosisData(result.data);
+        const allNames = new Set<string>();
+        [...(result.data.bread_items || []), ...(result.data.box_items || [])].forEach((item: ItemDiagnosis) => {
+          if (item.stock_by_accept_date && item.stock_by_accept_date.length > 0) {
+            allNames.add(item.name);
+          }
+        });
+        setExpandedItems(allNames);
       }
     } catch (err) {
       console.error('Failed to fetch diagnosis:', err);
@@ -656,6 +663,13 @@ export default function InventoryDashboard() {
         // Process diagnosis data (check for valid structure, not just truthy)
         if (result.data.diagnosis && result.data.diagnosis.bread_items) {
           setDiagnosisData(result.data.diagnosis);
+          const allNames = new Set<string>();
+          [...(result.data.diagnosis.bread_items || []), ...(result.data.diagnosis.box_items || [])].forEach((item: ItemDiagnosis) => {
+            if (item.stock_by_accept_date && item.stock_by_accept_date.length > 0) {
+              allNames.add(item.name);
+            }
+          });
+          setExpandedItems(allNames);
         }
       } else {
         setError(result.error || '無法載入資料');
@@ -1333,6 +1347,25 @@ export default function InventoryDashboard() {
                       {breadSortDesc ? '↓' : '↑'}
                     </button>
                   </div>
+                  <button
+                    onClick={() => {
+                      if (expandedItems.size > 0) {
+                        setExpandedItems(new Set());
+                      } else {
+                        const allNames = new Set<string>();
+                        pairedBreadDiagnoses.forEach(({ bread }) => {
+                          if (bread.stock_by_accept_date && bread.stock_by_accept_date.length > 0) {
+                            allNames.add(bread.name);
+                          }
+                        });
+                        setExpandedItems(allNames);
+                      }
+                    }}
+                    className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1 text-[10px] sm:text-xs text-gray-600 hover:bg-gray-50"
+                  >
+                    <Calendar className="w-3 h-3" />
+                    {expandedItems.size > 0 ? '收合全部' : '展開全部'}
+                  </button>
                   <span className="text-[10px] sm:text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
                     麵包前置期: {LEAD_TIME.bread} 天 | 塑膠袋前置期: {LEAD_TIME.bag} 天
                   </span>
