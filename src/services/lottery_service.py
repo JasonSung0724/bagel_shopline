@@ -527,7 +527,7 @@ class LotteryService:
     def _sanitize_campaign_for_public(self, campaign: Dict) -> Dict:
         """Remove sensitive fields from campaign for public API."""
         safe_fields = [
-            "id", "name", "description", "start_date", "end_date",
+            "id", "name", "description", "frontend_notice", "start_date", "end_date",
             "status", "max_attempts_per_user", "require_login"
         ]
 

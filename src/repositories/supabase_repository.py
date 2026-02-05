@@ -754,6 +754,39 @@ class InventoryRepository(SupabaseRepository):
             if not items_result.data:
                 return {}
 
+            # 1.5. Get raw items for stock by accept date breakdown
+            # Query raw items from inventory_raw_items table
+            raw_items_result = (
+                self.client.table(self.TABLE_RAW_ITEMS)
+                .select("product_name, available_stock, warehouse_code, customer_accept_date")
+                .eq("snapshot_id", snapshot_id)
+                .execute()
+            )
+
+            # Build stock_by_accept_date lookup: {product_name: [{date, stock}, ...]}
+            stock_by_accept_date_lookup: Dict[str, Dict[str, int]] = {}
+            if raw_items_result.data:
+                for row in raw_items_result.data:
+                    product_name = row.get("product_name", "")
+                    warehouse_code = row.get("warehouse_code", "") or ""
+                    available_stock = int(row.get("available_stock", 0) or 0)
+                    accept_date = row.get("customer_accept_date") or "未設定"
+
+                    # Skip if no product name or if it's defective stock
+                    if not product_name or "不良品" in warehouse_code:
+                        continue
+
+                    # Initialize product entry if not exists
+                    if product_name not in stock_by_accept_date_lookup:
+                        stock_by_accept_date_lookup[product_name] = {}
+
+                    # Aggregate stock by accept date
+                    if accept_date not in stock_by_accept_date_lookup[product_name]:
+                        stock_by_accept_date_lookup[product_name][accept_date] = 0
+                    stock_by_accept_date_lookup[product_name][accept_date] += available_stock
+
+            logger.info(f"Built stock_by_accept_date lookup for {len(stock_by_accept_date_lookup)} products")
+
             # 2. Get sales data from daily_sales table (實出量) for past 30 days
             start_date_30d = (datetime.now() - timedelta(days=30)).date().isoformat()
             start_date_20d = (datetime.now() - timedelta(days=20)).date().isoformat()
@@ -858,6 +891,14 @@ class InventoryRepository(SupabaseRepository):
                     health_status = "healthy"  # No sales data, default healthy
                     suggested_order = 0
 
+                # Get stock breakdown by accept date for this product
+                accept_date_dict = stock_by_accept_date_lookup.get(name, {})
+                # Convert to sorted list (earliest date first for easier prioritization)
+                stock_by_accept_date = [
+                    {"date": date, "stock": stock}
+                    for date, stock in sorted(accept_date_dict.items(), key=lambda x: x[0] if x[0] != "未設定" else "9999-99-99")
+                ]
+
                 return {
                     "name": name,
                     "category": category,
@@ -873,6 +914,7 @@ class InventoryRepository(SupabaseRepository):
                     "target_stock": round(target_stock),  # 正常水位 = 30日銷量總和
                     "health_status": health_status,
                     "suggested_order": round(suggested_order),
+                    "stock_by_accept_date": stock_by_accept_date,  # 依客戶端允收日期分組的庫存明細
                 }
 
             # Process items by category

@@ -742,11 +742,11 @@ class LotteryRepository:
         offset: int = 0
     ) -> List[Dict]:
         """
-        Search results by customer name, email, or customer ID.
+        Search results by customer name, email, customer ID, or redemption code.
 
         Args:
             campaign_id: Campaign ID
-            search_query: Search term (name, email, or customer ID)
+            search_query: Search term (name, email, customer ID, or redemption code)
             limit: Max results
             offset: Pagination offset
 
@@ -757,9 +757,21 @@ class LotteryRepository:
             return []
 
         try:
-            # First, search participants that match the query
             search_pattern = f"%{search_query}%"
+            result_ids = set()
 
+            # Search 1: Search results by redemption code
+            redemption_results = (
+                self.client.table(self.TABLE_RESULTS)
+                .select("id")
+                .eq("campaign_id", campaign_id)
+                .ilike("redemption_code", search_pattern)
+                .execute()
+            )
+            if redemption_results.data:
+                result_ids.update(r["id"] for r in redemption_results.data)
+
+            # Search 2: Search participants that match the query
             participants_query = (
                 self.client.table(self.TABLE_PARTICIPANTS)
                 .select("id")
@@ -770,20 +782,30 @@ class LotteryRepository:
                     f"shopline_customer_id.ilike.{search_pattern}"
                 )
             )
-
             participants_result = participants_query.execute()
 
-            if not participants_result.data:
+            if participants_result.data:
+                participant_ids = [p["id"] for p in participants_result.data]
+                # Get result IDs for those participants
+                participant_results = (
+                    self.client.table(self.TABLE_RESULTS)
+                    .select("id")
+                    .eq("campaign_id", campaign_id)
+                    .in_("participant_id", participant_ids)
+                    .execute()
+                )
+                if participant_results.data:
+                    result_ids.update(r["id"] for r in participant_results.data)
+
+            if not result_ids:
                 return []
 
-            participant_ids = [p["id"] for p in participants_result.data]
-
-            # Get results for those participants
+            # Get full results with participant info
             result = (
                 self.client.table(self.TABLE_RESULTS)
                 .select("*, lottery_participants(customer_email, customer_name, shopline_customer_id)")
                 .eq("campaign_id", campaign_id)
-                .in_("participant_id", participant_ids)
+                .in_("id", list(result_ids))
                 .order("scratched_at", desc=True)
                 .range(offset, offset + limit - 1)
                 .execute()

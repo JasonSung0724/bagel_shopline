@@ -55,6 +55,7 @@ interface Campaign {
   id: string;
   name: string;
   description?: string;
+  frontend_notice?: string;
   start_date: string;
   end_date: string;
   status: 'draft' | 'active' | 'paused' | 'ended';
@@ -143,6 +144,7 @@ export default function LotteryAdminPage() {
   const [campaignForm, setCampaignForm] = useState({
     name: '',
     description: '',
+    frontend_notice: '',
     start_date: '',
     end_date: '',
     max_attempts_per_user: 1,
@@ -576,7 +578,7 @@ export default function LotteryAdminPage() {
                 >
                   {tab === 'overview' && '總覽'}
                   {tab === 'prizes' && '獎品設定'}
-                  {tab === 'results' && '刮獎記錄'}
+                  {tab === 'results' && '獎品紀錄'}
                 </button>
               ))}
             </div>
@@ -873,7 +875,7 @@ export default function LotteryAdminPage() {
                               searchResults(selectedCampaign.id, searchQuery);
                             }
                           }}
-                          placeholder="搜尋會員姓名、Email 或會員編號..."
+                          placeholder="搜尋會員姓名、Email、會員編號或兌換碼..."
                           className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                         />
                       </div>
@@ -998,7 +1000,7 @@ export default function LotteryAdminPage() {
                         {results.length === 0 && (
                           <tr>
                             <td colSpan={7} className="text-center py-8 text-gray-500">
-                              {searchQuery ? '找不到符合的記錄' : '尚無刮獎記錄'}
+                              {searchQuery ? '找不到符合的記錄' : '尚無獎品紀錄'}
                             </td>
                           </tr>
                         )}
@@ -1149,24 +1151,51 @@ export default function LotteryAdminPage() {
                     <div>
                       <label className="block text-sm font-medium mb-1">總數量 *</label>
                       <input
-                        type="number"
-                        value={prizeForm.total_quantity}
-                        onChange={(e) => setPrizeForm({ ...prizeForm, total_quantity: parseInt(e.target.value) || 0 })}
+                        type="text"
+                        inputMode="numeric"
+                        value={prizeForm.total_quantity === 0 ? '' : prizeForm.total_quantity}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '' || /^\d+$/.test(val)) {
+                            setPrizeForm({ ...prizeForm, total_quantity: val === '' ? 0 : parseInt(val, 10) });
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          if (isNaN(val) || val < 0) {
+                            setPrizeForm({ ...prizeForm, total_quantity: 0 });
+                          }
+                        }}
                         className="w-full px-3 py-2 border rounded-lg"
-                        min={0}
+                        placeholder="0"
                       />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium mb-1">中獎機率 * (%)</label>
                       <input
-                        type="number"
-                        value={(prizeForm.probability * 100).toFixed(2)}
-                        onChange={(e) => setPrizeForm({ ...prizeForm, probability: (parseFloat(e.target.value) || 0) / 100 })}
+                        type="text"
+                        inputMode="decimal"
+                        value={prizeForm.probability === 0 ? '' : (prizeForm.probability * 100).toFixed(2)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                            const numVal = parseFloat(val) || 0;
+                            if (numVal >= 0 && numVal <= 100) {
+                              setPrizeForm({ ...prizeForm, probability: numVal / 100 });
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (isNaN(val) || val < 0) {
+                            setPrizeForm({ ...prizeForm, probability: 0 });
+                          } else if (val > 100) {
+                            setPrizeForm({ ...prizeForm, probability: 1 });
+                          }
+                        }}
                         className="w-full px-3 py-2 border rounded-lg"
-                        min={0}
-                        max={100}
-                        step={0.01}
+                        placeholder="0.00"
                       />
                     </div>
                   </div>
@@ -1256,6 +1285,7 @@ export default function LotteryAdminPage() {
                 setCampaignForm({
                   name: '',
                   description: '',
+                  frontend_notice: '',
                   start_date: new Date().toISOString().slice(0, 16),
                   end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
                   max_attempts_per_user: 1,
@@ -1319,6 +1349,7 @@ export default function LotteryAdminPage() {
                         setCampaignForm({
                           name: campaign.name,
                           description: campaign.description || '',
+                          frontend_notice: campaign.frontend_notice || '',
                           start_date: campaign.start_date.slice(0, 16),
                           end_date: campaign.end_date.slice(0, 16),
                           max_attempts_per_user: campaign.max_attempts_per_user,
@@ -1375,6 +1406,20 @@ export default function LotteryAdminPage() {
                     className="w-full px-3 py-2 border rounded-lg"
                     rows={3}
                     placeholder="活動說明..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    前端公告
+                    <span className="text-gray-400 font-normal ml-1">（顯示於 Shopline 刮刮卡頁面）</span>
+                  </label>
+                  <textarea
+                    value={campaignForm.frontend_notice}
+                    onChange={(e) => setCampaignForm({ ...campaignForm, frontend_notice: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                    rows={3}
+                    placeholder="例：中獎者請至門市兌換，兌換期限至 2024/12/31"
                   />
                 </div>
 

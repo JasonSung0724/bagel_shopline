@@ -1,18 +1,4 @@
-{% comment %}
-  ============================================
-  刮刮樂 Shopline 嵌入代碼 - 馬年新春版
-  ============================================
-  使用方式：
-  1. 在 Shopline 後台建立自訂頁面
-  2. 將此代碼貼入 Custom Liquid / Custom Code 區塊
-  3. 修改 CAMPAIGN_ID 為您的活動 ID
-  4. API_BASE_URL 已設定為：https://carbs-reduced-admin.com
-{% endcomment %}
-
 <style>
-/* ============================================
-   刮刮樂樣式 - 馬年新春喜氣版
-   ============================================ */
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Ma+Shan+Zheng&display=swap');
 
 * {
@@ -30,7 +16,7 @@
   z-index: 10;
 }
 
-/* 新年紅色背景 */
+
 .lottery-bg {
   position: fixed;
   top: 0;
@@ -63,7 +49,7 @@
   100% { background-position: 0% 50%; }
 }
 
-/* 浮動金幣與燈籠 */
+
 .particles {
   position: fixed;
   top: 0;
@@ -133,7 +119,7 @@
   100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
 }
 
-/* 奔馬動畫容器 */
+
 .horse-container {
   position: fixed;
   bottom: 0;
@@ -171,7 +157,7 @@
   height: 70px;
 }
 
-/* 炮竹容器 */
+
 .firecracker-container {
   position: fixed;
   top: 0;
@@ -251,7 +237,7 @@
   box-shadow: 0 4px 0 #FFD700, 0 -4px 0 #FFD700;
 }
 
-/* 炮竹火花動畫 */
+
 .firecracker-spark {
   position: absolute;
   width: 4px;
@@ -267,7 +253,7 @@
   100% { opacity: 0; transform: scale(0); }
 }
 
-/* 主卡片容器 */
+
 .lottery-card {
   background: linear-gradient(135deg, #FFF8DC 0%, #FFFAF0 50%, #FFF8DC 100%);
   border-radius: 24px;
@@ -297,7 +283,7 @@
   transform: translateY(-5px);
 }
 
-/* 頭部區域 */
+
 .lottery-header {
   background: linear-gradient(135deg, #DC143C 0%, #B22222 50%, #8B0000 100%);
   padding: 30px 20px;
@@ -383,7 +369,7 @@
   z-index: 1;
 }
 
-/* 新年祝福語裝飾 */
+
 .cny-blessing {
   display: flex;
   justify-content: center;
@@ -418,13 +404,13 @@
   100% { transform: scale(1) rotate(var(--rotate, -5deg)); }
 }
 
-/* 內容區域 */
+
 .lottery-content {
   padding: 30px 25px;
   background: linear-gradient(180deg, rgba(255, 248, 220, 0) 0%, rgba(255, 215, 0, 0.05) 100%);
 }
 
-/* 次數提示 */
+
 .lottery-attempts-box {
   background: linear-gradient(135deg, #FFF5F5 0%, #FFE4E1 100%);
   border: 3px solid #DC143C;
@@ -475,7 +461,35 @@
   text-shadow: 0 2px 4px rgba(220, 20, 60, 0.3);
 }
 
-/* 獎品展示 */
+
+.lottery-notice-section {
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 215, 0, 0.05) 100%);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 12px;
+  position: relative;
+}
+
+.lottery-notice-section::before {
+  content: '📢';
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+}
+
+.lottery-notice-text {
+  margin: 0;
+  padding-left: 28px;
+  font-size: 13px;
+  color: #8B0000;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+
 .lottery-prizes-section {
   margin-bottom: 25px;
 }
@@ -496,7 +510,7 @@
   margin-bottom: 25px;
 }
 
-/* 獎品卡片樣式 */
+
 .lottery-prize-card {
   background: linear-gradient(135deg, #FFF8DC 0%, #FFFAF0 100%);
   border: 2px solid #FFD700;
@@ -542,7 +556,7 @@
   word-break: break-word;
 }
 
-/* 舊版 chip 樣式（備用） */
+
 .lottery-prize-chip {
   background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
   border: 2px solid #DAA520;
@@ -560,7 +574,7 @@
   box-shadow: 0 5px 20px rgba(218, 165, 32, 0.5);
 }
 
-/* 開始按鈕 */
+
 .lottery-start-btn {
   width: 100%;
   padding: 20px 40px;
@@ -620,7 +634,7 @@
   display: none;
 }
 
-/* 刮刮卡區域 */
+
 .scratch-container {
   position: relative;
   width: 100%;
@@ -650,7 +664,7 @@
   justify-content: center;
   padding: 20px;
   background: linear-gradient(135deg, #FFF8DC 0%, #FFE4B5 100%);
-  /* 底層始終顯示，透過 canvas 的 destination-out 來刮開 */
+  
   opacity: 1;
   transition: opacity 0.5s ease;
 }
@@ -677,7 +691,7 @@
   background: linear-gradient(135deg, #E8E4D9 0%, #D4CFC4 50%, #C8C3B8 100%);
 }
 
-/* 揭曉後結果層會自動完全顯示（canvas 已隱藏） */
+
 .scratch-result-layer.revealed {
   opacity: 1;
 }
@@ -698,14 +712,14 @@
   pointer-events: none;
 }
 
-/* 結果顯示 */
+
 .result-icon {
   width: 70px;
   height: 70px;
   margin-bottom: 12px;
 }
 
-/* 中獎獎品圖片 */
+
 .result-prize-image {
   width: 80px;
   height: 80px;
@@ -766,7 +780,7 @@
   animation: resultSlide 0.6s ease 0.3s both;
 }
 
-/* 進度條 */
+
 .scratch-progress {
   margin-bottom: 15px;
 }
@@ -801,7 +815,7 @@
   font-weight: 600;
 }
 
-/* 兌換碼區域 */
+
 .redemption-box {
   background: linear-gradient(135deg, #DC143C 0%, #B22222 100%);
   border: 3px solid #FFD700;
@@ -888,7 +902,7 @@
   position: relative;
 }
 
-/* 結果訊息 */
+
 .result-message {
   font-size: 16px;
   color: #8B0000;
@@ -898,7 +912,7 @@
   font-weight: 500;
 }
 
-/* 再試一次按鈕 */
+
 .lottery-retry-btn {
   width: 100%;
   padding: 16px 32px;
@@ -920,7 +934,7 @@
   box-shadow: 0 10px 30px rgba(220, 20, 60, 0.3);
 }
 
-/* 慶祝動畫 - 紅包雨 */
+
 .confetti-container {
   position: fixed;
   top: 0;
@@ -976,7 +990,7 @@
   }
 }
 
-/* 煙火動畫 */
+
 .firework {
   position: fixed;
   width: 8px;
@@ -996,7 +1010,7 @@
   }
 }
 
-/* 炮竹爆炸特效 */
+
 .firecracker-explosion {
   position: fixed;
   pointer-events: none;
@@ -1022,7 +1036,7 @@
   }
 }
 
-/* 載入動畫 */
+
 .loader {
   width: 40px;
   height: 40px;
@@ -1038,14 +1052,14 @@
   100% { transform: rotate(360deg); }
 }
 
-/* 載入中文字 */
+
 .loading-text {
   margin-top: 20px;
   color: #8B0000;
   font-weight: 500;
 }
 
-/* 錯誤/登入提示 */
+
 .lottery-message-box {
   text-align: center;
   padding: 40px 20px;
@@ -1092,12 +1106,12 @@
   text-decoration: none;
 }
 
-/* 隱藏元素 */
+
 .hidden {
   display: none !important;
 }
 
-/* RWD */
+
 @media (max-width: 480px) {
   .lottery-wrapper {
     padding: 15px;
@@ -1141,7 +1155,7 @@
 <div class="lottery-bg"></div>
 <div class="particles" id="particles"></div>
 
-<!-- 炮竹裝飾 -->
+
 <div class="firecracker-container" id="firecracker-container">
   <div class="firecracker-string left">
     <div class="firecracker-rope"></div>
@@ -1181,41 +1195,41 @@
   </div>
 </div>
 
-<!-- 奔馬動畫 -->
+
 <div class="horse-container">
   <div class="running-horse">
     <svg viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg" width="150" height="105">
-      <!-- 馬身體 -->
+      
       <ellipse cx="100" cy="70" rx="55" ry="35" fill="url(#horseBody)"/>
-      <!-- 馬頭 -->
+      
       <path d="M145 55 Q165 35 170 45 Q175 55 165 65 Q155 75 145 70 Z" fill="url(#horseBody)"/>
-      <!-- 馬耳朵 -->
+      
       <path d="M160 40 Q165 30 168 38 Q166 45 160 45 Z" fill="url(#horseBody)"/>
-      <!-- 馬眼睛 -->
+      
       <circle cx="162" cy="52" r="3" fill="#1a1a1a"/>
       <circle cx="163" cy="51" r="1" fill="white"/>
-      <!-- 馬鬃毛 -->
+      
       <path d="M145 50 Q130 30 120 45 Q135 35 140 50" fill="#8B0000"/>
       <path d="M135 55 Q120 35 110 50 Q125 40 130 55" fill="#8B0000"/>
       <path d="M125 58 Q110 40 100 55 Q115 45 120 60" fill="#8B0000"/>
-      <!-- 馬尾巴 -->
+      
       <path d="M45 65 Q20 50 15 70 Q20 90 45 80" fill="#8B0000" class="horse-tail"/>
       <path d="M45 68 Q25 55 22 72 Q27 85 45 78" fill="#6B0000" class="horse-tail"/>
-      <!-- 前腿 -->
+      
       <path d="M120 95 Q125 115 120 130 Q118 135 115 130 Q110 115 115 95" fill="url(#horseBody)" class="front-leg-1"/>
       <path d="M135 95 Q140 115 135 130 Q133 135 130 130 Q125 115 130 95" fill="url(#horseBody)" class="front-leg-2"/>
-      <!-- 後腿 -->
+      
       <path d="M65 95 Q70 115 65 130 Q63 135 60 130 Q55 115 60 95" fill="url(#horseBody)" class="back-leg-1"/>
       <path d="M80 95 Q85 115 80 130 Q78 135 75 130 Q70 115 75 95" fill="url(#horseBody)" class="back-leg-2"/>
-      <!-- 蹄子 -->
+      
       <ellipse cx="117" cy="132" rx="5" ry="3" fill="#4a3728"/>
       <ellipse cx="132" cy="132" rx="5" ry="3" fill="#4a3728"/>
       <ellipse cx="62" cy="132" rx="5" ry="3" fill="#4a3728"/>
       <ellipse cx="77" cy="132" rx="5" ry="3" fill="#4a3728"/>
-      <!-- 新年裝飾 - 紅色緞帶 -->
+      
       <path d="M155 60 Q160 65 165 60 Q170 70 165 75 Q155 70 155 60" fill="#DC143C"/>
       <circle cx="163" cy="62" r="4" fill="#FFD700"/>
-      <!-- 漸變定義 -->
+      
       <defs>
         <linearGradient id="horseBody" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" style="stop-color:#D4A574"/>
@@ -1265,7 +1279,7 @@
 
 <div class="lottery-wrapper">
   <div class="lottery-card">
-    <!-- 載入中 -->
+    
     <div id="lottery-loading" class="lottery-content">
       <div style="text-align: center; padding: 60px 20px;">
         <div class="loader"></div>
@@ -1273,7 +1287,7 @@
       </div>
     </div>
 
-    <!-- 需要登入 -->
+    
     <div id="lottery-login" class="hidden">
       <div class="lottery-header">
         <svg class="lottery-icon" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2">
@@ -1294,7 +1308,7 @@
       </div>
     </div>
 
-    <!-- 錯誤訊息 -->
+    
     <div id="lottery-error" class="hidden">
       <div class="lottery-header" style="background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);">
         <svg class="lottery-icon" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2">
@@ -1309,7 +1323,7 @@
       </div>
     </div>
 
-    <!-- 已參加過 - 顯示上一次結果 -->
+    
     <div id="lottery-already-played" class="hidden">
       <div id="already-played-header" class="lottery-header">
         <svg id="already-played-icon-win" class="lottery-icon hidden" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2">
@@ -1331,12 +1345,17 @@
         </div>
       </div>
       <div class="lottery-content">
-        <!-- 中獎獎品圖片 -->
+        
+        <div id="already-played-notice-section" class="lottery-notice-section hidden">
+          <p id="already-played-notice" class="lottery-notice-text"></p>
+        </div>
+
+        
         <div id="already-played-prize-box" class="hidden" style="text-align: center; margin-bottom: 20px;">
           <img id="already-played-prize-image" style="width: 120px; height: 120px; object-fit: cover; border-radius: 16px; border: 3px solid #FFD700; box-shadow: 0 5px 20px rgba(0,0,0,0.2);" src="" alt="獎品" />
         </div>
 
-        <!-- 兌換碼區域 -->
+        
         <div id="already-played-redemption" class="redemption-box hidden">
           <p class="redemption-label">🧧 您的專屬兌換碼 🧧</p>
           <div class="redemption-code-display">
@@ -1356,7 +1375,7 @@
       </div>
     </div>
 
-    <!-- 準備開始 -->
+    
     <div id="lottery-ready" class="hidden">
       <div class="lottery-header">
         <svg class="lottery-icon" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2">
@@ -1372,7 +1391,11 @@
         </div>
       </div>
       <div class="lottery-content">
-        <!-- 獎品展示區塊（根據 API 回傳動態顯示） -->
+        
+        <div id="frontend-notice-section" class="lottery-notice-section hidden">
+          <p id="frontend-notice" class="lottery-notice-text"></p>
+        </div>
+        
         <div id="prizes-section" class="lottery-prizes-section hidden">
           <p class="lottery-prizes-title">🎊 豐富獎品等你來拿 🎊</p>
           <div id="prizes-list" class="lottery-prizes-grid"></div>
@@ -1383,7 +1406,7 @@
       </div>
     </div>
 
-    <!-- 刮刮卡 -->
+    
     <div id="lottery-scratch" class="hidden">
       <div class="lottery-header">
         <h1 id="scratch-title" class="lottery-title"></h1>
@@ -1392,7 +1415,7 @@
       <div class="lottery-content">
         <div class="scratch-container" id="scratch-container">
           <div id="scratch-result" class="scratch-result-layer">
-            <!-- 中獎獎品圖片 -->
+            
             <img id="prize-image" class="result-prize-image hidden" src="" alt="獎品圖片" />
             <svg id="win-icon" class="result-icon hidden" viewBox="0 0 24 24" fill="none" stroke="#DC143C" stroke-width="2">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
@@ -1444,15 +1467,15 @@
 
 <script>
 (function() {
-  // ============================================
-  // 設定區 - 請修改以下設定
-  // ============================================
+  
+  
+  
   const API_BASE_URL = 'https://carbs-reduced-admin.com';
   const CAMPAIGN_ID = '5973d399-3f88-4dd6-bd6b-6ca8d53f07aa';
 
-  // ============================================
-  // 全域變數
-  // ============================================
+  
+  
+  
   let customerId = null;
   let customerEmail = null;
   let customerName = null;
@@ -1463,28 +1486,28 @@
   let canvas = null;
   let ctx = null;
 
-  // ============================================
-  // 初始化
-  // ============================================
+  
+  
+  
   document.addEventListener('DOMContentLoaded', function() {
-    // 建立背景粒子（金幣和燈籠）
+    
     createParticles();
 
-    // 定期添加炮竹火花
+    
     setInterval(createFirecrackerSparks, 2000);
 
-    // 取得 Shopline 會員資訊
+    
     {% if customer %}
     customerId = "{{ customer.id }}";
     customerEmail = "{{ customer.email }}";
     customerName = "{{ customer.name }}";
     {% endif %}
 
-    // 檢查資格
+    
     checkEligibility();
   });
 
-  // 建立背景粒子（金幣和燈籠）
+  
   function createParticles() {
     const container = document.getElementById('particles');
     for (let i = 0; i < 15; i++) {
@@ -1501,7 +1524,7 @@
     }
   }
 
-  // 炮竹火花效果
+  
   function createFirecrackerSparks() {
     const container = document.getElementById('firecracker-container');
     const firecrackers = container.querySelectorAll('.firecracker');
@@ -1518,9 +1541,9 @@
     });
   }
 
-  // ============================================
-  // API 呼叫
-  // ============================================
+  
+  
+  
   function checkEligibility() {
     showState('loading');
 
@@ -1539,7 +1562,7 @@
         } else if (data.campaign && data.campaign.require_login && !customerId) {
           showState('login');
         } else if (data.last_result) {
-          // 已參加過，顯示上一次結果
+          
           showAlreadyPlayed(data.last_result, data.campaign);
         } else {
           showError(data.reason || '無法參加此活動');
@@ -1551,9 +1574,9 @@
       });
   }
 
-  // ============================================
-  // 狀態切換
-  // ============================================
+  
+  
+  
   function showState(state) {
     document.getElementById('lottery-loading').classList.add('hidden');
     document.getElementById('lottery-login').classList.add('hidden');
@@ -1575,6 +1598,8 @@
     const winIcon = document.getElementById('already-played-icon-win');
     const loseIcon = document.getElementById('already-played-icon-lose');
     const title = document.getElementById('already-played-title');
+    const noticeSection = document.getElementById('already-played-notice-section');
+    const noticeText = document.getElementById('already-played-notice');
     const prizeBox = document.getElementById('already-played-prize-box');
     const prizeImage = document.getElementById('already-played-prize-image');
     const redemptionBox = document.getElementById('already-played-redemption');
@@ -1583,25 +1608,32 @@
     const message = document.getElementById('already-played-message');
     const timeDisplay = document.getElementById('already-played-time');
 
-    // Reset
+    
     winIcon.classList.add('hidden');
     loseIcon.classList.add('hidden');
+    noticeSection.classList.add('hidden');
     prizeBox.classList.add('hidden');
     redemptionBox.classList.add('hidden');
 
+    
+    if (campaign && campaign.frontend_notice && campaign.frontend_notice.trim()) {
+      noticeText.textContent = campaign.frontend_notice;
+      noticeSection.classList.remove('hidden');
+    }
+
     if (lastResult.is_winner) {
-      // 中獎
+      
       header.style.background = 'linear-gradient(135deg, #DC143C 0%, #B22222 50%, #8B0000 100%)';
       winIcon.classList.remove('hidden');
       title.textContent = '🎉 恭喜中獎！';
 
-      // 顯示獎品圖片
+      
       if (lastResult.prize && lastResult.prize.image_url) {
         prizeImage.src = lastResult.prize.image_url;
         prizeBox.classList.remove('hidden');
       }
 
-      // 顯示兌換碼
+      
       if (lastResult.redemption_code) {
         codeDisplay.textContent = lastResult.redemption_code;
         if (lastResult.is_redeemed) {
@@ -1617,7 +1649,7 @@
       message.textContent = lastResult.message || '恭喜您獲得獎品！';
       message.style.color = '#8B0000';
     } else {
-      // 未中獎
+      
       header.style.background = 'linear-gradient(135deg, #8B4513 0%, #A0522D 100%)';
       loseIcon.classList.remove('hidden');
       title.textContent = '再接再厲';
@@ -1625,7 +1657,7 @@
       message.style.color = '#8B4513';
     }
 
-    // 顯示參加時間
+    
     if (lastResult.scratched_at) {
       const date = new Date(lastResult.scratched_at);
       timeDisplay.textContent = '參加時間：' + date.toLocaleString('zh-TW');
@@ -1635,7 +1667,7 @@
     showState('already-played');
   }
 
-  // 儲存上一次結果的兌換碼（用於複製）
+  
   let lastResultCode = null;
 
   window.copyAlreadyPlayedCode = function() {
@@ -1661,26 +1693,36 @@
     document.getElementById('campaign-name').textContent = campaign.name || '新春刮刮樂';
     document.getElementById('campaign-desc').textContent = campaign.description || '馬年行大運！試試手氣吧！';
 
-    // 顯示獎品（只顯示 show_on_frontend = true 的獎品，由後端 API 已過濾）
+    
+    const noticeSection = document.getElementById('frontend-notice-section');
+    const noticeText = document.getElementById('frontend-notice');
+    if (campaign.frontend_notice && campaign.frontend_notice.trim()) {
+      noticeText.textContent = campaign.frontend_notice;
+      noticeSection.classList.remove('hidden');
+    } else {
+      noticeSection.classList.add('hidden');
+    }
+
+    
     const prizesSection = document.getElementById('prizes-section');
     const prizesList = document.getElementById('prizes-list');
     prizesList.innerHTML = '';
 
     if (campaign.prizes && campaign.prizes.length > 0) {
-      // 有要顯示的獎品，顯示獎品區塊
+      
       prizesSection.classList.remove('hidden');
 
       campaign.prizes.forEach(prize => {
         const card = document.createElement('div');
         card.className = 'lottery-prize-card';
 
-        // 如果有圖片，顯示圖片；否則顯示佔位符
+        
         if (prize.image_url) {
           const img = document.createElement('img');
           img.src = prize.image_url;
           img.alt = prize.name;
           img.onerror = function() {
-            // 圖片載入失敗時顯示佔位符
+            
             this.parentNode.innerHTML = '<div class="prize-placeholder">🎁</div><span>' + prize.name + '</span>';
           };
           card.appendChild(img);
@@ -1698,16 +1740,16 @@
         prizesList.appendChild(card);
       });
     } else {
-      // 沒有要顯示的獎品，隱藏獎品區塊
+      
       prizesSection.classList.add('hidden');
     }
 
     showState('ready');
   }
 
-  // ============================================
-  // 開始刮獎
-  // ============================================
+  
+  
+  
   window.startScratchGame = function() {
     const btn = document.getElementById('start-btn');
     btn.disabled = true;
@@ -1737,13 +1779,13 @@
     });
   };
 
-  // ============================================
-  // 顯示刮刮卡
-  // ============================================
+  
+  
+  
   function showScratchCard() {
     document.getElementById('scratch-title').textContent = eligibility.campaign.name || '新春刮刮樂';
 
-    // 設定結果
+    
     const resultLayer = document.getElementById('scratch-result');
     const winIcon = document.getElementById('win-icon');
     const loseIcon = document.getElementById('lose-icon');
@@ -1759,7 +1801,7 @@
     if (scratchResult.is_winner) {
       resultLayer.classList.add('win');
 
-      // 如果有獎品圖片，顯示圖片；否則顯示勾勾圖示
+      
       if (scratchResult.prize && scratchResult.prize.image_url) {
         prizeImage.src = scratchResult.prize.image_url;
         prizeImage.classList.remove('hidden');
@@ -1778,7 +1820,7 @@
       prizeName.textContent = '下次一定中';
     }
 
-    // 重置狀態
+    
     isRevealed = false;
     document.getElementById('progress-box').classList.remove('hidden');
     document.getElementById('redemption-box').classList.add('hidden');
@@ -1789,7 +1831,7 @@
 
     showState('scratch');
 
-    // 初始化畫布
+    
     setTimeout(initCanvas, 100);
   }
 
@@ -1877,7 +1919,7 @@
     canvas.addEventListener('mousedown', handleStart);
     canvas.addEventListener('mousemove', handleMove);
     canvas.addEventListener('mouseup', handleEnd);
-    // 滑出介面時不停止，重新進入時如果滑鼠按住就繼續刮
+    
     canvas.addEventListener('mouseenter', handleEnter);
     canvas.addEventListener('touchstart', handleStart, { passive: false });
     canvas.addEventListener('touchmove', handleMove, { passive: false });
@@ -1957,7 +1999,7 @@
   }
 
   function handleEnter(e) {
-    // 滑鼠重新進入時，如果滑鼠左鍵是按住的狀態，自動繼續刮
+    
     if (e.buttons === 1 && !isRevealed) {
       isDrawing = true;
       scratch(e);
@@ -1976,27 +2018,27 @@
       y = e.clientY - rect.top;
     }
 
-    // 計算縮放比例
+    
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
-    // 刮除效果 - 縮小筆刷半徑讓刮除更細緻
+    
     ctx.globalCompositeOperation = 'destination-out';
     ctx.beginPath();
     ctx.arc(x * scaleX, y * scaleY, 8, 0, Math.PI * 2);
     ctx.fill();
 
-    // 計算進度（採樣方式計算，避免效能問題）
+    
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     let transparent = 0;
-    const step = 8; // 每隔 8 個像素取樣，提升效能
+    const step = 8; 
     for (let i = 3; i < imageData.data.length; i += 4 * step) {
       if (imageData.data[i] === 0) transparent++;
     }
     const totalSampled = Math.ceil(imageData.data.length / 4 / step);
     const progress = transparent / totalSampled;
 
-    // 進度條顯示（乘以 1.25 讓視覺進度對應）
+    
     const displayProgress = Math.min(progress * 1.25, 1);
     document.getElementById('progress-fill').style.width = (displayProgress * 100) + '%';
 
@@ -2010,15 +2052,15 @@
       document.getElementById('progress-text').textContent = '即將揭曉...';
     }
 
-    // 自動揭曉（需要刮開 85% 才會揭曉）
+    
     if (progress > 0.85 && !isRevealed) {
       revealResult();
     }
   }
 
-  // ============================================
-  // 揭曉結果
-  // ============================================
+  
+  
+  
   function revealResult() {
     isRevealed = true;
 
@@ -2026,7 +2068,7 @@
     document.getElementById('progress-box').classList.add('hidden');
     document.getElementById('scratch-result').classList.add('revealed');
 
-    // 中獎慶祝
+    
     if (scratchResult.is_winner) {
       triggerCelebration();
 
@@ -2036,11 +2078,11 @@
       }
     }
 
-    // 顯示訊息
+    
     document.getElementById('result-msg').textContent = scratchResult.message;
     document.getElementById('result-msg').classList.remove('hidden');
 
-    // 再試一次按鈕
+    
     if (scratchResult.attempts_remaining > 0) {
       const retryBtn = document.getElementById('retry-btn');
       retryBtn.textContent = '🔄 再刮一次（剩餘 ' + scratchResult.attempts_remaining + ' 次）';
@@ -2048,19 +2090,19 @@
     }
   }
 
-  // ============================================
-  // 慶祝動畫 - 新年版
-  // ============================================
+  
+  
+  
   function triggerCelebration() {
-    // 紅包雨和金幣
+    
     createRedPacketRain();
 
-    // 炮竹爆炸
+    
     setTimeout(() => createFirecrackerExplosion(100, 200), 200);
     setTimeout(() => createFirecrackerExplosion(window.innerWidth - 100, 200), 400);
     setTimeout(() => createFirecrackerExplosion(window.innerWidth / 2, 150), 600);
 
-    // 煙火
+    
     setTimeout(() => createFireworks(), 300);
     setTimeout(() => createFireworks(), 600);
     setTimeout(() => createFireworks(), 900);
@@ -2147,9 +2189,9 @@
     }
   }
 
-  // ============================================
-  // 複製兌換碼
-  // ============================================
+  
+  
+  
   window.copyRedemptionCode = function() {
     const code = scratchResult.redemption_code;
     if (code) {
@@ -2165,9 +2207,9 @@
     }
   };
 
-  // ============================================
-  // 再試一次
-  // ============================================
+  
+  
+  
   window.retryGame = function() {
     scratchResult = null;
     isRevealed = false;

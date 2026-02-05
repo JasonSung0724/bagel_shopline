@@ -62,6 +62,12 @@ const ITEMS_PER_ROLL = 6000;
 // Stock health status types
 type StockHealthStatus = 'critical' | 'healthy' | 'overstock';
 
+// Stock breakdown by accept date
+interface StockByAcceptDate {
+  date: string;  // 客戶端允收日期
+  stock: number; // 該日期對應的庫存數量
+}
+
 // Inventory diagnosis for each item (from backend API)
 interface ItemDiagnosis {
   name: string;
@@ -80,6 +86,7 @@ interface ItemDiagnosis {
   health_status: StockHealthStatus;
   suggested_order: number;
   matched_bag?: ItemDiagnosis | null;
+  stock_by_accept_date?: StockByAcceptDate[];  // 依客戶端允收日期分組的庫存明細
 }
 
 // Diagnosis API response
@@ -377,6 +384,7 @@ export default function InventoryDashboard() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [productMappings, setProductMappings] = useState<{ bread_name: string; bag_name: string }[]>([]);
   const [diagnosisData, setDiagnosisData] = useState<DiagnosisResponse | null>(null);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   // Restock filters
   const [restockProductFilter, setRestockProductFilter] = useState<string>('');
   const [restockDateFrom, setRestockDateFrom] = useState<string>('');
@@ -1454,7 +1462,54 @@ export default function InventoryDashboard() {
                         </div>
                       )}
 
-                      {/* Bottom Alert Messages */}
+                      {bread.stock_by_accept_date && bread.stock_by_accept_date.length > 0 && (
+                        <div className="pt-3 border-t border-gray-100">
+                          <button
+                            onClick={() => {
+                              const newExpanded = new Set(expandedItems);
+                              if (newExpanded.has(bread.name)) {
+                                newExpanded.delete(bread.name);
+                              } else {
+                                newExpanded.add(bread.name);
+                              }
+                              setExpandedItems(newExpanded);
+                            }}
+                            className="flex items-center justify-between w-full text-left"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-4 h-4 text-gray-500" />
+                              <span className="text-sm font-medium text-gray-700">允收日期明細</span>
+                              <span className="text-xs text-gray-400">({bread.stock_by_accept_date.length} 筆)</span>
+                            </div>
+                            <span className="text-gray-400 text-sm">
+                              {expandedItems.has(bread.name) ? '收合 ▲' : '展開 ▼'}
+                            </span>
+                          </button>
+                          {expandedItems.has(bread.name) && (
+                            <div className="mt-2 space-y-1">
+                              {bread.stock_by_accept_date.map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  className={`flex justify-between items-center px-3 py-2 rounded text-sm ${
+                                    idx === 0 && item.date !== '未設定'
+                                      ? 'bg-amber-50 border border-amber-200'
+                                      : 'bg-gray-50'
+                                  }`}
+                                >
+                                  <span className={idx === 0 && item.date !== '未設定' ? 'text-amber-700 font-medium' : 'text-gray-600'}>
+                                    {idx === 0 && item.date !== '未設定' && <Clock className="w-3 h-3 inline mr-1" />}
+                                    {item.date}
+                                  </span>
+                                  <span className={idx === 0 && item.date !== '未設定' ? 'text-amber-700 font-bold' : 'text-gray-800 font-medium'}>
+                                    {item.stock.toLocaleString()} {bread.unit}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <div className="mt-3 space-y-1">
                         {bread.health_status === 'critical' && (
                           <div className="flex items-center gap-2 text-xs text-red-600">
