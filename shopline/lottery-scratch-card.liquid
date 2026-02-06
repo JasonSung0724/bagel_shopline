@@ -463,30 +463,27 @@
 
 
 .lottery-notice-section {
-  margin-bottom: 20px;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 215, 0, 0.05) 100%);
-  border: 1px solid rgba(255, 215, 0, 0.3);
-  border-radius: 12px;
+  margin-top: 20px;
+  margin-bottom: 0;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   position: relative;
 }
 
 .lottery-notice-section::before {
-  content: '📢';
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 16px;
+  display: none;
 }
 
 .lottery-notice-text {
   margin: 0;
-  padding-left: 28px;
-  font-size: 13px;
-  color: #8B0000;
-  line-height: 1.6;
+  padding-left: 0;
+  font-size: 11px;
+  color: rgba(139, 0, 0, 0.4);
+  line-height: 1.5;
   white-space: pre-wrap;
+  text-align: center;
 }
 
 
@@ -1347,17 +1344,10 @@
         </div>
       </div>
       <div class="lottery-content">
-        
-        <div id="already-played-notice-section" class="lottery-notice-section hidden">
-          <p id="already-played-notice" class="lottery-notice-text"></p>
-        </div>
-
-        
         <div id="already-played-prize-box" class="hidden" style="text-align: center; margin-bottom: 20px;">
           <img id="already-played-prize-image" style="width: 120px; height: 120px; object-fit: cover; border-radius: 16px; border: 3px solid #FFD700; box-shadow: 0 5px 20px rgba(0,0,0,0.2);" src="" alt="獎品" />
         </div>
 
-        
         <div id="already-played-redemption" class="redemption-box hidden">
           <p class="redemption-label">🧧 您的專屬兌換碼 🧧</p>
           <div class="redemption-code-display">
@@ -1374,6 +1364,10 @@
 
         <p id="already-played-message" class="result-message"></p>
         <p id="already-played-time" style="text-align: center; color: #8B4513; font-size: 14px; margin-top: 10px;"></p>
+
+        <div id="already-played-notice-section" class="lottery-notice-section hidden">
+          <p id="already-played-notice" class="lottery-notice-text"></p>
+        </div>
       </div>
     </div>
 
@@ -1393,11 +1387,6 @@
         </div>
       </div>
       <div class="lottery-content">
-        
-        <div id="frontend-notice-section" class="lottery-notice-section hidden">
-          <p id="frontend-notice" class="lottery-notice-text"></p>
-        </div>
-        
         <div id="prizes-section" class="lottery-prizes-section hidden">
           <p class="lottery-prizes-title">🎊 豐富獎品等你來拿 🎊</p>
           <div id="prizes-list" class="lottery-prizes-grid"></div>
@@ -1405,6 +1394,10 @@
         <button id="start-btn" class="lottery-start-btn" onclick="startScratchGame()">
           🧧 開始刮獎 🧧
         </button>
+
+        <div id="frontend-notice-section" class="lottery-notice-section hidden">
+          <p id="frontend-notice" class="lottery-notice-text"></p>
+        </div>
       </div>
     </div>
 
