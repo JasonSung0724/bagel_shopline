@@ -643,8 +643,6 @@
   overflow: hidden;
   margin-bottom: 20px;
   box-shadow: 0 10px 40px rgba(139, 0, 0, 0.3), 0 0 0 3px #FFD700;
-  transform: scale(0);
-  animation: cardAppear 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 @keyframes cardAppear {
@@ -664,9 +662,15 @@
   justify-content: center;
   padding: 20px;
   background: linear-gradient(135deg, #FFF8DC 0%, #FFE4B5 100%);
-  
-  opacity: 1;
+
+  opacity: 0;
+  visibility: hidden;
   transition: opacity 0.5s ease;
+}
+
+.scratch-result-layer.canvas-ready {
+  opacity: 1;
+  visibility: visible;
 }
 
 .scratch-result-layer.win {
@@ -700,8 +704,6 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%23FFD700' stroke='%23DAA520' stroke-width='2'/%3E%3C/svg%3E") 16 16, crosshair;
   touch-action: none;
   transition: opacity 0.5s ease;
@@ -1490,22 +1492,59 @@
   
   
   document.addEventListener('DOMContentLoaded', function() {
-    
+
     createParticles();
 
-    
+
     setInterval(createFirecrackerSparks, 2000);
 
-    
-    {% if customer %}
-    customerId = "{{ customer.id }}";
-    customerEmail = "{{ customer.email }}";
-    customerName = "{{ customer.name }}";
-    {% endif %}
 
-    
-    checkEligibility();
+    // 使用 Shopline SDK 動態取得客戶資訊，避免頁面快取問題
+    initCustomerAndStart();
   });
+
+  // 透過 Shopline SDK 取得目前登入的客戶資訊
+  async function initCustomerAndStart() {
+    try {
+      // 使用 Shopline 的 SDK 取得客戶資訊
+      if (typeof SL !== 'undefined' && SL.customer) {
+        const customer = await SL.customer.getInfo();
+        if (customer && customer.id) {
+          customerId = customer.id;
+          customerEmail = customer.email || null;
+          customerName = customer.name || customer.first_name || null;
+          console.log('Customer info from SDK:', { customerId, customerEmail, customerName });
+        }
+      } else if (typeof Shopline !== 'undefined' && Shopline.customer) {
+        // 備用：另一種 Shopline SDK 的存取方式
+        const customer = Shopline.customer;
+        if (customer && customer.id) {
+          customerId = customer.id;
+          customerEmail = customer.email || null;
+          customerName = customer.name || customer.first_name || null;
+          console.log('Customer info from Shopline object:', { customerId, customerEmail, customerName });
+        }
+      } else {
+        // 備用：使用 Liquid 預渲染的值（可能有快取問題）
+        {% if customer %}
+        customerId = "{{ customer.id }}";
+        customerEmail = "{{ customer.email }}";
+        customerName = "{{ customer.name }}";
+        console.log('Customer info from Liquid (fallback):', { customerId, customerEmail, customerName });
+        {% endif %}
+      }
+    } catch (err) {
+      console.error('Error getting customer info:', err);
+      // 發生錯誤時使用 Liquid 的值
+      {% if customer %}
+      customerId = "{{ customer.id }}";
+      customerEmail = "{{ customer.email }}";
+      customerName = "{{ customer.name }}";
+      {% endif %}
+    }
+
+    checkEligibility();
+  }
 
   
   function createParticles() {
@@ -1633,8 +1672,11 @@
         prizeBox.classList.remove('hidden');
       }
 
-      
-      if (lastResult.redemption_code) {
+      const prize = lastResult.prize;
+      const isPhysical = prize && prize.prize_type === 'physical';
+      const isCoupon = prize && prize.prize_type === 'coupon';
+
+      if (isPhysical && lastResult.redemption_code) {
         codeDisplay.textContent = lastResult.redemption_code;
         if (lastResult.is_redeemed) {
           redeemStatus.textContent = '✅ 此獎品已兌換';
@@ -1643,6 +1685,12 @@
           redeemStatus.textContent = '📱 請截圖保存，兌獎時出示此畫面';
           redeemStatus.style.color = '#FFE4B5';
         }
+        redemptionBox.classList.remove('hidden');
+      }
+        else if (isCoupon && prize.prize_value) {
+        codeDisplay.textContent = prize.prize_value;
+        redeemStatus.textContent = '結帳時輸入此折扣碼';
+        redeemStatus.style.color = '#FFE4B5';
         redemptionBox.classList.remove('hidden');
       }
 
@@ -1793,7 +1841,7 @@
     const resultTitle = document.getElementById('result-title');
     const prizeName = document.getElementById('prize-name');
 
-    resultLayer.classList.remove('win', 'lose', 'revealed');
+    resultLayer.classList.remove('win', 'lose', 'revealed', 'canvas-ready');
     winIcon.classList.add('hidden');
     loseIcon.classList.add('hidden');
     prizeImage.classList.add('hidden');
@@ -1831,22 +1879,44 @@
 
     showState('scratch');
 
-    
-    setTimeout(initCanvas, 100);
+    // 等待動畫完成後再初始化 canvas（cardAppear 動畫是 0.6s）
+    setTimeout(initCanvas, 700);
   }
 
   function initCanvas() {
     canvas = document.getElementById('scratch-canvas');
-    ctx = canvas.getContext('2d');
+    const container = document.getElementById('scratch-container');
+
+    // 確保容器已經有穩定的尺寸
+    const rect = container.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      // 如果尺寸還沒準備好，稍後再試
+      setTimeout(initCanvas, 100);
+      return;
+    }
+
+    // 使用固定的 canvas 尺寸
+    const w = Math.round(rect.width);
+    const h = Math.round(rect.height);
+
+    // 設定 canvas 的內部尺寸
+    canvas.width = w;
+    canvas.height = h;
+
+    // 設定 canvas 的 CSS 尺寸（與內部尺寸一致，避免縮放）
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+
     canvas.classList.remove('hidden');
 
-    const container = document.getElementById('scratch-container');
-    const rect = container.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    // 重新獲取 context
+    ctx = canvas.getContext('2d');
 
-    const w = rect.width;
-    const h = rect.height;
+    // 重置所有 canvas 狀態
+    ctx.setTransform(1, 0, 0, 1, 0, 0);  // 重置 transform
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.clearRect(0, 0, w, h);
 
     const redGradient = ctx.createLinearGradient(0, 0, w, h);
     redGradient.addColorStop(0, '#C41E3A');
@@ -1916,10 +1986,22 @@
     drawCoin(ctx, 40, h - 40, 10);
     drawCoin(ctx, w - 40, h - 40, 10);
 
+    // canvas 繪製完成後，顯示結果層（在 canvas 下方）
+    document.getElementById('scratch-result').classList.add('canvas-ready');
+
+    // 移除舊的事件監聯器（避免重複綁定）
+    canvas.removeEventListener('mousedown', handleStart);
+    canvas.removeEventListener('mousemove', handleMove);
+    canvas.removeEventListener('mouseup', handleEnd);
+    canvas.removeEventListener('mouseenter', handleEnter);
+    canvas.removeEventListener('touchstart', handleStart);
+    canvas.removeEventListener('touchmove', handleMove);
+    canvas.removeEventListener('touchend', handleEnd);
+
+    // 綁定事件監聽器
     canvas.addEventListener('mousedown', handleStart);
     canvas.addEventListener('mousemove', handleMove);
     canvas.addEventListener('mouseup', handleEnd);
-    
     canvas.addEventListener('mouseenter', handleEnter);
     canvas.addEventListener('touchstart', handleStart, { passive: false });
     canvas.addEventListener('touchmove', handleMove, { passive: false });
@@ -2018,15 +2100,13 @@
       y = e.clientY - rect.top;
     }
 
-    
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-
-    
+    // 使用 destination-out 來刮除圖層
     ctx.globalCompositeOperation = 'destination-out';
     ctx.beginPath();
-    ctx.arc(x * scaleX, y * scaleY, 8, 0, Math.PI * 2);
+    ctx.arc(x, y, 25, 0, Math.PI * 2);
     ctx.fill();
+    // 恢復正常的繪製模式
+    ctx.globalCompositeOperation = 'source-over';
 
     
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -2068,17 +2148,26 @@
     document.getElementById('progress-box').classList.add('hidden');
     document.getElementById('scratch-result').classList.add('revealed');
 
-    
     if (scratchResult.is_winner) {
       triggerCelebration();
 
-      if (scratchResult.redemption_code) {
+      const prize = scratchResult.prize;
+      const isPhysical = prize && prize.prize_type === 'physical';
+      const isCoupon = prize && prize.prize_type === 'coupon';
+
+      // 實體商品：顯示兌換編號
+      if (isPhysical && scratchResult.redemption_code) {
         document.getElementById('redemption-code').textContent = scratchResult.redemption_code;
+        document.getElementById('redemption-box').classList.remove('hidden');
+      }
+      // 折價券：顯示 prize_value（後台設定的代碼）
+      else if (isCoupon && prize.prize_value) {
+        document.getElementById('redemption-code').textContent = prize.prize_value;
+        document.querySelector('#redemption-box .redemption-note').textContent = '結帳時輸入此折扣碼';
         document.getElementById('redemption-box').classList.remove('hidden');
       }
     }
 
-    
     document.getElementById('result-msg').textContent = scratchResult.message;
     document.getElementById('result-msg').classList.remove('hidden');
 
@@ -2193,10 +2282,13 @@
   
   
   window.copyRedemptionCode = function() {
-    const code = scratchResult.redemption_code;
+    const prize = scratchResult.prize;
+    const isCoupon = prize && prize.prize_type === 'coupon';
+    const code = isCoupon && prize.prize_value ? prize.prize_value : scratchResult.redemption_code;
+
     if (code) {
       navigator.clipboard.writeText(code).then(() => {
-        const btn = document.querySelector('.copy-btn');
+        const btn = document.querySelector('#redemption-box .copy-btn');
         btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
         setTimeout(() => {
           btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
