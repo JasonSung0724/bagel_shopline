@@ -947,15 +947,26 @@ class InventoryRepository(SupabaseRepository):
             # Create bread lookup for bag calculations
             bread_lookup = {b["name"]: b for b in bread_items}
 
-            # 5. Calculate bag diagnosis based on corresponding bread
+            # 5. Get factory bag inventory and create lookup
+            # 取得代工廠塑膠袋庫存，用於加總計算
+            factory_inventory = self.get_factory_bag_inventory()
+            factory_stock_lookup = {item["bag_name"]: item.get("quantity", 0) for item in factory_inventory}
+
+            # 5.1 Calculate bag diagnosis based on corresponding bread
             import math
 
-            def calculate_bag_diagnosis(bag_name: str, current_stock: int) -> Dict:
+            def calculate_bag_diagnosis(bag_name: str, warehouse_stock: int) -> Dict:
                 """
                 Calculate bag reorder_point and target_stock based on corresponding bread.
                 一卷塑膠袋可包 6000 個麵包，根據麵包的補貨點計算塑膠袋需求量，無條件進位
+
+                庫存計算：逢泰倉庫庫存 + 代工廠庫存 = 合計庫存
                 """
                 lead_time = LEAD_TIME.get("bag", 30)
+
+                # 取得代工廠庫存並計算合計
+                factory_stock = factory_stock_lookup.get(bag_name, 0)
+                total_stock = warehouse_stock + factory_stock
 
                 # Find corresponding bread
                 bread_name = bag_to_bread.get(bag_name)
@@ -972,30 +983,32 @@ class InventoryRepository(SupabaseRepository):
                     # 正常水位 = 補貨點
                     bag_target_stock = bag_reorder_point
 
-                    # Health status based on bag stock vs reorder point
+                    # Health status based on total stock (倉庫+代工廠) vs reorder point
                     if bag_reorder_point > 0:
-                        if current_stock < bag_reorder_point:
+                        if total_stock < bag_reorder_point:
                             health_status = "critical"
-                        elif current_stock > bag_target_stock * 2:
+                        elif total_stock > bag_target_stock * 2:
                             health_status = "overstock"
                         else:
                             health_status = "healthy"
                     else:
                         health_status = "healthy"
 
-                    # Suggested order
-                    suggested_order = max(0, bag_target_stock - current_stock) if health_status == "critical" else 0
+                    # Suggested order based on total stock
+                    suggested_order = max(0, bag_target_stock - total_stock) if health_status == "critical" else 0
                 else:
                     # No corresponding bread found
                     bag_reorder_point = 0
                     bag_target_stock = 0
-                    health_status = "healthy" if current_stock > 0 else "critical"
+                    health_status = "healthy" if total_stock > 0 else "critical"
                     suggested_order = 0
 
                 return {
                     "name": bag_name,
                     "category": "bag",
-                    "current_stock": current_stock,
+                    "current_stock": total_stock,  # 合計庫存（倉庫+代工廠）
+                    "warehouse_stock": warehouse_stock,  # 逢泰倉庫庫存
+                    "factory_stock": factory_stock,  # 代工廠庫存
                     "unit": "捲",
                     "lead_time": lead_time,
                     "reorder_point": bag_reorder_point,
@@ -1039,14 +1052,18 @@ class InventoryRepository(SupabaseRepository):
 
             # 7. Calculate summary
             all_items = bread_items + box_items + bag_items
-            total_bag_rolls = sum(i["current_stock"] for i in bag_items)
+            total_bag_rolls = sum(i["current_stock"] for i in bag_items)  # 合計（倉庫+代工廠）
+            total_warehouse_bag_rolls = sum(i.get("warehouse_stock", 0) for i in bag_items)  # 逢泰倉庫
+            total_factory_bag_rolls = sum(i.get("factory_stock", 0) for i in bag_items)  # 代工廠
             summary = {
                 "critical_count": len([i for i in all_items if i["health_status"] == "critical"]),
                 "healthy_count": len([i for i in all_items if i["health_status"] == "healthy"]),
                 "overstock_count": len([i for i in all_items if i["health_status"] == "overstock"]),
                 "total_bread_stock": sum(i["current_stock"] for i in bread_items),
                 "total_box_stock": sum(i["current_stock"] for i in box_items),
-                "total_bag_stock": total_bag_rolls,
+                "total_bag_stock": total_bag_rolls,  # 合計庫存（倉庫+代工廠）
+                "total_warehouse_bag_stock": total_warehouse_bag_rolls,  # 逢泰倉庫庫存
+                "total_factory_bag_stock": total_factory_bag_rolls,  # 代工廠庫存
                 "total_bag_capacity": total_bag_rolls * BAG_CAPACITY,  # 可包裝量 = 塑膠袋卷數 * 6000
             }
 
@@ -1622,11 +1639,12 @@ class InventoryRepository(SupabaseRepository):
         try:
             # 取得所有 master_bags
             master_bags = self.get_master_bags()
-            master_bag_names = {b["name"] for b in master_bags}
+            logger.info(f"Factory inventory: got {len(master_bags)} master bags")
 
             # 取得目前庫存資料
             result = self.client.table(self.TABLE_FACTORY_BAG_INVENTORY).select("*").execute()
             inventory_map = {item["bag_name"]: item for item in (result.data or [])}
+            logger.info(f"Factory inventory: got {len(inventory_map)} existing inventory records")
 
             # 合併：確保所有 master_bags 都有項目
             items = []
@@ -1643,6 +1661,7 @@ class InventoryRepository(SupabaseRepository):
                         "created_at": None
                     })
 
+            logger.info(f"Factory inventory: returning {len(items)} items")
             return items
 
         except Exception as e:

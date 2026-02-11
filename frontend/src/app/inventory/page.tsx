@@ -90,6 +90,8 @@ interface ItemDiagnosis {
   suggested_order: number;
   matched_bag?: ItemDiagnosis | null;
   stock_by_accept_date?: StockByAcceptDate[];  // 依客戶端允收日期分組的庫存明細
+  warehouse_stock?: number;  // 逢泰倉庫庫存（塑膠袋專用）
+  factory_stock?: number;    // 代工廠庫存（塑膠袋專用）
 }
 
 // Diagnosis API response
@@ -104,7 +106,9 @@ interface DiagnosisResponse {
     overstock_count: number;
     total_bread_stock: number;
     total_box_stock: number;
-    total_bag_stock: number;
+    total_bag_stock: number;  // 合計庫存（倉庫+代工廠）
+    total_warehouse_bag_stock?: number;  // 逢泰倉庫庫存
+    total_factory_bag_stock?: number;  // 代工廠庫存
     total_bag_capacity: number;  // 可包裝量 = 塑膠袋卷數 * 6000
   };
 }
@@ -1016,6 +1020,7 @@ export default function InventoryDashboard() {
         healthyCount: 0,
         totalBagCapacity: 0,
         totalDailySales: 0,
+        totalFactoryBagStock: 0,
       };
     }
     // Calculate total daily bread sales (sum of all bread items' daily_sales)
@@ -1029,6 +1034,7 @@ export default function InventoryDashboard() {
       healthyCount: diagnosisData.summary.healthy_count,
       totalBagCapacity: diagnosisData.summary.total_bag_capacity,
       totalDailySales,
+      totalFactoryBagStock: diagnosisData.summary.total_factory_bag_stock ?? 0,
     };
   }, [diagnosisData]);
 
@@ -1403,6 +1409,11 @@ export default function InventoryDashboard() {
               <p className="text-[10px] sm:text-xs text-gray-500">塑膠袋總庫存</p>
               <p className="text-sm sm:text-xl font-bold text-gray-800">{Number(totals.bag.toFixed(1)).toLocaleString()} <span className="text-[10px] sm:text-sm font-normal text-gray-400">捲</span></p>
               <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">不良品: <span className="text-gray-500">{(snapshotInfo?.totalBagDefective ?? 0).toLocaleString()}</span></p>
+              {(diagnosisSummary.totalFactoryBagStock ?? 0) > 0 && (
+                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
+                  含代工廠: <span className="text-blue-500">{(diagnosisSummary.totalFactoryBagStock ?? 0).toLocaleString()}</span> 捲
+                </p>
+              )}
               <p className="hidden sm:block text-xs text-gray-400 mt-0.5">可包裝約 {diagnosisSummary.totalBagCapacity.toLocaleString()} 個</p>
             </div>
             <Package className="w-4 h-4 sm:w-6 sm:h-6 text-blue-500" />
@@ -1577,10 +1588,15 @@ export default function InventoryDashboard() {
                               {bag.health_status === 'critical' ? '急需補貨' : bag.health_status === 'overstock' ? '庫存積壓' : '庫存充足'}
                             </span>
                           </div>
-                          <div className="flex items-baseline gap-2 mb-2">
+                          <div className="flex items-baseline gap-2 mb-1">
                             <span className="text-2xl font-bold text-gray-800">{bag.current_stock.toLocaleString()}</span>
                             <span className="text-xs text-gray-400">{bag.unit} / 正常水位 {bag.target_stock.toLocaleString()}</span>
                           </div>
+                          {(bag.factory_stock ?? 0) > 0 && (
+                            <p className="text-[10px] text-gray-400 mb-2">
+                              倉庫 {(bag.warehouse_stock ?? 0).toLocaleString()} + <span className="text-blue-500">代工廠 {(bag.factory_stock ?? 0).toLocaleString()}</span>
+                            </p>
+                          )}
                           {/* Bag Bar */}
                           <div className="relative h-2 bg-gray-100 rounded-full overflow-hidden">
                             <div
