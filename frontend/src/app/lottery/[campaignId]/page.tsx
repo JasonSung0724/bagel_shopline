@@ -12,6 +12,7 @@ import {
   RefreshCw,
   LogIn,
   Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 
 // API Base URL - this will be your backend server
@@ -453,7 +454,28 @@ export default function LotteryScratchPage() {
         {/* Result details */}
         {isRevealed && (
           <div className="space-y-4">
-            {scratchResult?.is_winner && scratchResult.redemption_code && (
+            {/* Link type prize - show redeem button */}
+            {scratchResult?.is_winner && scratchResult.prize?.prize_type === 'link' && scratchResult.prize?.prize_value && (
+              <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-xl p-4">
+                <p className="text-sm text-orange-800 mb-3 text-center">點擊下方按鈕領取您的獎勵</p>
+                <a
+                  href={scratchResult.prize.prize_value}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white font-bold py-3 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg"
+                >
+                  <Gift className="w-5 h-5" />
+                  立即領取獎勵
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+                <p className="text-xs text-orange-600 mt-2 text-center">
+                  點擊按鈕後將會跳轉至兌獎頁面
+                </p>
+              </div>
+            )}
+
+            {/* Non-link type prize - show redemption code */}
+            {scratchResult?.is_winner && scratchResult.prize?.prize_type !== 'link' && scratchResult.redemption_code && (
               <div className="bg-green-50 border border-green-200 rounded-xl p-4">
                 <p className="text-sm text-green-800 mb-2">您的兌換碼：</p>
                 <div className="flex items-center justify-center gap-2">

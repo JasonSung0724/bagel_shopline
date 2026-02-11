@@ -99,6 +99,12 @@ class InventoryRepository(SupabaseRepository):
             return None
 
         try:
+            # Check if snapshot with same source file already exists (防止重複匯入同一檔案)
+            existing_by_file = self._get_snapshot_by_source_file(snapshot.source_file)
+            if existing_by_file:
+                logger.info(f"Snapshot for source file {snapshot.source_file} already exists, skipping...")
+                return existing_by_file["id"]
+
             # Check if snapshot for this date already exists
             existing = self._get_snapshot_by_date(snapshot.snapshot_date)
             if existing:
@@ -159,6 +165,20 @@ class InventoryRepository(SupabaseRepository):
             return result.data[0] if result.data else None
         except Exception as e:
             logger.error(f"Failed to check existing snapshot: {e}")
+            return None
+
+    def _get_snapshot_by_source_file(self, source_file: str) -> Optional[Dict]:
+        """Get snapshot by source file name (防止同一檔案重複匯入)."""
+        try:
+            result = (
+                self.client.table(self.TABLE_SNAPSHOTS)
+                .select("*")
+                .eq("source_file", source_file)
+                .execute()
+            )
+            return result.data[0] if result.data else None
+        except Exception as e:
+            logger.error(f"Failed to check existing snapshot by source file: {e}")
             return None
 
     def _update_snapshot(self, snapshot_id: str, snapshot: "InventorySnapshot") -> str:

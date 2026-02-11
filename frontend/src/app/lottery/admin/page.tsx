@@ -39,7 +39,7 @@ interface Prize {
   campaign_id: string;
   name: string;
   description?: string;
-  prize_type: 'physical' | 'coupon' | 'points' | 'free_shipping' | 'discount' | 'none';
+  prize_type: 'physical' | 'coupon' | 'points' | 'free_shipping' | 'discount' | 'link' | 'none';
   prize_value?: string;
   image_url?: string;
   total_quantity: number;
@@ -116,6 +116,7 @@ const prizeTypeLabels: Record<string, string> = {
   points: '點數',
   free_shipping: '免運',
   discount: '折扣',
+  link: '兌獎連結',
   none: '未中獎',
 };
 
@@ -1133,18 +1134,24 @@ export default function LotteryAdminPage() {
                       <option value="points">點數</option>
                       <option value="free_shipping">免運</option>
                       <option value="discount">折扣</option>
+                      <option value="link">兌獎連結</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1">獎品價值/代碼</label>
+                    <label className="block text-sm font-medium mb-1">
+                      {prizeForm.prize_type === 'link' ? '兌獎連結 URL *' : '獎品價值/代碼'}
+                    </label>
                     <input
-                      type="text"
+                      type={prizeForm.prize_type === 'link' ? 'url' : 'text'}
                       value={prizeForm.prize_value}
                       onChange={(e) => setPrizeForm({ ...prizeForm, prize_value: e.target.value })}
                       className="w-full px-3 py-2 border rounded-lg"
-                      placeholder="例：100元折價券、COUPON2024"
+                      placeholder={prizeForm.prize_type === 'link' ? '例：https://example.com/redeem' : '例：100元折價券、COUPON2024'}
                     />
+                    {prizeForm.prize_type === 'link' && (
+                      <p className="text-xs text-gray-500 mt-1">用戶點擊按鈕後會跳轉至此連結領取獎勵</p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
