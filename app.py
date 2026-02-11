@@ -70,6 +70,9 @@ def index():
             "/api/inventory/trend": "Get stock trend (庫存趨勢)",
             "/api/inventory/sales-trend": "Get sales trend based on 實出量 from daily_sales (銷量趨勢)",
             "/api/inventory/product-mappings": "Get/Add/Delete product mappings (麵包與塑膠袋對照)",
+            "/api/factory-inventory": "GET/POST: Factory bag inventory (代工廠塑膠袋庫存)",
+            "/api/factory-inventory/batch": "POST: Batch update factory bag inventory",
+            "/api/factory-inventory/logs": "GET: Factory bag inventory edit history",
             "/api/sales/sync": "PATCH: Sync sales data for specific date range (補銷量)",
             "/api/auth/verify": "Verify inventory page password",
         }
@@ -1425,6 +1428,183 @@ def get_master_boxes():
             "error": str(e)
         }), 500
 
+
+# ===========================================
+# Factory Bag Inventory API (代工廠塑膠袋庫存)
+# ===========================================
+
+@app.route("/api/factory-inventory", methods=["GET"])
+def get_factory_bag_inventory():
+    """
+    Get factory bag inventory for all bags.
+
+    Returns:
+        List of all bags with their factory inventory quantities
+    """
+    try:
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        data = workflow.inventory_repo.get_factory_bag_inventory()
+        summary = workflow.inventory_repo.get_factory_bag_inventory_summary()
+
+        return jsonify({
+            "success": True,
+            "data": data,
+            "summary": summary,
+            "count": len(data)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/factory-inventory", methods=["POST"])
+def update_factory_bag_inventory():
+    """
+    Update factory bag inventory (single item).
+
+    Request body:
+        {"bag_name": "塑膠袋-xxx", "quantity": 10}
+
+    Returns:
+        {"success": true} if successful
+    """
+    try:
+        data = request.get_json()
+        bag_name = data.get("bag_name")
+        quantity = data.get("quantity")
+
+        if not bag_name:
+            return jsonify({
+                "success": False,
+                "error": "bag_name is required"
+            }), 400
+
+        if quantity is None or not isinstance(quantity, (int, float)):
+            return jsonify({
+                "success": False,
+                "error": "quantity must be a number"
+            }), 400
+
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        success = workflow.inventory_repo.update_factory_bag_inventory(bag_name, int(quantity))
+
+        if success:
+            return jsonify({
+                "success": True,
+                "message": f"Updated {bag_name} to {quantity} rolls"
+            }), 200
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Failed to update inventory"
+            }), 500
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/factory-inventory/batch", methods=["POST"])
+def update_factory_bag_inventory_batch():
+    """
+    Batch update factory bag inventory.
+
+    Request body:
+        {"items": [{"bag_name": "塑膠袋-xxx", "quantity": 10}, ...]}
+
+    Returns:
+        {"success": true} if successful
+    """
+    try:
+        data = request.get_json()
+        items = data.get("items", [])
+
+        if not items:
+            return jsonify({
+                "success": False,
+                "error": "items array is required"
+            }), 400
+
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        success = workflow.inventory_repo.update_factory_bag_inventory_batch(items)
+
+        if success:
+            return jsonify({
+                "success": True,
+                "message": f"Updated {len(items)} items"
+            }), 200
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Failed to update inventory"
+            }), 500
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/factory-inventory/logs", methods=["GET"])
+def get_factory_bag_inventory_logs():
+    """
+    Get factory bag inventory edit history.
+
+    Query params:
+        bag_name: Filter by bag name (optional)
+        days: Number of days to look back (default: 30)
+
+    Returns:
+        List of edit history records
+    """
+    try:
+        bag_name = request.args.get("bag_name")
+        days = int(request.args.get("days", 30))
+
+        workflow = InventoryWorkflow()
+        if not workflow.inventory_repo.is_connected:
+            return jsonify({
+                "success": False,
+                "error": "Database not connected"
+            }), 500
+
+        logs = workflow.inventory_repo.get_factory_bag_inventory_logs(bag_name, days)
+
+        return jsonify({
+            "success": True,
+            "data": logs,
+            "count": len(logs)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 
 # ===========================================

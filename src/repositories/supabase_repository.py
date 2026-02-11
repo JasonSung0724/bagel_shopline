@@ -1601,3 +1601,214 @@ class InventoryRepository(SupabaseRepository):
         except Exception as e:
             logger.error(f"Failed to get sales summary: {e}")
             return {"total_sales": 0, "by_category": {}, "top_products": []}
+
+    # ============================================================
+    # Factory Bag Inventory Methods (代工廠塑膠袋庫存)
+    # ============================================================
+
+    TABLE_FACTORY_BAG_INVENTORY = "factory_bag_inventory"
+    TABLE_FACTORY_BAG_INVENTORY_LOGS = "factory_bag_inventory_logs"
+
+    def get_factory_bag_inventory(self) -> List[Dict]:
+        """
+        取得代工廠所有塑膠袋庫存
+
+        Returns:
+            所有塑膠袋庫存列表，包含 master_bags 中所有品項
+        """
+        if not self.is_connected:
+            return []
+
+        try:
+            # 取得所有 master_bags
+            master_bags = self.get_master_bags()
+            master_bag_names = {b["name"] for b in master_bags}
+
+            # 取得目前庫存資料
+            result = self.client.table(self.TABLE_FACTORY_BAG_INVENTORY).select("*").execute()
+            inventory_map = {item["bag_name"]: item for item in (result.data or [])}
+
+            # 合併：確保所有 master_bags 都有項目
+            items = []
+            for bag in master_bags:
+                bag_name = bag["name"]
+                if bag_name in inventory_map:
+                    items.append(inventory_map[bag_name])
+                else:
+                    items.append({
+                        "id": None,
+                        "bag_name": bag_name,
+                        "quantity": 0,
+                        "updated_at": None,
+                        "created_at": None
+                    })
+
+            return items
+
+        except Exception as e:
+            logger.error(f"Failed to get factory bag inventory: {e}")
+            return []
+
+    def update_factory_bag_inventory(self, bag_name: str, quantity: int) -> bool:
+        """
+        更新代工廠單一塑膠袋庫存並記錄歷程
+
+        Args:
+            bag_name: 塑膠袋名稱
+            quantity: 新數量（以卷為單位）
+
+        Returns:
+            True if successful
+        """
+        if not self.is_connected:
+            return False
+
+        try:
+            now = datetime.now().isoformat()
+
+            # Upsert 庫存資料
+            self.client.table(self.TABLE_FACTORY_BAG_INVENTORY).upsert({
+                "bag_name": bag_name,
+                "quantity": quantity,
+                "updated_at": now
+            }, on_conflict="bag_name").execute()
+
+            # 新增歷程記錄
+            self.client.table(self.TABLE_FACTORY_BAG_INVENTORY_LOGS).insert({
+                "bag_name": bag_name,
+                "quantity": quantity,
+                "recorded_at": now
+            }).execute()
+
+            logger.success(f"Updated factory bag inventory: {bag_name} = {quantity} rolls")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to update factory bag inventory: {e}")
+            return False
+
+    def update_factory_bag_inventory_batch(self, items: List[Dict]) -> bool:
+        """
+        批次更新代工廠塑膠袋庫存
+
+        Args:
+            items: 更新列表，格式：[{"bag_name": "xxx", "quantity": 10}, ...]
+
+        Returns:
+            True if successful
+        """
+        if not self.is_connected:
+            return False
+
+        try:
+            now = datetime.now().isoformat()
+
+            # 準備 upsert 資料
+            inventory_data = []
+            log_data = []
+
+            for item in items:
+                bag_name = item.get("bag_name")
+                quantity = int(item.get("quantity", 0))
+
+                if not bag_name:
+                    continue
+
+                inventory_data.append({
+                    "bag_name": bag_name,
+                    "quantity": quantity,
+                    "updated_at": now
+                })
+
+                log_data.append({
+                    "bag_name": bag_name,
+                    "quantity": quantity,
+                    "recorded_at": now
+                })
+
+            # 批次 upsert 庫存
+            if inventory_data:
+                self.client.table(self.TABLE_FACTORY_BAG_INVENTORY).upsert(
+                    inventory_data, on_conflict="bag_name"
+                ).execute()
+
+            # 批次新增歷程
+            if log_data:
+                self.client.table(self.TABLE_FACTORY_BAG_INVENTORY_LOGS).insert(log_data).execute()
+
+            logger.success(f"Batch updated {len(inventory_data)} factory bag inventory items")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to batch update factory bag inventory: {e}")
+            return False
+
+    def get_factory_bag_inventory_logs(self, bag_name: str = None, days: int = 30) -> List[Dict]:
+        """
+        取得代工廠塑膠袋庫存編輯歷程
+
+        Args:
+            bag_name: 塑膠袋名稱（可選，不指定則取得全部）
+            days: 查詢天數
+
+        Returns:
+            歷程記錄列表
+        """
+        if not self.is_connected:
+            return []
+
+        try:
+            from datetime import timedelta
+
+            start_date = (datetime.now() - timedelta(days=days)).isoformat()
+
+            query = (
+                self.client.table(self.TABLE_FACTORY_BAG_INVENTORY_LOGS)
+                .select("*")
+                .gte("recorded_at", start_date)
+            )
+
+            if bag_name:
+                query = query.eq("bag_name", bag_name)
+
+            result = query.order("recorded_at", desc=True).execute()
+
+            return result.data or []
+
+        except Exception as e:
+            logger.error(f"Failed to get factory bag inventory logs: {e}")
+            return []
+
+    def get_factory_bag_inventory_summary(self) -> Dict:
+        """
+        取得代工廠塑膠袋庫存摘要
+
+        Returns:
+            {
+                "total_rolls": 總捲數,
+                "item_count": 品項數,
+                "last_updated": 最後更新時間
+            }
+        """
+        if not self.is_connected:
+            return {"total_rolls": 0, "item_count": 0, "last_updated": None}
+
+        try:
+            inventory = self.get_factory_bag_inventory()
+
+            total_rolls = sum(item.get("quantity", 0) for item in inventory)
+            item_count = len([item for item in inventory if item.get("quantity", 0) > 0])
+
+            # 取得最後更新時間
+            updated_times = [item.get("updated_at") for item in inventory if item.get("updated_at")]
+            last_updated = max(updated_times) if updated_times else None
+
+            return {
+                "total_rolls": total_rolls,
+                "item_count": item_count,
+                "last_updated": last_updated
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get factory bag inventory summary: {e}")
+            return {"total_rolls": 0, "item_count": 0, "last_updated": None}

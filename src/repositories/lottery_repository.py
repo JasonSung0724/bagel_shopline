@@ -309,6 +309,23 @@ class LotteryRepository:
             return None
 
         try:
+            # If total_quantity is being updated, we need to adjust remaining_quantity
+            if "total_quantity" in data:
+                # Get current prize data
+                current = self.client.table(self.TABLE_PRIZES).select("*").eq("id", prize_id).execute()
+                if current.data:
+                    current_prize = current.data[0]
+                    old_total = current_prize.get("total_quantity", 0)
+                    old_remaining = current_prize.get("remaining_quantity", 0)
+                    new_total = data["total_quantity"]
+
+                    # Calculate used quantity
+                    used_quantity = old_total - old_remaining
+
+                    # New remaining = new total - used (but not less than 0)
+                    new_remaining = max(0, new_total - used_quantity)
+                    data["remaining_quantity"] = new_remaining
+
             data["updated_at"] = datetime.now().isoformat()
 
             result = (

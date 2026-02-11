@@ -36,6 +36,9 @@ import {
   X,
   Check,
   Clock,
+  Factory,
+  Save,
+  History,
 } from 'lucide-react';
 
 // API Base URL - empty string means same origin (use Nginx proxy)
@@ -333,7 +336,28 @@ const StockLevelBar = ({ current, max = 12000, lowThreshold = 1000 }: StockLevel
 };
 
 // Tab types
-type TabType = 'diagnosis' | 'inventory' | 'analysis' | 'restock' | 'order';
+type TabType = 'diagnosis' | 'inventory' | 'analysis' | 'restock' | 'order' | 'factory';
+
+// Factory bag inventory types
+interface FactoryBagItem {
+  id: string | null;
+  bag_name: string;
+  quantity: number;
+  updated_at: string | null;
+}
+
+interface FactoryBagLog {
+  id: string;
+  bag_name: string;
+  quantity: number;
+  recorded_at: string;
+}
+
+interface FactoryInventorySummary {
+  total_rolls: number;
+  item_count: number;
+  last_updated: string | null;
+}
 
 // Session storage key for auth
 const AUTH_SESSION_KEY = 'inventory_auth';
@@ -419,6 +443,14 @@ export default function InventoryDashboard() {
     status: 'started' | 'failed';
     error?: string;
   } | null>(null);
+
+  // Factory inventory states (代工廠塑膠袋庫存)
+  const [factoryInventory, setFactoryInventory] = useState<FactoryBagItem[]>([]);
+  const [factoryInventorySummary, setFactoryInventorySummary] = useState<FactoryInventorySummary | null>(null);
+  const [factoryLogs, setFactoryLogs] = useState<FactoryBagLog[]>([]);
+  const [factoryEditValues, setFactoryEditValues] = useState<Record<string, string>>({});
+  const [factorySaving, setFactorySaving] = useState(false);
+  const [factoryLoading, setFactoryLoading] = useState(false);
 
 
   // Handle password submission
@@ -529,6 +561,79 @@ export default function InventoryDashboard() {
       console.error('Failed to fetch restock logs:', err);
     }
   }, []);
+
+  // Fetch factory bag inventory (代工廠塑膠袋庫存)
+  const fetchFactoryInventory = useCallback(async () => {
+    try {
+      setFactoryLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/factory-inventory`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setFactoryInventory(result.data);
+        setFactoryInventorySummary(result.summary);
+        // Initialize edit values
+        const editValues: Record<string, string> = {};
+        result.data.forEach((item: FactoryBagItem) => {
+          editValues[item.bag_name] = String(item.quantity);
+        });
+        setFactoryEditValues(editValues);
+      }
+    } catch (err) {
+      console.error('Failed to fetch factory inventory:', err);
+    } finally {
+      setFactoryLoading(false);
+    }
+  }, []);
+
+  // Fetch factory bag inventory logs (代工廠庫存編輯歷程)
+  const fetchFactoryLogs = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/factory-inventory/logs?days=30`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setFactoryLogs(result.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch factory inventory logs:', err);
+    }
+  }, []);
+
+  // Save factory bag inventory (批次儲存代工廠庫存)
+  const saveFactoryInventory = async () => {
+    try {
+      setFactorySaving(true);
+
+      // Build items array from edit values
+      const items = Object.entries(factoryEditValues).map(([bag_name, quantity]) => ({
+        bag_name,
+        quantity: parseInt(quantity, 10) || 0
+      }));
+
+      const response = await fetch(`${API_BASE_URL}/api/factory-inventory/batch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Refresh data
+        await fetchFactoryInventory();
+        await fetchFactoryLogs();
+      } else {
+        console.error('Failed to save factory inventory:', result.error);
+      }
+    } catch (err) {
+      console.error('Failed to save factory inventory:', err);
+    } finally {
+      setFactorySaving(false);
+    }
+  };
 
   // Fetch combined analysis data (sales + stock trends with stats for all periods)
   const fetchAnalysisData = useCallback(async (category: string = 'bread') => {
@@ -748,8 +853,11 @@ export default function InventoryDashboard() {
       }
     } else if (activeTab === 'restock' && restockLogs.length === 0) {
       fetchRestockLogs();
+    } else if (activeTab === 'factory' && factoryInventory.length === 0) {
+      fetchFactoryInventory();
+      fetchFactoryLogs();
     }
-  }, [activeTab, analysisMode, salesTrendData.length, trendData.length, restockLogs.length, fetchSalesTrend, fetchTrendData, fetchRestockLogs]);
+  }, [activeTab, analysisMode, salesTrendData.length, trendData.length, restockLogs.length, factoryInventory.length, fetchSalesTrend, fetchTrendData, fetchRestockLogs, fetchFactoryInventory, fetchFactoryLogs]);
 
   // Refresh data from database (no sync from email)
   const handleRefresh = async () => {
@@ -775,6 +883,10 @@ export default function InventoryDashboard() {
         break;
       case 'restock':
         await fetchRestockLogs();
+        break;
+      case 'factory':
+        await fetchFactoryInventory();
+        await fetchFactoryLogs();
         break;
     }
 
@@ -1185,6 +1297,7 @@ export default function InventoryDashboard() {
                 { id: 'inventory' as TabType, label: '庫存總覽', shortLabel: '總覽', icon: Package },
                 { id: 'analysis' as TabType, label: '銷量分析', shortLabel: '分析', icon: TrendingUp },
                 { id: 'restock' as TabType, label: '進貨紀錄', shortLabel: '進貨', icon: ClipboardList },
+                { id: 'factory' as TabType, label: '代工廠庫存', shortLabel: '代工廠', icon: Factory },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -2797,6 +2910,238 @@ export default function InventoryDashboard() {
                   {snapshotInfo?.snapshotDate
                     ? `以上數據已與 ${snapshotInfo.snapshotDate} 的倉庫明細表同步。系統每日 21:05 自動從郵件同步庫存資料。`
                     : '尚未同步資料，系統每日 21:05 自動從郵件同步庫存資料。'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab Content: Factory Bag Inventory (代工廠塑膠袋庫存) */}
+        {activeTab === 'factory' && (
+          <div className="space-y-4 sm:space-y-6">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+              <div className="bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex items-center gap-2 mb-1">
+                  <Factory className="w-4 h-4 text-blue-500" />
+                  <p className="text-xs sm:text-sm text-gray-500">塑膠袋總捲數</p>
+                </div>
+                <p className="text-xl sm:text-2xl font-bold text-gray-800">
+                  {factoryInventorySummary?.total_rolls.toLocaleString() ?? 0}
+                  <span className="text-xs sm:text-sm font-normal text-gray-400 ml-1">捲</span>
+                </p>
+              </div>
+              <div className="bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex items-center gap-2 mb-1">
+                  <Package className="w-4 h-4 text-green-500" />
+                  <p className="text-xs sm:text-sm text-gray-500">有庫存品項</p>
+                </div>
+                <p className="text-xl sm:text-2xl font-bold text-gray-800">
+                  {factoryInventorySummary?.item_count ?? 0}
+                  <span className="text-xs sm:text-sm font-normal text-gray-400 ml-1">項</span>
+                </p>
+              </div>
+              <div className="col-span-2 sm:col-span-1 bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex items-center gap-2 mb-1">
+                  <Clock className="w-4 h-4 text-gray-500" />
+                  <p className="text-xs sm:text-sm text-gray-500">最後更新</p>
+                </div>
+                <p className="text-sm sm:text-base font-medium text-gray-800 truncate">
+                  {factoryInventorySummary?.last_updated
+                    ? new Date(factoryInventorySummary.last_updated).toLocaleString('zh-TW')
+                    : '尚未設定'}
+                </p>
+              </div>
+            </div>
+
+            {/* Inventory Editor */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="flex items-center justify-between p-4 border-b border-gray-100">
+                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                  <Package className="w-5 h-5 text-[#EB5C20]" />
+                  塑膠袋庫存編輯
+                </h3>
+                <button
+                  onClick={saveFactoryInventory}
+                  disabled={factorySaving || factoryLoading}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#EB5C20] text-white rounded-lg hover:bg-[#d44c15] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  {factorySaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      儲存中...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      儲存全部
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {factoryLoading ? (
+                <div className="p-8 text-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-[#EB5C20] mx-auto mb-4" />
+                  <p className="text-gray-500">載入中...</p>
+                </div>
+              ) : factoryInventory.length === 0 ? (
+                <div className="p-8 text-center">
+                  <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">尚無塑膠袋品項</p>
+                  <p className="text-sm text-gray-400 mt-1">請先在主資料庫新增塑膠袋品項</p>
+                </div>
+              ) : (
+                <>
+                  {/* Mobile: Card layout */}
+                  <div className="sm:hidden divide-y divide-gray-100">
+                    {factoryInventory.map((item) => (
+                      <div key={item.bag_name} className="p-3 flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-800 text-sm truncate">{item.bag_name}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {item.updated_at
+                              ? `更新: ${new Date(item.updated_at).toLocaleDateString('zh-TW')}`
+                              : '尚未設定'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            value={factoryEditValues[item.bag_name] ?? '0'}
+                            onChange={(e) => {
+                              setFactoryEditValues(prev => ({
+                                ...prev,
+                                [item.bag_name]: e.target.value
+                              }));
+                            }}
+                            className="w-20 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#EB5C20] focus:border-transparent"
+                          />
+                          <span className="text-xs text-gray-400">捲</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop: Table layout */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-gray-50 text-gray-500 font-medium">
+                        <tr>
+                          <th className="px-4 lg:px-6 py-3">塑膠袋名稱</th>
+                          <th className="px-4 lg:px-6 py-3 text-right">數量（捲）</th>
+                          <th className="px-4 lg:px-6 py-3 text-right">最後更新</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {factoryInventory.map((item) => (
+                          <tr key={item.bag_name} className="hover:bg-gray-50">
+                            <td className="px-4 lg:px-6 py-3 lg:py-4 font-medium text-gray-800">
+                              {item.bag_name}
+                            </td>
+                            <td className="px-4 lg:px-6 py-3 lg:py-4 text-right">
+                              <input
+                                type="number"
+                                min="0"
+                                value={factoryEditValues[item.bag_name] ?? '0'}
+                                onChange={(e) => {
+                                  setFactoryEditValues(prev => ({
+                                    ...prev,
+                                    [item.bag_name]: e.target.value
+                                  }));
+                                }}
+                                className="w-24 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#EB5C20] focus:border-transparent"
+                              />
+                            </td>
+                            <td className="px-4 lg:px-6 py-3 lg:py-4 text-right text-gray-500">
+                              {item.updated_at
+                                ? new Date(item.updated_at).toLocaleString('zh-TW')
+                                : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Edit History */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="flex items-center justify-between p-4 border-b border-gray-100">
+                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                  <History className="w-5 h-5 text-gray-500" />
+                  編輯歷程（最近 30 天）
+                </h3>
+              </div>
+
+              {factoryLogs.length === 0 ? (
+                <div className="p-8 text-center">
+                  <History className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">尚無編輯紀錄</p>
+                </div>
+              ) : (
+                <>
+                  {/* Mobile: Card layout */}
+                  <div className="sm:hidden divide-y divide-gray-100 max-h-64 overflow-y-auto">
+                    {factoryLogs.slice(0, 50).map((log) => (
+                      <div key={log.id} className="p-3 flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-800 text-sm truncate">{log.bag_name}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {new Date(log.recorded_at).toLocaleString('zh-TW')}
+                          </p>
+                        </div>
+                        <span className="font-bold text-blue-600 text-sm">
+                          {log.quantity} 捲
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop: Table layout */}
+                  <div className="hidden sm:block overflow-x-auto max-h-80 overflow-y-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-gray-50 text-gray-500 font-medium sticky top-0">
+                        <tr>
+                          <th className="px-4 lg:px-6 py-3">時間</th>
+                          <th className="px-4 lg:px-6 py-3">塑膠袋名稱</th>
+                          <th className="px-4 lg:px-6 py-3 text-right">數量</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {factoryLogs.slice(0, 100).map((log) => (
+                          <tr key={log.id} className="hover:bg-gray-50">
+                            <td className="px-4 lg:px-6 py-3 text-gray-600">
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-gray-400" />
+                                {new Date(log.recorded_at).toLocaleString('zh-TW')}
+                              </div>
+                            </td>
+                            <td className="px-4 lg:px-6 py-3 font-medium text-gray-800">
+                              {log.bag_name}
+                            </td>
+                            <td className="px-4 lg:px-6 py-3 text-right font-bold text-blue-600">
+                              {log.quantity} 捲
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Info Box */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />
+              <div>
+                <h4 className="font-bold text-blue-700 text-sm">代工廠庫存說明</h4>
+                <p className="text-sm text-blue-600 mt-1">
+                  此頁面用於手動記錄存放在代工廠的塑膠袋庫存（以捲為單位）。由於代工廠無提供 API，需要人工輸入更新。每次儲存都會記錄歷程，方便追蹤庫存變動。
                 </p>
               </div>
             </div>
