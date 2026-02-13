@@ -902,6 +902,73 @@
 }
 
 
+.link-redemption-box {
+  background: linear-gradient(135deg, #DC143C 0%, #B22222 100%);
+  border: 3px solid #FFD700;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  text-align: center;
+  animation: slideUp 0.6s ease 0.4s both;
+  position: relative;
+  overflow: hidden;
+}
+
+.link-redemption-box::before {
+  content: '恭喜發財';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 60px;
+  color: rgba(255, 215, 0, 0.1);
+  font-family: 'Ma Shan Zheng', cursive;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.redeem-link-btn {
+  display: inline-block;
+  padding: 16px 40px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #8B0000;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FFD700 100%);
+  background-size: 200% 200%;
+  border: 3px solid #DAA520;
+  border-radius: 16px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  animation: gradientBtn 3s ease infinite;
+  box-shadow: 0 5px 20px rgba(218, 165, 32, 0.4);
+}
+
+.redeem-link-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+  animation: btnShine 2s ease infinite;
+}
+
+.redeem-link-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 15px 40px rgba(218, 165, 32, 0.5);
+  color: #8B0000;
+  text-decoration: none;
+}
+
+.redeem-link-btn:active {
+  transform: translateY(0);
+}
+
+
 .result-message {
   font-size: 16px;
   color: #8B0000;
@@ -1362,6 +1429,14 @@
           <p id="already-played-redeem-status" class="redemption-note"></p>
         </div>
 
+        <div id="already-played-link-box" class="link-redemption-box hidden">
+          <p class="redemption-label">🎁 點擊下方按鈕兌換獎品 🎁</p>
+          <a id="already-played-link-btn" href="#" target="_blank" class="redeem-link-btn">
+            🎉 立即兌獎
+          </a>
+          <p id="already-played-link-status" class="redemption-note">點擊按鈕前往兌獎頁面</p>
+        </div>
+
         <p id="already-played-message" class="result-message"></p>
         <p id="already-played-time" style="text-align: center; color: #8B4513; font-size: 14px; margin-top: 10px;"></p>
 
@@ -1446,6 +1521,14 @@
             </button>
           </div>
           <p class="redemption-note">📱 請截圖保存，兌獎時出示此畫面</p>
+        </div>
+
+        <div id="link-redemption-box" class="link-redemption-box hidden">
+          <p class="redemption-label">🎁 點擊下方按鈕兌換獎品 🎁</p>
+          <a id="redeem-link-btn" href="#" target="_blank" class="redeem-link-btn">
+            🎉 立即兌獎
+          </a>
+          <p class="redemption-note">點擊按鈕前往兌獎頁面</p>
         </div>
 
         <p id="result-msg" class="result-message hidden"></p>
@@ -1637,15 +1720,19 @@
     const redemptionBox = document.getElementById('already-played-redemption');
     const codeDisplay = document.getElementById('already-played-code');
     const redeemStatus = document.getElementById('already-played-redeem-status');
+    const linkBox = document.getElementById('already-played-link-box');
+    const linkBtn = document.getElementById('already-played-link-btn');
+    const linkStatus = document.getElementById('already-played-link-status');
     const message = document.getElementById('already-played-message');
     const timeDisplay = document.getElementById('already-played-time');
 
-    
+
     winIcon.classList.add('hidden');
     loseIcon.classList.add('hidden');
     noticeSection.classList.add('hidden');
     prizeBox.classList.add('hidden');
     redemptionBox.classList.add('hidden');
+    linkBox.classList.add('hidden');
 
     
     if (campaign && campaign.frontend_notice && campaign.frontend_notice.trim()) {
@@ -1669,7 +1756,20 @@
       const isPhysical = prize && prize.prize_type === 'physical';
       const isCoupon = prize && prize.prize_type === 'coupon';
 
-      if (isPhysical && lastResult.redemption_code) {
+      const isLink = prize && prize.prize_type === 'link';
+
+      if (isLink && prize.prize_value) {
+        linkBtn.href = prize.prize_value;
+        linkBtn.textContent = '🎉 立即兌獎';
+        if (lastResult.is_redeemed) {
+          linkStatus.textContent = '✅ 您已點擊過兌獎連結';
+          linkStatus.style.color = '#90EE90';
+        } else {
+          linkStatus.textContent = '點擊按鈕前往兌獎頁面';
+          linkStatus.style.color = '#FFE4B5';
+        }
+        linkBox.classList.remove('hidden');
+      } else if (isPhysical && lastResult.redemption_code) {
         codeDisplay.textContent = lastResult.redemption_code;
         if (lastResult.is_redeemed) {
           redeemStatus.textContent = '✅ 此獎品已兌換';
@@ -1679,8 +1779,7 @@
           redeemStatus.style.color = '#FFE4B5';
         }
         redemptionBox.classList.remove('hidden');
-      }
-        else if (isCoupon && prize.prize_value) {
+      } else if (isCoupon && prize.prize_value) {
         codeDisplay.textContent = prize.prize_value;
         redeemStatus.textContent = '結帳時輸入此折扣碼';
         redeemStatus.style.color = '#FFE4B5';
@@ -2147,9 +2246,16 @@
       const prize = scratchResult.prize;
       const isPhysical = prize && prize.prize_type === 'physical';
       const isCoupon = prize && prize.prize_type === 'coupon';
+      const isLink = prize && prize.prize_type === 'link';
 
+      // 兌獎連結：顯示按鈕連結到 prize_value
+      if (isLink && prize.prize_value) {
+        const linkBtn = document.getElementById('redeem-link-btn');
+        linkBtn.href = prize.prize_value;
+        document.getElementById('link-redemption-box').classList.remove('hidden');
+      }
       // 實體商品：顯示兌換編號
-      if (isPhysical && scratchResult.redemption_code) {
+      else if (isPhysical && scratchResult.redemption_code) {
         document.getElementById('redemption-code').textContent = scratchResult.redemption_code;
         document.getElementById('redemption-box').classList.remove('hidden');
       }
