@@ -777,7 +777,7 @@ export default function LotteryAdminPage() {
                             </td>
                             <td className="text-center px-4 py-3">{prize.total_quantity}</td>
                             <td className="text-center px-4 py-3">{prize.remaining_quantity}</td>
-                            <td className="text-center px-4 py-3">{(prize.probability * 100).toFixed(2)}%</td>
+                            <td className="text-center px-4 py-3">{(prize.probability * 100).toFixed(3)}%</td>
                             <td className="text-center px-4 py-3">
                               {prize.show_on_frontend ? (
                                 <span className="inline-flex items-center gap-1 text-blue-600">
@@ -848,10 +848,10 @@ export default function LotteryAdminPage() {
                       <div className="flex items-center gap-2 text-yellow-800">
                         <Percent className="w-5 h-5" />
                         <span className="font-medium">
-                          機率總和：{(selectedCampaign.prizes.reduce((sum, p) => sum + p.probability, 0) * 100).toFixed(2)}%
+                          機率總和：{(selectedCampaign.prizes.reduce((sum, p) => sum + p.probability, 0) * 100).toFixed(3)}%
                         </span>
                         <span className="text-sm">
-                          （剩餘 {((1 - selectedCampaign.prizes.reduce((sum, p) => sum + p.probability, 0)) * 100).toFixed(2)}% 為未中獎）
+                          （剩餘 {((1 - selectedCampaign.prizes.reduce((sum, p) => sum + p.probability, 0)) * 100).toFixed(3)}% 為未中獎）
                         </span>
                       </div>
                     </div>
@@ -1183,27 +1183,29 @@ export default function LotteryAdminPage() {
                       <input
                         type="text"
                         inputMode="decimal"
-                        value={prizeForm.probability === 0 ? '' : (prizeForm.probability * 100).toFixed(2)}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                            const numVal = parseFloat(val) || 0;
-                            if (numVal >= 0 && numVal <= 100) {
-                              setPrizeForm({ ...prizeForm, probability: numVal / 100 });
-                            }
-                          }
-                        }}
+                        defaultValue={prizeForm.probability === 0 ? '' : (prizeForm.probability * 100).toFixed(3)}
+                        key={editingPrize?.id || 'new'}
                         onBlur={(e) => {
-                          const val = parseFloat(e.target.value);
-                          if (isNaN(val) || val < 0) {
+                          const val = e.target.value.trim();
+                          if (val === '') {
                             setPrizeForm({ ...prizeForm, probability: 0 });
-                          } else if (val > 100) {
+                            return;
+                          }
+                          const numVal = parseFloat(val);
+                          if (isNaN(numVal) || numVal < 0) {
+                            setPrizeForm({ ...prizeForm, probability: 0 });
+                            e.target.value = '';
+                          } else if (numVal > 100) {
                             setPrizeForm({ ...prizeForm, probability: 1 });
+                            e.target.value = '100';
+                          } else {
+                            setPrizeForm({ ...prizeForm, probability: numVal / 100 });
                           }
                         }}
                         className="w-full px-3 py-2 border rounded-lg"
-                        placeholder="0.00"
+                        placeholder="0.000"
                       />
+                      <p className="text-xs text-gray-500 mt-1">支援小數點後三位，例如：0.001</p>
                     </div>
                   </div>
 
