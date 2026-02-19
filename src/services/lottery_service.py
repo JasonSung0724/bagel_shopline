@@ -650,8 +650,8 @@ class LotteryService:
         winners_only: bool = False,
         limit: int = 100,
         offset: int = 0
-    ) -> List[Dict]:
-        """Get results for a campaign."""
+    ) -> Dict[str, Any]:
+        """Get results for a campaign with total count."""
         return self.repo.get_results_by_campaign(campaign_id, winners_only, limit, offset)
 
     def get_user_results(self, campaign_id: str, shopline_customer_id: str) -> List[Dict]:
@@ -667,7 +667,7 @@ class LotteryService:
         search_query: str,
         limit: int = 100,
         offset: int = 0
-    ) -> List[Dict]:
+    ) -> Dict[str, Any]:
         """Search results by customer name, email, or customer ID."""
         return self.repo.search_results(campaign_id, search_query, limit, offset)
 

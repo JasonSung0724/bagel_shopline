@@ -2242,14 +2242,15 @@ def get_lottery_results(campaign_id):
 
         # If search query is provided, use search_results
         if search_query:
-            results = service.search_results(campaign_id, search_query, limit, offset)
+            result = service.search_results(campaign_id, search_query, limit, offset)
         else:
-            results = service.get_results(campaign_id, winners_only, limit, offset)
+            result = service.get_results(campaign_id, winners_only, limit, offset)
 
         return jsonify({
             "success": True,
-            "data": results,
-            "count": len(results)
+            "data": result.get("data", []),
+            "total": result.get("total", 0),
+            "count": len(result.get("data", []))
         }), 200
 
     except Exception as e:

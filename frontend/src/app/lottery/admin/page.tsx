@@ -172,6 +172,12 @@ export default function LotteryAdminPage() {
   // Search state for results
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // Pagination state for results
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
+  const resultsPerPage = 50;
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'overview' | 'prizes' | 'results'>('overview');
@@ -205,13 +211,14 @@ export default function LotteryAdminPage() {
   }, [fetchWithAuth]);
 
   // Load campaign details
-  const loadCampaignDetails = useCallback(async (campaignId: string) => {
+  const loadCampaignDetails = useCallback(async (campaignId: string, page: number = 1) => {
     setIsLoading(true);
     try {
+      const offset = (page - 1) * resultsPerPage;
       const [campaignRes, statsRes, resultsRes] = await Promise.all([
         fetchWithAuth(`${API_BASE_URL}/api/lottery/admin/campaigns/${campaignId}`),
         fetchWithAuth(`${API_BASE_URL}/api/lottery/admin/campaigns/${campaignId}/stats`),
-        fetchWithAuth(`${API_BASE_URL}/api/lottery/admin/campaigns/${campaignId}/results?limit=50`),
+        fetchWithAuth(`${API_BASE_URL}/api/lottery/admin/campaigns/${campaignId}/results?limit=${resultsPerPage}&offset=${offset}`),
       ]);
 
       const [campaignData, statsData, resultsData] = await Promise.all([
@@ -222,7 +229,13 @@ export default function LotteryAdminPage() {
 
       if (campaignData.success) setSelectedCampaign(campaignData.data);
       if (statsData.success) setCampaignStats(statsData.data);
-      if (resultsData.success) setResults(resultsData.data);
+      if (resultsData.success) {
+        setResults(resultsData.data);
+        setTotalResults(resultsData.total || resultsData.data.length);
+      }
+      setCurrentPage(page);
+      setHasSearched(false);
+      setSearchQuery('');
     } catch (error) {
       console.error('Failed to load campaign details:', error);
     } finally {
@@ -231,15 +244,19 @@ export default function LotteryAdminPage() {
   }, [fetchWithAuth]);
 
   // Search results
-  const searchResults = useCallback(async (campaignId: string, query: string) => {
+  const searchResults = useCallback(async (campaignId: string, query: string, page: number = 1) => {
     setIsSearching(true);
     try {
+      const offset = (page - 1) * resultsPerPage;
       const searchParam = query ? `&search=${encodeURIComponent(query)}` : '';
-      const res = await fetchWithAuth(`${API_BASE_URL}/api/lottery/admin/campaigns/${campaignId}/results?limit=100${searchParam}`);
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/lottery/admin/campaigns/${campaignId}/results?limit=${resultsPerPage}&offset=${offset}${searchParam}`);
       const data = await res.json();
       if (data.success) {
         setResults(data.data);
+        setTotalResults(data.total || data.data.length);
       }
+      setCurrentPage(page);
+      setHasSearched(true);
     } catch (error) {
       console.error('Failed to search results:', error);
     } finally {
@@ -257,10 +274,10 @@ export default function LotteryAdminPage() {
       const data = await res.json();
       if (data.success && selectedCampaign) {
         // Refresh results
-        if (searchQuery) {
-          searchResults(selectedCampaign.id, searchQuery);
+        if (hasSearched && searchQuery) {
+          searchResults(selectedCampaign.id, searchQuery, currentPage);
         } else {
-          loadCampaignDetails(selectedCampaign.id);
+          loadCampaignDetails(selectedCampaign.id, currentPage);
         }
       } else {
         alert(data.error || '更新失敗');
@@ -269,7 +286,7 @@ export default function LotteryAdminPage() {
       console.error('Failed to toggle redemption:', error);
       alert('更新失敗');
     }
-  }, [fetchWithAuth, selectedCampaign, searchQuery, searchResults, loadCampaignDetails]);
+  }, [fetchWithAuth, selectedCampaign, searchQuery, hasSearched, currentPage, searchResults, loadCampaignDetails]);
 
   // Auth
   const handleAuth = async () => {
@@ -892,12 +909,13 @@ export default function LotteryAdminPage() {
                         )}
                         搜尋
                       </button>
-                      {searchQuery && (
+                      {hasSearched && (
                         <button
                           onClick={() => {
                             setSearchQuery('');
+                            setHasSearched(false);
                             if (selectedCampaign) {
-                              searchResults(selectedCampaign.id, '');
+                              loadCampaignDetails(selectedCampaign.id, 1);
                             }
                           }}
                           className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-lg"
@@ -906,9 +924,9 @@ export default function LotteryAdminPage() {
                         </button>
                       )}
                     </div>
-                    {searchQuery && (
+                    {hasSearched && (
                       <div className="mt-2 text-sm text-gray-500">
-                        搜尋 &quot;{searchQuery}&quot; 找到 {results.length} 筆結果
+                        搜尋 &quot;{searchQuery}&quot; 找到 {totalResults} 筆結果
                       </div>
                     )}
                   </div>
@@ -1001,13 +1019,59 @@ export default function LotteryAdminPage() {
                         {results.length === 0 && (
                           <tr>
                             <td colSpan={7} className="text-center py-8 text-gray-500">
-                              {searchQuery ? '找不到符合的記錄' : '尚無獎品紀錄'}
+                              {hasSearched ? '找不到符合的記錄' : '尚無獎品紀錄'}
                             </td>
                           </tr>
                         )}
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Pagination */}
+                  {totalResults > resultsPerPage && (
+                    <div className="bg-white rounded-lg p-4 shadow-sm flex items-center justify-between">
+                      <div className="text-sm text-gray-500">
+                        共 {totalResults} 筆，第 {currentPage} / {Math.ceil(totalResults / resultsPerPage)} 頁
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const newPage = currentPage - 1;
+                            if (selectedCampaign) {
+                              if (hasSearched) {
+                                searchResults(selectedCampaign.id, searchQuery, newPage);
+                              } else {
+                                loadCampaignDetails(selectedCampaign.id, newPage);
+                              }
+                            }
+                          }}
+                          disabled={currentPage <= 1}
+                          className="px-3 py-1 border rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          上一頁
+                        </button>
+                        <span className="text-sm text-gray-600">
+                          {currentPage} / {Math.ceil(totalResults / resultsPerPage)}
+                        </span>
+                        <button
+                          onClick={() => {
+                            const newPage = currentPage + 1;
+                            if (selectedCampaign) {
+                              if (hasSearched) {
+                                searchResults(selectedCampaign.id, searchQuery, newPage);
+                              } else {
+                                loadCampaignDetails(selectedCampaign.id, newPage);
+                              }
+                            }
+                          }}
+                          disabled={currentPage >= Math.ceil(totalResults / resultsPerPage)}
+                          className="px-3 py-1 border rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          下一頁
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </>

@@ -658,12 +658,24 @@ class LotteryRepository:
         winners_only: bool = False,
         limit: int = 100,
         offset: int = 0
-    ) -> List[Dict]:
-        """Get all results for a campaign."""
+    ) -> Dict[str, Any]:
+        """Get all results for a campaign with total count."""
         if not self.is_connected:
-            return []
+            return {"data": [], "total": 0}
 
         try:
+            # Get total count first
+            count_query = (
+                self.client.table(self.TABLE_RESULTS)
+                .select("id", count="exact")
+                .eq("campaign_id", campaign_id)
+            )
+            if winners_only:
+                count_query = count_query.eq("is_winner", True)
+            count_result = count_query.execute()
+            total = count_result.count or 0
+
+            # Get paginated data
             query = (
                 self.client.table(self.TABLE_RESULTS)
                 .select("*, lottery_participants(customer_email, customer_name, shopline_customer_id)")
@@ -674,11 +686,11 @@ class LotteryRepository:
                 query = query.eq("is_winner", True)
 
             result = query.order("scratched_at", desc=True).range(offset, offset + limit - 1).execute()
-            return result.data or []
+            return {"data": result.data or [], "total": total}
 
         except Exception as e:
             logger.error(f"Failed to get results by campaign: {e}")
-            return []
+            return {"data": [], "total": 0}
 
     def get_results_by_participant(self, participant_id: str) -> List[Dict]:
         """Get all results for a participant."""
@@ -757,7 +769,7 @@ class LotteryRepository:
         search_query: str,
         limit: int = 100,
         offset: int = 0
-    ) -> List[Dict]:
+    ) -> Dict[str, Any]:
         """
         Search results by customer name, email, customer ID, or redemption code.
 
@@ -768,10 +780,10 @@ class LotteryRepository:
             offset: Pagination offset
 
         Returns:
-            List of matching results with participant info
+            Dict with data and total count
         """
         if not self.is_connected:
-            return []
+            return {"data": [], "total": 0}
 
         try:
             search_pattern = f"%{search_query}%"
@@ -815,24 +827,27 @@ class LotteryRepository:
                     result_ids.update(r["id"] for r in participant_results.data)
 
             if not result_ids:
-                return []
+                return {"data": [], "total": 0}
+
+            result_ids_list = list(result_ids)
+            total = len(result_ids_list)
 
             # Get full results with participant info
             result = (
                 self.client.table(self.TABLE_RESULTS)
                 .select("*, lottery_participants(customer_email, customer_name, shopline_customer_id)")
                 .eq("campaign_id", campaign_id)
-                .in_("id", list(result_ids))
+                .in_("id", result_ids_list)
                 .order("scratched_at", desc=True)
                 .range(offset, offset + limit - 1)
                 .execute()
             )
 
-            return result.data or []
+            return {"data": result.data or [], "total": total}
 
         except Exception as e:
             logger.error(f"Failed to search results: {e}")
-            return []
+            return {"data": [], "total": 0}
 
     def update_result_redemption(
         self,
